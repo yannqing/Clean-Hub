@@ -44,6 +44,14 @@ class NativePosSyncEngine(context: Context) {
     private val database = NativePosDatabase(context.applicationContext)
     private val api = NativePosApiClient(NativePosSession(context.applicationContext))
 
+    /** Refreshes store-owned checkout and receipt rules without replaying sales. */
+    fun refreshCheckoutSettings(): JSONObject {
+        val branch = api.get("/pos/branches/me")
+        val settings = api.get("/pos/terminal-settings")
+        cacheCheckoutSettings(branch, settings)
+        return settings
+    }
+
     fun synchronize(): NativeSyncResult {
         refreshSnapshot()
         var replayed = 0
@@ -157,29 +165,44 @@ class NativePosSyncEngine(context: Context) {
             customers = customers?.optJSONArray("data")?.toNativeCustomers(),
             tickets = tickets?.optJSONArray("data")?.toNativeTickets(terminal.currency),
         )
-        printSettings?.let { settings ->
-            database.replaceReceiptPrintSettings(
-                autoPrintReceipt = settings.optBoolean("autoPrintReceipt", true),
-                printCopies = settings.optInt("printCopies", 1).coerceIn(1, 3),
-            )
-            database.replaceCheckoutSettings(
-                NativeCheckoutSettings(
-                    roundingRule = settings.optString("roundingRule", "none"),
-                    cashRoundingStep = branch.optInt("cashRoundingStep", 1).coerceIn(1, 100),
-                    taxEnabled = settings.optBoolean("taxEnabled"),
-                    defaultTaxRate = settings.optString("defaultTaxRate", "0.0000"),
-                    pricesIncludeTax = settings.optBoolean("pricesIncludeTax", true),
-                    taxRegistrationNumber = settings.optString("taxRegistrationNumber")
-                        .takeIf { it.isNotBlank() && it != "null" },
-                    emailReceiptEnabled = settings.optBoolean("emailReceiptEnabled"),
-                    autoPrintReceipt = settings.optBoolean("autoPrintReceipt", true),
-                    lockTimeoutSeconds = settings.optInt("lockTimeoutSeconds", 0),
-                ),
-            )
-        }
+        printSettings?.let { cacheCheckoutSettings(branch, it) }
         hardwareDevices?.let { devices ->
             database.replaceReceiptPrinterBinding(devices.defaultReceiptPrinterId())
         }
+    }
+
+    private fun cacheCheckoutSettings(branch: JSONObject, settings: JSONObject) {
+        database.replaceReceiptPrintSettings(
+            autoPrintReceipt = settings.optBoolean("autoPrintReceipt", true),
+            printCopies = settings.optInt("printCopies", 1).coerceIn(1, 3),
+        )
+        database.replaceCheckoutSettings(
+            NativeCheckoutSettings(
+                roundingRule = settings.optString("roundingRule", "none"),
+                cashRoundingStep = branch.optInt("cashRoundingStep", 1).coerceIn(1, 100),
+                defaultPaymentMethod = settings.optString("defaultPaymentMethod", "cash"),
+                paymentMethodsEnabled = settings.optJSONArray("paymentMethodsEnabled").toNativeStringList(),
+                mobileMoneyProvidersEnabled = settings.optJSONArray("mobileMoneyProvidersEnabled").toNativeStringList(),
+                receiptProfile = NativeReceiptProfile(
+                    name = branch.optString("receiptName").takeIf { it.isNotBlank() && it != "null" },
+                    phone = branch.optString("receiptPhone").takeIf { it.isNotBlank() && it != "null" }
+                        ?: branch.optString("phone").takeIf { it.isNotBlank() && it != "null" },
+                    address = branch.optString("receiptAddress").takeIf { it.isNotBlank() && it != "null" }
+                        ?: branch.optString("address").takeIf { it.isNotBlank() && it != "null" },
+                    thankYouMessage = branch.optString("receiptThankYouMessage").takeIf { it.isNotBlank() && it != "null" },
+                    fields = branch.optJSONArray("receiptFields")?.toNativeStringList()?.toSet()
+                        ?: NativeReceiptProfile().fields,
+                ),
+                taxEnabled = settings.optBoolean("taxEnabled"),
+                defaultTaxRate = settings.optString("defaultTaxRate", "0.0000"),
+                pricesIncludeTax = settings.optBoolean("pricesIncludeTax", true),
+                taxRegistrationNumber = settings.optString("taxRegistrationNumber")
+                    .takeIf { it.isNotBlank() && it != "null" },
+                emailReceiptEnabled = settings.optBoolean("emailReceiptEnabled"),
+                autoPrintReceipt = settings.optBoolean("autoPrintReceipt", true),
+                lockTimeoutSeconds = settings.optInt("lockTimeoutSeconds", 0),
+            ),
+        )
     }
 
     private fun reportCashException(command: NativePendingCheckout, error: NativePosApiException) {
@@ -389,6 +412,13 @@ class NativePosSyncEngine(context: Context) {
     private fun String.toMinorUnits(): Long? = runCatching {
         BigDecimal(this).movePointRight(2).setScale(0, RoundingMode.UNNECESSARY).longValueExact()
     }.getOrNull()
+
+    private fun JSONArray?.toNativeStringList(): List<String> = buildList {
+        val source = this@toNativeStringList ?: return@buildList
+        for (index in 0 until source.length()) {
+            source.optString(index).takeIf { it.isNotBlank() }?.let(::add)
+        }
+    }
 }
 
 class NativePosSyncWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {

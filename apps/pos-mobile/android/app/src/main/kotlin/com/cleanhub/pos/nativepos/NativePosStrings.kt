@@ -612,6 +612,61 @@ internal class NativePosCopy(
     val delete: String get() = get("delete")
     val confirmPayment: String get() = get("confirmPayment")
     val cashOnlyNotice: String get() = get("cashOnlyNotice")
+    val paymentChoiceHint: String get() = get("paymentChoiceHint")
+    val paymentMethodLabel: String get() = get("paymentMethodLabel")
+    val payLater: String get() = get("payLater")
+    val paymentReference: String get() = get("paymentReference")
+    val paymentReferenceRequired: String get() = get("paymentReferenceRequired")
+    val manualPaymentPendingHint: String get() = get("manualPaymentPendingHint")
+    val balanceDueAt: String get() = get("balanceDueAt")
+    val unpaidReason: String get() = get("unpaidReason")
+    val payLaterDetailsRequired: String get() = get("payLaterDetailsRequired")
+    val salePayLaterRecorded: String get() = get("salePayLaterRecorded")
+    val saleAwaitingConfirmation: String get() = get("saleAwaitingConfirmation")
+    val saleNeedsReview: String get() = get("saleNeedsReview")
+    val paymentReceipt: String get() = get("paymentReceipt")
+    val receiptPayLater: String get() = get("receiptPayLater")
+    val receiptPendingPayment: String get() = get("receiptPendingPayment")
+    val paymentReferenceLine: String get() = get("paymentReferenceLine")
+    val manualPaymentReason: String get() = get("manualPaymentReason")
+    val confirmManualPayment: String get() = get("confirmManualPayment")
+    val failManualPayment: String get() = get("failManualPayment")
+    val reviewManualPayment: String get() = get("reviewManualPayment")
+    val manualPaymentConfirmed: String get() = get("manualPaymentConfirmed")
+    val manualPaymentMarkedFailed: String get() = get("manualPaymentMarkedFailed")
+    val orderCountLabel: String get() = get("orderCountLabel")
+    val taxableAmountLabel: String get() = get("taxableAmountLabel")
+    val taxAmountLabel: String get() = get("taxAmountLabel")
+    val discountAmountLabel: String get() = get("discountAmountLabel")
+    val refundAmountLabel: String get() = get("refundAmountLabel")
+    val refundInvalid: String get() = get("refundInvalid")
+    val refundPending: String get() = get("refundPending")
+    val refundRecorded: String get() = get("refundRecorded")
+    val refundResolutionInvalid: String get() = get("refundResolutionInvalid")
+    val refundSettled: String get() = get("refundSettled")
+    val refundFailed: String get() = get("refundFailed")
+    val refundLimit: String get() = get("refundLimit")
+    val cashRefundHint: String get() = get("cashRefundHint")
+    val refundReasonLabel: String get() = get("refundReasonLabel")
+    val recordRefund: String get() = get("recordRefund")
+    val refundRecords: String get() = get("refundRecords")
+    val refundReferenceLabel: String get() = get("refundReferenceLabel")
+    val refundSettledAction: String get() = get("refundSettledAction")
+    val refundFailedAction: String get() = get("refundFailedAction")
+    val resolveRefundAction: String get() = get("resolveRefundAction")
+    val exportZReport: String get() = get("exportZReport")
+    val zReportSaved: String get() = get("zReportSaved")
+    val zReportExportFailed: String get() = get("zReportExportFailed")
+    val receiptNameLabel: String get() = get("receiptNameLabel")
+    val receiptPhoneLabel: String get() = get("receiptPhoneLabel")
+    val receiptAddressLabel: String get() = get("receiptAddressLabel")
+    val paymentMethodsLabel: String get() = get("paymentMethodsLabel")
+    val noPaymentMethods: String get() = get("noPaymentMethods")
+    val taxSettingsLabel: String get() = get("taxSettingsLabel")
+    val taxDisabled: String get() = get("taxDisabled")
+    val pricesIncludeTax: String get() = get("pricesIncludeTax")
+    val pricesExcludeTax: String get() = get("pricesExcludeTax")
+    val receiptNumberLine: String get() = get("receiptNumberLine")
     val itemsCashSuffix: String get() = get("itemsCashSuffix")
     val verifyingPricing: String get() = get("verifyingPricing")
     val pricingFailed: String get() = get("pricingFailed")
@@ -878,6 +933,61 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
     "delete" to "删除",
     "confirmPayment" to "确认结款",
     "cashOnlyNotice" to "本期仅支持现金收款；金额以服务端价格预览为准。",
+    "paymentChoiceHint" to "请选择门店已启用的收款方式；金额以服务端价格预览为准。",
+    "paymentMethodLabel" to "收款方式",
+    "payLater" to "稍后付款",
+    "paymentReference" to "支付参考号",
+    "paymentReferenceRequired" to "请输入至少 3 个字符的支付参考号。",
+    "manualPaymentPendingHint" to "此笔移动支付先记为待确认，经理核对到账后再确认。",
+    "balanceDueAt" to "应付日期与时间（YYYY-MM-DD HH:mm）",
+    "unpaidReason" to "稍后付款原因",
+    "payLaterDetailsRequired" to "稍后付款需要关联客户、未来应付时间及至少 3 个字符的原因。",
+    "salePayLaterRecorded" to "订单已创建，尚未收款。",
+    "saleAwaitingConfirmation" to "订单已创建，移动支付待确认。",
+    "saleNeedsReview" to "交易已保存在本机，但服务端拒绝了上传；请交由经理处理，勿再次收款。",
+    "paymentReceipt" to "交易凭证",
+    "receiptPayLater" to "未付款 · 应付时间：%s",
+    "receiptPendingPayment" to "支付待确认 · %s · 参考号：%s",
+    "paymentReferenceLine" to "参考号：%s",
+    "manualPaymentReason" to "确认或失败原因（至少 3 字）",
+    "confirmManualPayment" to "已到账，确认",
+    "failManualPayment" to "未到账，标记失败",
+    "reviewManualPayment" to "核对这笔待确认支付",
+    "manualPaymentConfirmed" to "移动支付已确认到账。",
+    "manualPaymentMarkedFailed" to "移动支付已标记失败。",
+    "orderCountLabel" to "%d 笔订单",
+    "taxableAmountLabel" to "应税金额",
+    "taxAmountLabel" to "销项税额",
+    "discountAmountLabel" to "折扣合计",
+    "refundAmountLabel" to "退款合计",
+    "refundInvalid" to "退款金额、原支付流水或原因无效。",
+    "refundPending" to "退款已登记，待渠道实际退款后核销；订单实收暂未扣减。",
+    "refundRecorded" to "现金退款已记录，请确认现金已交还客户。",
+    "refundResolutionInvalid" to "请填写核销原因；成功核销还需填写渠道退款流水号。",
+    "refundSettled" to "渠道退款已核销，订单实收已更新。",
+    "refundFailed" to "渠道退款失败已记录。",
+    "refundLimit" to "最多可退：%s",
+    "cashRefundHint" to "确认前请核对现金，记录成功后从钱箱退还客户。",
+    "refundReasonLabel" to "退款或核销原因",
+    "recordRefund" to "记录退款",
+    "refundRecords" to "退款记录",
+    "refundReferenceLabel" to "渠道退款流水号",
+    "refundSettledAction" to "确认渠道已退款",
+    "refundFailedAction" to "标记退款失败",
+    "resolveRefundAction" to "核销渠道退款",
+    "exportZReport" to "导出 Z 报表 CSV",
+    "zReportSaved" to "Z 报表已保存。",
+    "zReportExportFailed" to "Z 报表保存失败。",
+    "receiptNameLabel" to "收据抬头",
+    "receiptPhoneLabel" to "收据电话",
+    "receiptAddressLabel" to "收据地址",
+    "paymentMethodsLabel" to "门店允许的支付方式",
+    "noPaymentMethods" to "未配置支付方式",
+    "taxSettingsLabel" to "门店税务设置",
+    "taxDisabled" to "未启用税费",
+    "pricesIncludeTax" to "价格含税",
+    "pricesExcludeTax" to "价格未含税",
+    "receiptNumberLine" to "收据号：RC-%s",
     "itemsCashSuffix" to "%d 项 · 现金",
     "verifyingPricing" to "正在核验商品价格、优惠和税费…",
     "pricingFailed" to "价格核验失败：%s",
@@ -1583,6 +1693,61 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
     "delete" to "Delete",
     "confirmPayment" to "Confirm the payment",
     "cashOnlyNotice" to "Cash only for now; the amount follows the server's price preview.",
+    "paymentChoiceHint" to "Choose an enabled payment method. The amount follows the server price preview.",
+    "paymentMethodLabel" to "Payment method",
+    "payLater" to "Pay later",
+    "paymentReference" to "Payment reference",
+    "paymentReferenceRequired" to "Enter a payment reference of at least 3 characters.",
+    "manualPaymentPendingHint" to "Mobile money remains pending until a manager verifies receipt and confirms it.",
+    "balanceDueAt" to "Due date and time (YYYY-MM-DD HH:mm)",
+    "unpaidReason" to "Reason for deferred payment",
+    "payLaterDetailsRequired" to "Pay later requires a customer, a future due time and a reason of at least 3 characters.",
+    "salePayLaterRecorded" to "Order created; payment is still due.",
+    "saleAwaitingConfirmation" to "Order created; mobile payment awaits confirmation.",
+    "saleNeedsReview" to "The sale is saved locally but the server rejected it. Ask a manager to review it; do not charge again.",
+    "paymentReceipt" to "Transaction slip",
+    "receiptPayLater" to "Unpaid · due: %s",
+    "receiptPendingPayment" to "Payment pending · %s · reference: %s",
+    "paymentReferenceLine" to "Reference: %s",
+    "manualPaymentReason" to "Reason (at least 3 characters)",
+    "confirmManualPayment" to "Received, confirm",
+    "failManualPayment" to "Not received, mark failed",
+    "reviewManualPayment" to "Review pending payment",
+    "manualPaymentConfirmed" to "Mobile payment confirmed.",
+    "manualPaymentMarkedFailed" to "Mobile payment marked failed.",
+    "orderCountLabel" to "%d orders",
+    "taxableAmountLabel" to "Taxable amount",
+    "taxAmountLabel" to "Output tax",
+    "discountAmountLabel" to "Discounts",
+    "refundAmountLabel" to "Refunds",
+    "refundInvalid" to "Invalid refund amount, original payment or reason.",
+    "refundPending" to "Refund recorded. Reconcile after the provider refunds the customer; paid amount is unchanged.",
+    "refundRecorded" to "Cash refund recorded. Confirm the cash was returned to the customer.",
+    "refundResolutionInvalid" to "Enter a resolution reason and, for success, the provider refund reference.",
+    "refundSettled" to "Provider refund reconciled. The order paid amount has been updated.",
+    "refundFailed" to "Provider refund failure recorded.",
+    "refundLimit" to "Maximum refundable: %s",
+    "cashRefundHint" to "Verify the cash first. Return it from the drawer after recording the refund.",
+    "refundReasonLabel" to "Refund or resolution reason",
+    "recordRefund" to "Record refund",
+    "refundRecords" to "Refund records",
+    "refundReferenceLabel" to "Provider refund reference",
+    "refundSettledAction" to "Confirm provider refund",
+    "refundFailedAction" to "Mark refund failed",
+    "resolveRefundAction" to "Reconcile provider refund",
+    "exportZReport" to "Export Z report CSV",
+    "zReportSaved" to "Z report saved.",
+    "zReportExportFailed" to "Could not save Z report.",
+    "receiptNameLabel" to "Receipt name",
+    "receiptPhoneLabel" to "Receipt phone",
+    "receiptAddressLabel" to "Receipt address",
+    "paymentMethodsLabel" to "Store payment methods",
+    "noPaymentMethods" to "No payment methods configured",
+    "taxSettingsLabel" to "Store tax settings",
+    "taxDisabled" to "Tax disabled",
+    "pricesIncludeTax" to "Tax included in prices",
+    "pricesExcludeTax" to "Tax added to prices",
+    "receiptNumberLine" to "Receipt no.: RC-%s",
     "itemsCashSuffix" to "%d items · cash",
     "verifyingPricing" to "Checking prices, discounts and tax…",
     "pricingFailed" to "Price check failed: %s",
@@ -2288,6 +2453,61 @@ private val COPY_FR_VALUES: Map<String, String> = mapOf(
     "delete" to "Supprimer",
     "confirmPayment" to "Confirmer le paiement",
     "cashOnlyNotice" to "Espèces uniquement pour l'instant ; le montant suit l'aperçu de prix du serveur.",
+    "paymentChoiceHint" to "Choisissez un mode de paiement activé. Le montant suit l'aperçu du serveur.",
+    "paymentMethodLabel" to "Mode de paiement",
+    "payLater" to "Payer plus tard",
+    "paymentReference" to "Référence du paiement",
+    "paymentReferenceRequired" to "Saisissez une référence de paiement d'au moins 3 caractères.",
+    "manualPaymentPendingHint" to "Le paiement mobile reste en attente jusqu'à vérification et confirmation par un responsable.",
+    "balanceDueAt" to "Date et heure d'échéance (AAAA-MM-JJ HH:mm)",
+    "unpaidReason" to "Motif du paiement différé",
+    "payLaterDetailsRequired" to "Le paiement différé exige un client, une échéance future et un motif d'au moins 3 caractères.",
+    "salePayLaterRecorded" to "Commande créée ; le paiement reste dû.",
+    "saleAwaitingConfirmation" to "Commande créée ; le paiement mobile attend confirmation.",
+    "saleNeedsReview" to "Vente enregistrée localement, mais refusée par le serveur. Demandez une vérification ; ne facturez pas à nouveau.",
+    "paymentReceipt" to "Justificatif de transaction",
+    "receiptPayLater" to "Non payé · échéance : %s",
+    "receiptPendingPayment" to "Paiement en attente · %s · référence : %s",
+    "paymentReferenceLine" to "Référence : %s",
+    "manualPaymentReason" to "Motif (au moins 3 caractères)",
+    "confirmManualPayment" to "Reçu, confirmer",
+    "failManualPayment" to "Non reçu, marquer échec",
+    "reviewManualPayment" to "Vérifier le paiement en attente",
+    "manualPaymentConfirmed" to "Paiement mobile confirmé.",
+    "manualPaymentMarkedFailed" to "Paiement mobile marqué comme échoué.",
+    "orderCountLabel" to "%d commandes",
+    "taxableAmountLabel" to "Montant imposable",
+    "taxAmountLabel" to "TVA collectée",
+    "discountAmountLabel" to "Remises",
+    "refundAmountLabel" to "Remboursements",
+    "refundInvalid" to "Montant, paiement initial ou motif de remboursement invalide.",
+    "refundPending" to "Remboursement enregistré. Rapprochez-le après le versement du prestataire ; le montant encaissé reste inchangé.",
+    "refundRecorded" to "Remboursement en espèces enregistré. Vérifiez que le client a reçu l'argent.",
+    "refundResolutionInvalid" to "Saisissez un motif et, en cas de succès, la référence du remboursement.",
+    "refundSettled" to "Remboursement du prestataire rapproché. Le montant encaissé est mis à jour.",
+    "refundFailed" to "Échec du remboursement du prestataire enregistré.",
+    "refundLimit" to "Remboursable au maximum : %s",
+    "cashRefundHint" to "Vérifiez les espèces. Remettez-les au client après avoir enregistré le remboursement.",
+    "refundReasonLabel" to "Motif du remboursement ou du rapprochement",
+    "recordRefund" to "Enregistrer le remboursement",
+    "refundRecords" to "Remboursements",
+    "refundReferenceLabel" to "Référence du remboursement",
+    "refundSettledAction" to "Confirmer le remboursement",
+    "refundFailedAction" to "Signaler l'échec",
+    "resolveRefundAction" to "Rapprocher le remboursement",
+    "exportZReport" to "Exporter le rapport Z en CSV",
+    "zReportSaved" to "Rapport Z enregistré.",
+    "zReportExportFailed" to "Impossible d'enregistrer le rapport Z.",
+    "receiptNameLabel" to "Nom du reçu",
+    "receiptPhoneLabel" to "Téléphone du reçu",
+    "receiptAddressLabel" to "Adresse du reçu",
+    "paymentMethodsLabel" to "Moyens de paiement du magasin",
+    "noPaymentMethods" to "Aucun moyen de paiement configuré",
+    "taxSettingsLabel" to "Paramètres fiscaux du magasin",
+    "taxDisabled" to "Taxe désactivée",
+    "pricesIncludeTax" to "Prix TTC",
+    "pricesExcludeTax" to "Prix HT",
+    "receiptNumberLine" to "N° de reçu : RC-%s",
     "itemsCashSuffix" to "%d articles · espèces",
     "verifyingPricing" to "Vérification des prix, remises et taxes…",
     "pricingFailed" to "Échec de la vérification des prix : %s",

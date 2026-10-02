@@ -277,10 +277,32 @@ data class NativeReceiptPrintSettings(
     val printCopies: Int,
 )
 
+/** Store-owned receipt identity and field selection, retained for offline printing. */
+data class NativeReceiptProfile(
+    val name: String? = null,
+    val phone: String? = null,
+    val address: String? = null,
+    val thankYouMessage: String? = null,
+    val fields: Set<String> = setOf(
+        "merchant_name", "branch_name", "receipt_title", "receipt_number", "order_number",
+        "issued_at", "customer_name", "item_name", "item_quantity", "item_line_total",
+        "subtotal", "discount", "taxable_amount", "tax", "tax_registration_number",
+        "tax_exemption_reason", "rounding", "total", "paid_amount", "cash_tendered",
+        "change", "balance", "payment_method", "receipt_address", "receipt_phone",
+        "thank_you_message",
+    ),
+) {
+    fun shows(field: String): Boolean = field in fields
+}
+
 /** Financial and receipt rules cached from the same terminal settings used by POS Web. */
 data class NativeCheckoutSettings(
     val roundingRule: String = "none",
     val cashRoundingStep: Int = 1,
+    val defaultPaymentMethod: String = "cash",
+    val paymentMethodsEnabled: List<String> = listOf("cash"),
+    val mobileMoneyProvidersEnabled: List<String> = emptyList(),
+    val receiptProfile: NativeReceiptProfile = NativeReceiptProfile(),
     val taxEnabled: Boolean = false,
     val defaultTaxRate: String = "0.0000",
     val pricesIncludeTax: Boolean = true,
@@ -324,9 +346,14 @@ enum class NativeReceiptDelivery(val wireValue: String) {
 }
 
 /** The final cashier choices retained in the durable checkout command. */
-data class NativeCashCheckoutRequest(
+data class NativeCheckoutRequest(
     val expectedTotalMinor: Long,
     val tenderedMinor: Long,
+    /** "cash", "wave", "orange_money", or "later". External tenders require a live connection. */
+    val paymentMethod: String = "cash",
+    val externalReference: String? = null,
+    val balanceDueAt: String? = null,
+    val unpaidReason: String? = null,
     val discountCode: String? = null,
     val discountReason: String? = null,
     val taxExemptionReason: String? = null,

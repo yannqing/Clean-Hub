@@ -9,7 +9,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private const val DATABASE_NAME = "cleanhub_native_pos.db"
-private const val DATABASE_VERSION = 19
+private const val DATABASE_VERSION = 20
 private const val MAX_RUNTIME_AGE_MS = 8 * 60 * 60 * 1_000L
 private const val MAX_CATALOG_AGE_MS = 24 * 60 * 60 * 1_000L
 private const val MAX_CASH_STATE_AGE_MS = 2 * 60 * 60 * 1_000L
@@ -173,7 +173,7 @@ class NativePosDatabase(
         } else if (oldVersion < 15) {
             db.execSQL("ALTER TABLE checkout_settings ADD COLUMN auto_print_receipt INTEGER NOT NULL DEFAULT 1")
         }
-        if (oldVersion < 18) {
+        if (oldVersion in 14..17) {
             // The idle lock needs its timeout on a terminal that has been
             // offline for days, so it is cached with the checkout settings
             // rather than read from the online-only terminal settings call.
@@ -202,6 +202,12 @@ class NativePosDatabase(
             // is not a reliable proxy after a full snapshot is replaced.
             db.execSQL("ALTER TABLE service_ticket ADD COLUMN created_at TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE service_ticket ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
+        }
+        if (oldVersion in 14..19) {
+            db.execSQL("ALTER TABLE checkout_settings ADD COLUMN default_payment_method TEXT NOT NULL DEFAULT 'cash'")
+            db.execSQL("ALTER TABLE checkout_settings ADD COLUMN payment_methods_enabled TEXT NOT NULL DEFAULT '[\"cash\"]'")
+            db.execSQL("ALTER TABLE checkout_settings ADD COLUMN mobile_money_providers_enabled TEXT NOT NULL DEFAULT '[]'")
+            db.execSQL("ALTER TABLE checkout_settings ADD COLUMN receipt_profile_json TEXT NOT NULL DEFAULT '{}'")
         }
     }
 
@@ -253,6 +259,16 @@ class NativePosDatabase(
             put("singleton", 1)
             put("rounding_rule", settings.roundingRule)
             put("cash_rounding_step", settings.cashRoundingStep.coerceIn(1, 100))
+            put("default_payment_method", settings.defaultPaymentMethod)
+            put("payment_methods_enabled", JSONArray(settings.paymentMethodsEnabled).toString())
+            put("mobile_money_providers_enabled", JSONArray(settings.mobileMoneyProvidersEnabled).toString())
+            put("receipt_profile_json", JSONObject().apply {
+                put("name", settings.receiptProfile.name)
+                put("phone", settings.receiptProfile.phone)
+                put("address", settings.receiptProfile.address)
+                put("thankYouMessage", settings.receiptProfile.thankYouMessage)
+                put("fields", JSONArray(settings.receiptProfile.fields.toList()))
+            }.toString())
             put("tax_enabled", if (settings.taxEnabled) 1 else 0)
             put("default_tax_rate", settings.defaultTaxRate)
             put("prices_include_tax", if (settings.pricesIncludeTax) 1 else 0)
@@ -265,7 +281,7 @@ class NativePosDatabase(
     }
 
     fun checkoutSettings(): NativeCheckoutSettings = readableDatabase.rawQuery(
-        "SELECT rounding_rule, cash_rounding_step, tax_enabled, default_tax_rate, prices_include_tax, tax_registration_number, email_receipt_enabled, auto_print_receipt, lock_timeout_seconds FROM checkout_settings WHERE singleton = 1",
+        "SELECT rounding_rule, cash_rounding_step, tax_enabled, default_tax_rate, prices_include_tax, tax_registration_number, email_receipt_enabled, auto_print_receipt, lock_timeout_seconds, default_payment_method, payment_methods_enabled, mobile_money_providers_enabled, receipt_profile_json FROM checkout_settings WHERE singleton = 1",
         null,
     ).use { cursor ->
         if (!cursor.moveToFirst()) return@use NativeCheckoutSettings()
@@ -279,8 +295,30 @@ class NativePosDatabase(
             emailReceiptEnabled = cursor.getInt(6) == 1,
             autoPrintReceipt = cursor.getInt(7) == 1,
             lockTimeoutSeconds = cursor.getInt(8).coerceAtLeast(0),
+            defaultPaymentMethod = cursor.getString(9),
+            paymentMethodsEnabled = jsonStringList(cursor.getString(10)),
+            mobileMoneyProvidersEnabled = jsonStringList(cursor.getString(11)),
+            receiptProfile = runCatching {
+                val profile = JSONObject(cursor.getString(12))
+                NativeReceiptProfile(
+                    name = profile.optString("name").takeIf { it.isNotBlank() && it != "null" },
+                    phone = profile.optString("phone").takeIf { it.isNotBlank() && it != "null" },
+                    address = profile.optString("address").takeIf { it.isNotBlank() && it != "null" },
+                    thankYouMessage = profile.optString("thankYouMessage").takeIf { it.isNotBlank() && it != "null" },
+                    fields = profile.optJSONArray("fields")?.let { array ->
+                        (0 until array.length()).map { array.optString(it) }.filter(String::isNotBlank).toSet()
+                    } ?: NativeReceiptProfile().fields,
+                )
+            }.getOrDefault(NativeReceiptProfile()),
         )
     }
+
+    private fun jsonStringList(value: String): List<String> = runCatching {
+        val array = JSONArray(value)
+        (0 until array.length()).mapNotNull { index ->
+            array.optString(index).takeIf { it.isNotBlank() }
+        }
+    }.getOrDefault(emptyList())
 
     fun replaceReceiptPrinterBinding(printerId: String?) {
         if (printerId.isNullOrBlank()) {
@@ -319,6 +357,12 @@ class NativePosDatabase(
         arrayOf(jobId),
     ).use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
 
+    /** A missing row means the server accepted the stable checkout command. */
+    fun checkoutStatus(operationId: String): String? = readableDatabase.rawQuery(
+        "SELECT status FROM pending_operation WHERE operation_id = ?",
+        arrayOf(operationId),
+    ).use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+
     /**
      * Claims a physical print before calling the vendor service. A process
      * death during that call becomes a failed job, never an automatic retry
@@ -326,11 +370,14 @@ class NativePosDatabase(
      */
     fun claimReceiptPrint(jobId: String? = null, includeFailed: Boolean = false): NativePendingReceiptPrint? {
         val acceptedStatuses = if (includeFailed) "('pending', 'failed')" else "('pending')"
-        val selection = if (jobId == null) {
+        val jobSelection = if (jobId == null) {
             "status IN $acceptedStatuses"
         } else {
             "job_id = ? AND status IN $acceptedStatuses"
         }
+        // A permanently rejected checkout must never produce a sale receipt.
+        // Pending offline cash remains printable as an accepted local command.
+        val selection = "$jobSelection AND entity_id NOT IN (SELECT entity_id FROM pending_operation WHERE status = 'failed')"
         val selectionArgs = jobId?.let { arrayOf(it) }
         writableDatabase.beginTransaction()
         try {
@@ -520,20 +567,30 @@ class NativePosDatabase(
      */
     fun enqueueCheckout(
         cart: NativePosCart,
-        checkoutRequest: NativeCashCheckoutRequest,
+        checkoutRequest: NativeCheckoutRequest,
         reserveOfflineStock: Boolean,
         receiptPrintDraft: NativeReceiptPrintDraft? = null,
     ): NativeCheckoutResult {
         require(!cart.isEmpty) { copy.cartIsEmpty }
         val now = System.currentTimeMillis()
         val terminal = snapshot(now).terminal ?: throw NativePosValidationException(copy.localDataExpired)
-        val cashState = snapshot(now).cashState ?: throw NativePosValidationException(copy.noValidShiftOrDrawer)
-        if (!cashState.isOfflineCashReady()) {
-            throw NativePosValidationException(copy.shiftAndDrawerRequired)
-        }
+        val paymentMethod = checkoutRequest.paymentMethod
+        require(paymentMethod in setOf("cash", "wave", "orange_money", "later")) { "Unsupported payment method" }
+        val cashState = if (paymentMethod == "cash") {
+            snapshot(now).cashState?.takeIf { it.isOfflineCashReady() }
+                ?: throw NativePosValidationException(copy.shiftAndDrawerRequired)
+        } else null
         val totalMinor = checkoutRequest.expectedTotalMinor
         require(totalMinor > 0) { copy.totalMustBePositive }
-        if (checkoutRequest.tenderedMinor < totalMinor) throw NativePosValidationException(copy.tenderBelowTotalShort)
+        if (paymentMethod == "cash" && checkoutRequest.tenderedMinor < totalMinor) {
+            throw NativePosValidationException(copy.tenderBelowTotalShort)
+        }
+        if (paymentMethod in setOf("wave", "orange_money") && checkoutRequest.externalReference.orEmpty().trim().length < 3) {
+            throw NativePosValidationException(copy.paymentReferenceRequired)
+        }
+        if (paymentMethod == "later" && (cart.customer == null || checkoutRequest.unpaidReason.orEmpty().trim().length < 3 || checkoutRequest.balanceDueAt.isNullOrBlank())) {
+            throw NativePosValidationException(copy.payLaterDetailsRequired)
+        }
         val discountCode = checkoutRequest.discountCode?.trim()?.takeIf { it.isNotEmpty() }
         val discountReason = checkoutRequest.discountReason?.trim()?.takeIf { it.isNotEmpty() }
         if (discountCode != null && (discountReason == null || discountReason.length < 3)) {
@@ -547,10 +604,14 @@ class NativePosDatabase(
             }
             val orderId = cart.checkoutId
             val operationId = NativeUlid.create(now + 1)
-            val paymentIdempotencyKey = "$orderId:cash"
+            val paymentIdempotencyKey = "$orderId:$paymentMethod"
             val payload = JSONObject().apply {
                 put("expectedTotalAmount", minorToMoney(totalMinor))
-                put("settlementIntent", "pay_now")
+                put("settlementIntent", if (paymentMethod == "later") "pay_later" else "pay_now")
+                if (paymentMethod == "later") {
+                    put("balanceDueAt", checkoutRequest.balanceDueAt)
+                    put("unpaidReason", checkoutRequest.unpaidReason?.trim())
+                }
                 put("order", JSONObject().apply {
                     put("id", orderId)
                     put("orderType", "manual")
@@ -578,18 +639,23 @@ class NativePosDatabase(
                 })
                 checkoutRequest.taxExemptionReason?.trim()?.takeIf { it.isNotEmpty() }
                     ?.let { put("taxExemptionReason", it) }
-                checkoutRequest.cashRoundingStep?.takeIf { it > 1 }?.let { step ->
+                checkoutRequest.cashRoundingStep?.takeIf { paymentMethod == "cash" && it > 1 }?.let { step ->
                     put("cashRoundingApplied", true)
                     put("cashRoundingStep", step)
                 }
-                put("payment", JSONObject().apply {
-                    put("paymentMethod", "cash")
+                if (paymentMethod != "later") put("payment", JSONObject().apply {
+                    put("paymentMethod", if (paymentMethod == "cash") "cash" else "app")
                     put("amount", minorToMoney(totalMinor))
-                    put("tenderedAmount", minorToMoney(checkoutRequest.tenderedMinor))
-                    put("shiftId", cashState.shiftId)
-                    put("registerSessionId", cashState.registerSessionId)
-                    cashState.cashSessionId?.let { put("cashDrawerSessionId", it) }
-                    put("occurredAt", java.time.Instant.ofEpochMilli(NativeServerClock.now(now)).toString())
+                    if (paymentMethod == "cash") {
+                        put("tenderedAmount", minorToMoney(checkoutRequest.tenderedMinor))
+                        cashState?.shiftId?.let { put("shiftId", it) }
+                        cashState?.registerSessionId?.let { put("registerSessionId", it) }
+                        cashState?.cashSessionId?.let { put("cashDrawerSessionId", it) }
+                        put("occurredAt", java.time.Instant.ofEpochMilli(NativeServerClock.now(now)).toString())
+                    } else {
+                        put("provider", paymentMethod)
+                        put("externalReference", checkoutRequest.externalReference?.trim())
+                    }
                     put("idempotencyKey", paymentIdempotencyKey)
                 })
             }.toString()
@@ -944,15 +1010,36 @@ class NativePosDatabase(
     }
 
     fun markCheckoutFailed(operationId: String, message: String) {
-        writableDatabase.update(
-            "pending_operation",
-            ContentValues().apply {
-                put("status", "failed")
-                put("last_error", message.take(500))
-            },
-            "operation_id = ?",
-            arrayOf(operationId),
-        )
+        writableDatabase.beginTransaction()
+        try {
+            val orderId = writableDatabase.rawQuery(
+                "SELECT entity_id FROM pending_operation WHERE operation_id = ?",
+                arrayOf(operationId),
+            ).use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+            writableDatabase.update(
+                "pending_operation",
+                ContentValues().apply {
+                    put("status", "failed")
+                    put("last_error", message.take(500))
+                },
+                "operation_id = ?",
+                arrayOf(operationId),
+            )
+            orderId?.let {
+                writableDatabase.update(
+                    "pending_receipt_print",
+                    ContentValues().apply {
+                        put("status", "failed")
+                        put("last_error", message.take(500))
+                    },
+                    "entity_id = ? AND status = 'pending'",
+                    arrayOf(it),
+                )
+            }
+            writableDatabase.setTransactionSuccessful()
+        } finally {
+            writableDatabase.endTransaction()
+        }
     }
 
     /**
@@ -1187,6 +1274,10 @@ class NativePosDatabase(
               email_receipt_enabled INTEGER NOT NULL DEFAULT 0,
               auto_print_receipt INTEGER NOT NULL DEFAULT 1,
               lock_timeout_seconds INTEGER NOT NULL DEFAULT 0,
+              default_payment_method TEXT NOT NULL DEFAULT 'cash',
+              payment_methods_enabled TEXT NOT NULL DEFAULT '["cash"]',
+              mobile_money_providers_enabled TEXT NOT NULL DEFAULT '[]',
+              receipt_profile_json TEXT NOT NULL DEFAULT '{}',
               updated_at INTEGER NOT NULL
             )
             """.trimIndent(),

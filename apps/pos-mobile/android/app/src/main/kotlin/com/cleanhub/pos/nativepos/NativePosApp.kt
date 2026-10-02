@@ -64,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -145,7 +146,17 @@ private data class NativeMorePayment(
     val tenderedAmount: String?,
     val changeAmount: String?,
     val status: String,
+    val provider: String?,
+    val externalReference: String?,
     val createdAt: String,
+)
+private data class NativeMorePaymentAdjustment(
+    val id: String,
+    val originalPaymentId: String?,
+    val type: String,
+    val status: String,
+    val amount: String,
+    val reason: String,
 )
 private data class NativeMoreOrderDetail(
     val id: String,
@@ -158,6 +169,7 @@ private data class NativeMoreOrderDetail(
     val version: Int,
     val items: List<NativeMoreOrderItem>,
     val payments: List<NativeMorePayment>,
+    val adjustments: List<NativeMorePaymentAdjustment> = emptyList(),
 )
 private data class NativeMoreSearchResult(
     val id: String,
@@ -257,7 +269,14 @@ private data class NativeMoreZReport(
     val countedCash: String,
     val variance: String,
     val currency: String,
+    val orderCount: Int,
+    val taxableAmount: String?,
+    val taxAmount: String?,
+    val refundAmount: String,
+    val discountAmount: String,
+    val paymentBreakdown: List<NativeMoreZPayment>,
 )
+private data class NativeMoreZPayment(val method: String, val provider: String?, val netAmount: String)
 
 private enum class NativePosTab(val symbol: String) {
     Workspace("⌂"),
@@ -420,6 +439,7 @@ fun NativePosApp(applicationContext: Context) {
     // Ids for a customer creation that may need retrying; see createCustomer.
     var pendingCustomerDraft by remember { mutableStateOf<NativeCustomerDraft?>(null) }
     val moreOrderCashKeys = remember { NativePaymentIdempotency() }
+    val moreOrderRefundKeys = remember { NativePaymentIdempotency() }
     // A pay-in or pay-out carries a key that survives a retry, for the same
     // reason a payment does: the server dedupes on it, and a fresh key per tap
     // turns a lost response into a second movement the drawer never received.
@@ -1067,10 +1087,10 @@ fun NativePosApp(applicationContext: Context) {
                     }
                     NativeMoreDestination.Settings -> {
                         terminalSettings = withContext(Dispatchers.IO) {
-                            api.get("/pos/terminal-settings").toNativeTerminalSettingsSummary().also {
-                                database.replaceReceiptPrintSettings(it.autoPrintReceipt, it.printCopies.coerceIn(1, 3))
-                            }
+                            NativePosSyncEngine(applicationContext).refreshCheckoutSettings()
+                                .toNativeTerminalSettingsSummary()
                         }
+                        reload()
                     }
                     NativeMoreDestination.Shift -> {
                         refreshMoreShiftData()
@@ -1086,6 +1106,17 @@ fun NativePosApp(applicationContext: Context) {
         }
     }
 
+    suspend fun openMoreOrderDetailAfterMutation(orderId: String) {
+        moreOrderDetail = withContext(Dispatchers.IO) {
+            val detail = api.get("/pos/orders/$orderId")
+            val payments = api.get("/pos/orders/$orderId/payments")
+            val adjustments = api.get("/pos/payment-adjustments?orderId=$orderId")
+            detail.toNativeMoreOrderDetail(payments.optJSONArray("data"))
+                .copy(adjustments = adjustments.optJSONArray("data").toNativeMorePaymentAdjustments())
+        }
+        reload()
+    }
+
     fun openMoreOrder(orderId: String) {
         if (!internetAvailable) {
             message = copy.orderDetailNeedsNetwork
@@ -1095,11 +1126,7 @@ fun NativePosApp(applicationContext: Context) {
         scope.launch {
             busy = true
             try {
-                moreOrderDetail = withContext(Dispatchers.IO) {
-                    val detail = api.get("/pos/orders/$orderId")
-                    val payments = api.get("/pos/orders/$orderId/payments")
-                    detail.toNativeMoreOrderDetail(payments.optJSONArray("data"))
-                }
+                openMoreOrderDetailAfterMutation(orderId)
                 message = null
             } catch (error: Exception) {
                 message = error.userMessage(copy)
@@ -1225,8 +1252,14 @@ fun NativePosApp(applicationContext: Context) {
                             autoPrintReceipt = it.autoPrintReceipt,
                             printCopies = it.printCopies,
                         )
+                        database.replaceCheckoutSettings(database.checkoutSettings().copy(
+                            roundingRule = it.roundingRule,
+                            autoPrintReceipt = it.autoPrintReceipt,
+                            lockTimeoutSeconds = it.lockTimeoutSeconds,
+                        ))
                     }
                 }
+                reload()
                 message = copy.settingsSaved
             } catch (error: Exception) {
                 message = error.userMessage(copy)
@@ -1325,7 +1358,7 @@ fun NativePosApp(applicationContext: Context) {
         scope.launch {
             busy = true
             try {
-                moreOrderDetail = withContext(Dispatchers.IO) {
+                withContext(Dispatchers.IO) {
                     api.post("/pos/orders/${order.id}/payments", JSONObject().apply {
                         put("paymentMethod", "cash")
                         put("amount", outstanding)
@@ -1336,12 +1369,10 @@ fun NativePosApp(applicationContext: Context) {
                         put("occurredAt", occurredAt)
                         put("idempotencyKey", idempotencyKey)
                     })
-                    val detail = api.get("/pos/orders/${order.id}")
-                    val payments = api.get("/pos/orders/${order.id}/payments")
-                    detail.toNativeMoreOrderDetail(payments.optJSONArray("data"))
                 }
-                // Landed: the next payment on this order is a new one and must
-                // get its own key.
+                openMoreOrderDetailAfterMutation(order.id)
+                // Landed and refreshed: a further payment on this order may
+                // now start a new idempotency key.
                 moreOrderCashKeys.release(order.id)
                 moreOrderDetail?.let { updated ->
                     moreOrders = moreOrders.map { row ->
@@ -1352,7 +1383,6 @@ fun NativePosApp(applicationContext: Context) {
                         ) else row
                     }
                 }
-                reload()
                 message = copy.cashPaymentRecorded
             } catch (error: Exception) {
                 message = error.userMessage(copy)
@@ -1370,17 +1400,122 @@ fun NativePosApp(applicationContext: Context) {
         scope.launch {
             busy = true
             try {
-                moreOrderDetail = withContext(Dispatchers.IO) {
+                withContext(Dispatchers.IO) {
                     api.post("/pos/orders/${order.id}/status-changes", JSONObject().apply {
                         put("to", target)
                         put("version", order.version)
                     })
-                    val detail = api.get("/pos/orders/${order.id}")
-                    val payments = api.get("/pos/orders/${order.id}/payments")
-                    detail.toNativeMoreOrderDetail(payments.optJSONArray("data"))
                 }
-                reload()
+                openMoreOrderDetailAfterMutation(order.id)
                 message = copy.orderStatusUpdated
+            } catch (error: Exception) {
+                message = error.userMessage(copy)
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    fun resolveMoreManualPayment(order: NativeMoreOrderDetail, payment: NativeMorePayment, confirmed: Boolean, reason: String) {
+        if (!internetAvailable) {
+            message = copy.orderPaymentNeedsNetwork
+            return
+        }
+        if (payment.method != "app" || payment.status != "pending") return
+        scope.launch {
+            busy = true
+            try {
+                withContext(Dispatchers.IO) {
+                    api.post(
+                        "/pos/orders/${order.id}/payments/${payment.id}/${if (confirmed) "confirm" else "fail"}",
+                        JSONObject().put("reason", reason.trim()),
+                    )
+                }
+                openMoreOrderDetailAfterMutation(order.id)
+                message = if (confirmed) copy.manualPaymentConfirmed else copy.manualPaymentMarkedFailed
+            } catch (error: Exception) {
+                message = error.userMessage(copy)
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    fun createMoreRefund(order: NativeMoreOrderDetail, payment: NativeMorePayment, amount: String, reason: String) {
+        if (!internetAvailable) { message = copy.orderPaymentNeedsNetwork; return }
+        val amountMinor = parseMoney(amount)
+        if (payment.status != "paid" || amountMinor == null || amountMinor <= 0 ||
+            amountMinor > (parseMoney(payment.amount) ?: 0) || reason.trim().isEmpty()) {
+            message = copy.refundInvalid
+            return
+        }
+        val subject = "${order.id}:${payment.id}:${refundMinorToMoney(amountMinor)}:${reason.trim()}"
+        scope.launch {
+            busy = true
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    api.post("/pos/payment-adjustments/refunds", JSONObject().apply {
+                        put("orderId", order.id)
+                        put("originalPaymentId", payment.id)
+                        put("amount", refundMinorToMoney(amountMinor))
+                        put("reason", reason.trim())
+                        put("idempotencyKey", moreOrderRefundKeys.keyFor(subject))
+                    })
+                }
+                moreOrderRefundKeys.release(subject)
+                result.optJSONObject("adjustment")?.toNativeMorePaymentAdjustment()?.let { adjustment ->
+                    moreOrderDetail = moreOrderDetail?.takeIf { it.id == order.id }?.let { current ->
+                        current.copy(
+                            paidAmount = result.optString("paidAmount", current.paidAmount),
+                            paymentStatus = result.optString("paymentStatus", current.paymentStatus),
+                            adjustments = current.adjustments.filterNot { it.id == adjustment.id } + adjustment,
+                        )
+                    }
+                }
+                val refreshError = runCatching { openMoreOrderDetailAfterMutation(order.id) }.exceptionOrNull()
+                val outcomeMessage = if (result.optJSONObject("adjustment")?.optString("status") == "pending") copy.refundPending else copy.refundRecorded
+                message = refreshError?.let { copy.cacheRefreshesLater.format(outcomeMessage) } ?: outcomeMessage
+                if (payment.method == "cash" && result.optJSONObject("adjustment")?.optString("status") == "succeeded") {
+                    val drawerResult = withContext(Dispatchers.IO) { hardware.openCashDrawer() }
+                    if (!drawerResult.success) message = "$outcomeMessage ${drawerResult.message}"
+                }
+            } catch (error: Exception) {
+                message = error.userMessage(copy)
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    fun resolveMoreRefund(order: NativeMoreOrderDetail, adjustment: NativeMorePaymentAdjustment, succeeded: Boolean, reference: String, reason: String) {
+        if (!internetAvailable) { message = copy.orderPaymentNeedsNetwork; return }
+        if (adjustment.type != "refund" || adjustment.status !in setOf("pending", "failed") || reason.trim().length < 3 ||
+            (succeeded && reference.trim().isEmpty())) {
+            message = copy.refundResolutionInvalid
+            return
+        }
+        scope.launch {
+            busy = true
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    api.post("/pos/payment-adjustments/${adjustment.id}/refund-outcome", JSONObject().apply {
+                        put("outcome", if (succeeded) "succeeded" else "failed")
+                        put("reason", reason.trim())
+                        if (succeeded) put("settlementReference", reference.trim())
+                    })
+                }
+                result.optJSONObject("adjustment")?.toNativeMorePaymentAdjustment()?.let { updated ->
+                    moreOrderDetail = moreOrderDetail?.takeIf { it.id == order.id }?.let { current ->
+                        current.copy(
+                            paidAmount = result.optString("paidAmount", current.paidAmount),
+                            paymentStatus = result.optString("paymentStatus", current.paymentStatus),
+                            adjustments = current.adjustments.filterNot { it.id == updated.id } + updated,
+                        )
+                    }
+                }
+                val refreshError = runCatching { openMoreOrderDetailAfterMutation(order.id) }.exceptionOrNull()
+                val outcomeMessage = if (succeeded) copy.refundSettled else copy.refundFailed
+                message = refreshError?.let { copy.cacheRefreshesLater.format(outcomeMessage) } ?: outcomeMessage
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -2264,8 +2399,13 @@ fun NativePosApp(applicationContext: Context) {
                             onCheckout = { checkoutRequest ->
                                 val cartAtCheckout = cart
                                 val terminalAtCheckout = current.terminal
-                                if (checkoutRequest.tenderedMinor < checkoutRequest.expectedTotalMinor) {
+                                if (checkoutRequest.paymentMethod == "cash" && checkoutRequest.tenderedMinor < checkoutRequest.expectedTotalMinor) {
                                     checkoutFailure = copy.tenderBelowTotal
+                                    message = checkoutFailure
+                                    return@NativeSaleView
+                                }
+                                if (checkoutRequest.paymentMethod != "cash" && !internetAvailable) {
+                                    checkoutFailure = copy.requiresNetwork
                                     message = checkoutFailure
                                     return@NativeSaleView
                                 }
@@ -2273,7 +2413,7 @@ fun NativePosApp(applicationContext: Context) {
                                 scope.launch {
                                     busy = true
                                     try {
-                                        val checkoutAndPrintSettings = withContext(Dispatchers.IO) {
+                                        val checkoutAndStatus = withContext(Dispatchers.IO) {
                                             if (internetAvailable) {
                                                 runCatching { NativePosSyncEngine(applicationContext).synchronize() }
                                                     .getOrElse { error ->
@@ -2296,10 +2436,9 @@ fun NativePosApp(applicationContext: Context) {
                                                     checkoutRequest.taxExemptionReason,
                                                 )
                                             }
-                                            val freshExpectedTotal = applyNativeCashRounding(
-                                                freshPricing.totalMinor,
-                                                checkoutRequest.cashRoundingStep,
-                                            )
+                                            val freshExpectedTotal = if (checkoutRequest.paymentMethod == "cash") {
+                                                applyNativeCashRounding(freshPricing.totalMinor, checkoutRequest.cashRoundingStep)
+                                            } else freshPricing.totalMinor
                                             if (freshExpectedTotal != checkoutRequest.expectedTotalMinor) {
                                                 throw NativePosValidationException(copy.priceChanged)
                                             }
@@ -2309,14 +2448,18 @@ fun NativePosApp(applicationContext: Context) {
                                                     checkoutRequest = checkoutRequest,
                                                     reserveOfflineStock = !internetAvailable,
                                                     receiptPrintDraft = if (checkoutRequest.receiptDelivery == NativeReceiptDelivery.Print) {
-                                                        buildNativeCashReceiptDraft(copy,
+                                                        buildNativeReceiptDraft(copy,
                                                             terminal = terminalAtCheckout,
                                                             cart = cartAtCheckout,
                                                             pricing = freshPricing,
                                                             amountDueMinor = checkoutRequest.expectedTotalMinor,
                                                             tenderedMinor = checkoutRequest.tenderedMinor,
+                                                            paymentMethod = checkoutRequest.paymentMethod,
+                                                            externalReference = checkoutRequest.externalReference,
+                                                            balanceDueAt = checkoutRequest.balanceDueAt,
                                                             taxExemptionReason = checkoutRequest.taxExemptionReason,
                                                             printSettings = printSettings,
+                                                            receiptProfile = database.checkoutSettings().receiptProfile,
                                                         )
                                                     } else null,
                                                 )
@@ -2325,19 +2468,20 @@ fun NativePosApp(applicationContext: Context) {
                                             // window. The persisted command still covers an abrupt
                                             // response loss and replays with the same order id.
                                             if (internetAvailable) {
-                                                NativePosSyncEngine(applicationContext).synchronize()
+                                                runCatching { NativePosSyncEngine(applicationContext).synchronize() }
                                             }
-                                            checkout
+                                            checkout to database.checkoutStatus(checkout.operationId)
                                         }
-                                        val checkout = checkoutAndPrintSettings
+                                        val (checkout, checkoutStatus) = checkoutAndStatus
                                         val checkoutHardwareStatus = withContext(Dispatchers.IO) { hardware.status() }
                                         hardwareStatus = checkoutHardwareStatus
-                                        val drawerMessage = if (checkoutHardwareStatus.cashDrawerConnected) {
+                                        val drawerMessage = if (checkoutRequest.paymentMethod == "cash" && checkoutHardwareStatus.cashDrawerConnected) {
                                             withContext(Dispatchers.IO) {
                                                 hardware.openCashDrawer().takeUnless { it.success }?.message
                                             }
                                         } else null
                                         val autoPrintMessage = if (
+                                            checkoutStatus != "failed" &&
                                             checkoutRequest.receiptDelivery == NativeReceiptDelivery.Print &&
                                                 checkout.printJobId != null
                                         ) {
@@ -2345,7 +2489,7 @@ fun NativePosApp(applicationContext: Context) {
                                         } else {
                                             null
                                         }
-                                        if (internetAvailable) {
+                                        if (internetAvailable && checkoutStatus == null) {
                                             runCatching {
                                                 withContext(Dispatchers.IO) {
                                                     api.post(
@@ -2368,15 +2512,17 @@ fun NativePosApp(applicationContext: Context) {
                                             cart = NativePosCart.empty(cartAtCheckout.currency)
                                         }
                                         reload()
-                                        val saleMessage = if (internetAvailable) {
-                                            copy.saleSubmittedOnline
-                                        } else {
-                                            copy.saleQueuedOffline
+                                        val saleMessage = when {
+                                            checkoutStatus == "failed" -> copy.saleNeedsReview
+                                            checkoutStatus == "pending" -> copy.saleQueuedOffline
+                                            checkoutRequest.paymentMethod == "later" -> copy.salePayLaterRecorded
+                                            checkoutRequest.paymentMethod != "cash" -> copy.saleAwaitingConfirmation
+                                            else -> copy.saleSubmittedOnline
                                         }
                                         message = when {
                                             drawerMessage != null -> "$saleMessage $drawerMessage"
                                             autoPrintMessage != null -> "$saleMessage $autoPrintMessage"
-                                            checkout.printJobId != null -> "$saleMessage ${copy.receiptQueued}"
+                                            checkout.printJobId != null && checkoutStatus != "failed" -> "$saleMessage ${copy.receiptQueued}"
                                             else -> saleMessage
                                         }
                                     } catch (error: Exception) {
@@ -2401,6 +2547,7 @@ fun NativePosApp(applicationContext: Context) {
                         statistics = moreStatistics,
                         notifications = moreNotifications,
                         terminalSettings = terminalSettings,
+                        checkoutSettings = checkoutSettings,
                         hardwareStatus = hardwareStatus,
                         hardwareDevices = hardwareDevices,
                         bluetoothPrinters = bluetoothPrinters,
@@ -2429,6 +2576,9 @@ fun NativePosApp(applicationContext: Context) {
                         onOpenOrder = ::openMoreOrder,
                         orderDetail = moreOrderDetail,
                         onRecordOrderCash = ::recordMoreOrderCash,
+                        onResolveManualPayment = ::resolveMoreManualPayment,
+                        onCreateRefund = ::createMoreRefund,
+                        onResolveRefund = ::resolveMoreRefund,
                         onChangeOrderStatus = ::changeMoreOrderStatus,
                         onMarkNotificationRead = ::markNotificationRead,
                         onMarkAllNotificationsRead = ::markAllNotificationsRead,
@@ -3959,6 +4109,7 @@ private fun NativeMoreView(
     statistics: NativeMoreStatistics?,
     notifications: List<NativeMoreNotification>,
     terminalSettings: NativeTerminalSettingsSummary?,
+    checkoutSettings: NativeCheckoutSettings,
     hardwareStatus: NativeHardwareStatus?,
     hardwareDevices: List<NativeHardwareDevice>,
     bluetoothPrinters: List<NativeBluetoothPrinter>,
@@ -3981,6 +4132,9 @@ private fun NativeMoreView(
     onOpenOrder: (String) -> Unit,
     orderDetail: NativeMoreOrderDetail?,
     onRecordOrderCash: (NativeMoreOrderDetail, String) -> Unit,
+    onResolveManualPayment: (NativeMoreOrderDetail, NativeMorePayment, Boolean, String) -> Unit,
+    onCreateRefund: (NativeMoreOrderDetail, NativeMorePayment, String, String) -> Unit,
+    onResolveRefund: (NativeMoreOrderDetail, NativeMorePaymentAdjustment, Boolean, String, String) -> Unit,
     onChangeOrderStatus: (NativeMoreOrderDetail, String) -> Unit,
     onMarkNotificationRead: (String) -> Unit,
     onMarkAllNotificationsRead: () -> Unit,
@@ -4055,12 +4209,16 @@ private fun NativeMoreView(
         )
         NativeMoreDestination.OrderDetail -> NativeMoreOrderDetailView(copy,
             order = orderDetail,
+            canResolveManualPayments = current.terminal?.role in setOf("owner", "manager"),
             internetAvailable = internetAvailable,
             busy = busy,
             message = message,
             onBack = { onNavigate(NativeMoreDestination.Orders) },
             onRefresh = { orderDetail?.let { onOpenOrder(it.id) } },
             onRecordCash = onRecordOrderCash,
+            onResolveManualPayment = onResolveManualPayment,
+            onCreateRefund = onCreateRefund,
+            onResolveRefund = onResolveRefund,
             onChangeStatus = onChangeOrderStatus,
         )
         NativeMoreDestination.Statistics -> NativeMoreStatisticsView(copy,
@@ -4110,6 +4268,7 @@ private fun NativeMoreView(
         NativeMoreDestination.Settings -> NativeMoreSettingsView(copy,
             terminal = current.terminal,
             settings = terminalSettings,
+            checkoutSettings = checkoutSettings,
             busy = busy,
             message = message,
             onBack = { onNavigate(NativeMoreDestination.Menu) },
@@ -4165,6 +4324,19 @@ private fun NativeShiftHandoverView(
     var movementAmount by remember { mutableStateOf("") }
     var movementReason by remember { mutableStateOf("") }
     var localFeedback by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    var pendingReportCsv by remember { mutableStateOf<String?>(null) }
+    val createReportDocument = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) {
+            val csv = pendingReportCsv
+            localFeedback = if (csv != null && runCatching {
+                context.contentResolver.openOutputStream(uri)?.use { stream ->
+                    stream.write(csv.toByteArray(Charsets.UTF_8))
+                } ?: error("Cannot open report destination")
+            }.isSuccess) copy.zReportSaved else copy.zReportExportFailed
+        }
+        pendingReportCsv = null
+    }
     var runningAction by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(busy) {
         if (!busy) runningAction = null
@@ -4417,7 +4589,21 @@ private fun NativeShiftHandoverView(
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(copy.recentZReports, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         data.zReports.forEach { report ->
-                            NativeReferenceRow("${report.netSales} ${report.currency}", "${report.cutoffAt} · ${copy.varianceLabel} ${report.variance}", "")
+                            NativeReferenceRow("${report.netSales} ${report.currency}", "${report.cutoffAt} · ${copy.varianceLabel} ${report.variance}", copy.orderCountLabel.format(report.orderCount))
+                            report.taxableAmount?.let { NativeReferenceRow(copy.taxableAmountLabel, it, report.currency) }
+                            report.taxAmount?.let { NativeReferenceRow(copy.taxAmountLabel, it, report.currency) }
+                            NativeReferenceRow(copy.discountAmountLabel, report.discountAmount, report.currency)
+                            NativeReferenceRow(copy.refundAmountLabel, report.refundAmount, report.currency)
+                            report.paymentBreakdown.forEach { payment ->
+                                NativeReferenceRow("${payment.method}${payment.provider?.let { " / $it" }.orEmpty()}", payment.netAmount, report.currency)
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    pendingReportCsv = buildNativeZReportCsv(report)
+                                    createReportDocument.launch("z-report-${report.cutoffAt.take(10)}-${report.id}.csv")
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text(copy.exportZReport) }
                         }
                     }
                 }
@@ -4768,16 +4954,28 @@ private fun NativeMoreOrdersView(
 private fun NativeMoreOrderDetailView(
     copy: NativePosCopy,
     order: NativeMoreOrderDetail?,
+    canResolveManualPayments: Boolean,
     internetAvailable: Boolean,
     busy: Boolean,
     message: String?,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onRecordCash: (NativeMoreOrderDetail, String) -> Unit,
+    onResolveManualPayment: (NativeMoreOrderDetail, NativeMorePayment, Boolean, String) -> Unit,
+    onCreateRefund: (NativeMoreOrderDetail, NativeMorePayment, String, String) -> Unit,
+    onResolveRefund: (NativeMoreOrderDetail, NativeMorePaymentAdjustment, Boolean, String, String) -> Unit,
     onChangeStatus: (NativeMoreOrderDetail, String) -> Unit,
 ) {
     var tendered by remember(order?.id) { mutableStateOf("") }
     var showTenderInput by remember(order?.id) { mutableStateOf(false) }
+    var resolutionPaymentId by remember(order?.id) { mutableStateOf<String?>(null) }
+    var resolutionReason by remember(order?.id) { mutableStateOf("") }
+    var refundPaymentId by remember(order?.id) { mutableStateOf<String?>(null) }
+    var refundAmount by remember(order?.id) { mutableStateOf("") }
+    var refundReason by remember(order?.id) { mutableStateOf("") }
+    var refundAdjustmentId by remember(order?.id) { mutableStateOf<String?>(null) }
+    var refundReference by remember(order?.id) { mutableStateOf("") }
+    var refundResolutionReason by remember(order?.id) { mutableStateOf("") }
     NativeMorePage(copy, copy.menuOrderDetail, onBack) {
         OutlinedButton(onClick = onRefresh, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) copy.loading else copy.refreshOrders) }
         if (order == null) {
@@ -4786,10 +4984,11 @@ private fun NativeMoreOrderDetailView(
             return@NativeMorePage
         }
         val outstanding = outstandingAmount(order.totalAmount, order.paidAmount)
+        val pendingManualPayment = order.payments.any { it.method == "app" && it.status == "pending" }
         NativeReferenceRow(copy.customerLabel, order.customerName ?: copy.walkInCustomer, null)
         NativeReferenceRow(copy.orderStatus, "${order.status} · ${order.paymentStatus}", null)
         NativeReferenceRow(copy.orderAmount, copy.paidPrefix.format("${order.paidAmount} ${order.currency}"), "${order.totalAmount} ${order.currency}")
-        if (isPositiveDecimal(outstanding) && order.status != "cancelled" && order.status != "delivered") {
+        if (isPositiveDecimal(outstanding) && !pendingManualPayment && order.status != "cancelled" && order.status != "delivered") {
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(copy.cashCollection, color = POS_INK, fontWeight = FontWeight.SemiBold)
@@ -4828,7 +5027,62 @@ private fun NativeMoreOrderDetailView(
         if (order.payments.isNotEmpty()) {
             Text(copy.paymentRecords, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             order.payments.forEach { payment ->
-                NativeReferenceRow(payment.method, "${payment.status} · ${payment.createdAt}", "${payment.amount} ${order.currency}")
+                NativeReferenceRow(payment.provider ?: payment.method, "${payment.status} · ${payment.createdAt}", "${payment.amount} ${order.currency}")
+                if (payment.status == "pending" && payment.method == "app" && canResolveManualPayments) {
+                    Text(copy.paymentReferenceLine.format(payment.externalReference.orEmpty()), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    if (resolutionPaymentId == payment.id) {
+                        TextField(value = resolutionReason, onValueChange = { resolutionReason = it }, label = { Text(copy.manualPaymentReason) }, modifier = Modifier.fillMaxWidth())
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { onResolveManualPayment(order, payment, true, resolutionReason); resolutionPaymentId = null }, enabled = internetAvailable && !busy && resolutionReason.trim().length >= 3, modifier = Modifier.weight(1f)) { Text(copy.confirmManualPayment) }
+                            OutlinedButton(onClick = { onResolveManualPayment(order, payment, false, resolutionReason); resolutionPaymentId = null }, enabled = internetAvailable && !busy && resolutionReason.trim().length >= 3, modifier = Modifier.weight(1f)) { Text(copy.failManualPayment) }
+                        }
+                    } else {
+                        OutlinedButton(onClick = { resolutionPaymentId = payment.id; resolutionReason = "" }, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.reviewManualPayment) }
+                    }
+                }
+                if (payment.status == "paid" && canResolveManualPayments) {
+                    val refundedMinor = order.adjustments.filter {
+                        it.type == "refund" && it.originalPaymentId == payment.id && it.status != "failed"
+                    }.sumOf { parseMoney(it.amount) ?: 0L }
+                    val refundableMinor = ((parseMoney(payment.amount) ?: 0L) - refundedMinor).coerceAtLeast(0)
+                    if (refundableMinor > 0L) {
+                        if (refundPaymentId == payment.id) {
+                            Text(copy.refundLimit.format("${refundMinorToMoney(refundableMinor)} ${order.currency}"), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                            if (payment.method == "cash") Text(copy.cashRefundHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                            TextField(value = refundAmount, onValueChange = { refundAmount = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text(copy.refundAmountLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            TextField(value = refundReason, onValueChange = { refundReason = it }, label = { Text(copy.refundReasonLabel) }, modifier = Modifier.fillMaxWidth())
+                            Button(
+                                onClick = { onCreateRefund(order, payment, refundAmount, refundReason); refundPaymentId = null },
+                                enabled = internetAvailable && !busy && (parseMoney(refundAmount)?.let { it in 1..refundableMinor } == true) && refundReason.trim().isNotEmpty(),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text(copy.recordRefund) }
+                        } else {
+                            OutlinedButton(onClick = {
+                                refundPaymentId = payment.id
+                                refundAmount = refundMinorToMoney(refundableMinor)
+                                refundReason = ""
+                            }, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.recordRefund) }
+                        }
+                    }
+                }
+            }
+        }
+        if (order.adjustments.isNotEmpty()) {
+            Text(copy.refundRecords, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            order.adjustments.filter { it.type == "refund" }.forEach { adjustment ->
+                NativeReferenceRow(copy.refundAmountLabel, "${adjustment.status} · ${adjustment.reason}", "${adjustment.amount} ${order.currency}")
+                if (adjustment.status != "succeeded" && canResolveManualPayments) {
+                    if (refundAdjustmentId == adjustment.id) {
+                        TextField(value = refundReference, onValueChange = { refundReference = it }, label = { Text(copy.refundReferenceLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        TextField(value = refundResolutionReason, onValueChange = { refundResolutionReason = it }, label = { Text(copy.refundReasonLabel) }, modifier = Modifier.fillMaxWidth())
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { onResolveRefund(order, adjustment, true, refundReference, refundResolutionReason); refundAdjustmentId = null }, enabled = internetAvailable && !busy && refundReference.trim().isNotEmpty() && refundResolutionReason.trim().length >= 3, modifier = Modifier.weight(1f)) { Text(copy.refundSettledAction) }
+                            if (adjustment.status == "pending") OutlinedButton(onClick = { onResolveRefund(order, adjustment, false, "", refundResolutionReason); refundAdjustmentId = null }, enabled = internetAvailable && !busy && refundResolutionReason.trim().length >= 3, modifier = Modifier.weight(1f)) { Text(copy.refundFailedAction) }
+                        }
+                    } else {
+                        OutlinedButton(onClick = { refundAdjustmentId = adjustment.id; refundReference = ""; refundResolutionReason = "" }, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.resolveRefundAction) }
+                    }
+                }
             }
         }
         message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
@@ -4912,6 +5166,7 @@ private fun NativeMoreSettingsView(
     copy: NativePosCopy,
     terminal: NativeTerminal?,
     settings: NativeTerminalSettingsSummary?,
+    checkoutSettings: NativeCheckoutSettings,
     busy: Boolean,
     message: String?,
     onBack: () -> Unit,
@@ -4936,6 +5191,18 @@ private fun NativeMoreSettingsView(
     NativeMorePage(copy, copy.menuSettings, onBack) {
         OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) copy.loading else copy.refreshTerminalSettings) }
         terminal?.let { NativeReferenceRow(copy.terminalLabel, it.terminalId, it.branchName) }
+        val receiptProfile = checkoutSettings.receiptProfile
+        receiptProfile.name?.let { NativeReferenceRow(copy.receiptNameLabel, it, null) }
+        receiptProfile.phone?.let { NativeReferenceRow(copy.receiptPhoneLabel, it, null) }
+        receiptProfile.address?.let { NativeReferenceRow(copy.receiptAddressLabel, it, null) }
+        NativeReferenceRow(copy.paymentMethodsLabel, checkoutSettings.paymentMethodsEnabled.joinToString(", ") { method ->
+            if (method == "app") checkoutSettings.mobileMoneyProvidersEnabled.joinToString(" / ").ifBlank { method } else method
+        }.ifBlank { copy.noPaymentMethods }, null)
+        NativeReferenceRow(copy.taxSettingsLabel,
+            if (checkoutSettings.taxEnabled) "${formatNativeTaxRate(checkoutSettings.defaultTaxRate)} · ${if (checkoutSettings.pricesIncludeTax) copy.pricesIncludeTax else copy.pricesExcludeTax}"
+            else copy.taxDisabled,
+            checkoutSettings.taxRegistrationNumber,
+        )
         Card(
             modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { onOpenHardware() },
             shape = RoundedCornerShape(16.dp),
@@ -5678,7 +5945,7 @@ private fun NativeSaleView(
     onRemove: (NativeProduct) -> Unit,
     onClearProduct: (String) -> Unit,
     onRemoveTicketItem: (String) -> Unit,
-    onCheckout: (NativeCashCheckoutRequest) -> Unit,
+    onCheckout: (NativeCheckoutRequest) -> Unit,
     onSynchronize: () -> Unit,
 ) {
     val terminal = current.terminal ?: return
@@ -5689,6 +5956,7 @@ private fun NativeSaleView(
     fun CheckoutSummary(modifier: Modifier = Modifier.fillMaxWidth(), persistent: Boolean = false) {
         CheckoutPanel(
             cart = cart,
+            timeZone = terminal.timeZone,
             busy = busy,
             copy = copy,
             message = message,
@@ -5985,6 +6253,7 @@ private fun CartQuantityStepper(quantity: Long, onAdd: () -> Unit, onRemove: () 
 @Composable
 private fun CheckoutPanel(
     cart: NativePosCart,
+    timeZone: String,
     busy: Boolean,
     copy: NativePosCopy,
     message: String?,
@@ -5997,7 +6266,7 @@ private fun CheckoutPanel(
     onRemoveProduct: (NativeCartLine) -> Unit,
     onClearProduct: (String) -> Unit,
     onRemoveTicketItem: (String) -> Unit,
-    onCheckout: (NativeCashCheckoutRequest) -> Unit,
+    onCheckout: (NativeCheckoutRequest) -> Unit,
     modifier: Modifier = Modifier.fillMaxWidth(),
     persistent: Boolean = false,
 ) {
@@ -6065,8 +6334,9 @@ private fun CheckoutPanel(
         )
     }
     if (checkoutOpen) {
-        NativeCashCheckoutDialog(
+        NativeCheckoutDialog(
             cart = cart,
+            timeZone = timeZone,
             busy = busy,
             copy = copy,
             checkoutSettings = checkoutSettings,
@@ -6225,8 +6495,9 @@ private fun NativeCheckoutProductLine(
  * tender is preselected; free-form entry is only for a note that needs change.
  */
 @Composable
-private fun NativeCashCheckoutDialog(
+private fun NativeCheckoutDialog(
     cart: NativePosCart,
+    timeZone: String,
     busy: Boolean,
     copy: NativePosCopy,
     checkoutSettings: NativeCheckoutSettings,
@@ -6235,11 +6506,28 @@ private fun NativeCashCheckoutDialog(
     canManageSensitiveOperations: Boolean,
     onRefreshPricing: suspend (NativePosCart, String?, String?) -> NativeCartPricing,
     onDismiss: () -> Unit,
-    onConfirm: (NativeCashCheckoutRequest) -> Unit,
+    onConfirm: (NativeCheckoutRequest) -> Unit,
 ) {
     var discountCode by remember(cart.checkoutId) { mutableStateOf("") }
     var discountReason by remember(cart.checkoutId) { mutableStateOf("") }
     var taxExemptionReason by remember(cart.checkoutId) { mutableStateOf("") }
+    val paymentOptions = buildList {
+        if ("cash" in checkoutSettings.paymentMethodsEnabled) add("cash")
+        if (internetAvailable && "app" in checkoutSettings.paymentMethodsEnabled) {
+            checkoutSettings.mobileMoneyProvidersEnabled.filter { it in setOf("wave", "orange_money") }.forEach(::add)
+        }
+        if (internetAvailable && cart.customer != null && canManageSensitiveOperations) add("later")
+    }
+    val preferredPayment = when (checkoutSettings.defaultPaymentMethod) {
+        "app" -> paymentOptions.firstOrNull { it == "wave" || it == "orange_money" }
+        else -> paymentOptions.firstOrNull { it == checkoutSettings.defaultPaymentMethod }
+    } ?: paymentOptions.firstOrNull().orEmpty()
+    var paymentMethod by remember(cart.checkoutId, preferredPayment) { mutableStateOf(preferredPayment) }
+    var externalReference by remember(cart.checkoutId) { mutableStateOf("") }
+    var balanceDueAtText by remember(cart.checkoutId) { mutableStateOf("") }
+    var unpaidReason by remember(cart.checkoutId) { mutableStateOf("") }
+    val cashPayment = paymentMethod == "cash"
+    val deferredPayment = paymentMethod == "later"
     var pricing by remember(cart.checkoutId) {
         mutableStateOf(calculateNativeLocalPricing(cart, checkoutSettings, null))
     }
@@ -6271,7 +6559,7 @@ private fun NativeCashCheckoutDialog(
     var cashRoundingStep by remember(pricing.totalMinor) {
         mutableStateOf(checkoutSettings.cashRoundingStep.takeIf { it > 1 } ?: 5)
     }
-    val totalMinor = applyNativeCashRounding(pricing.totalMinor, cashRoundingStep)
+    val totalMinor = if (cashPayment) applyNativeCashRounding(pricing.totalMinor, cashRoundingStep) else pricing.totalMinor
     val cashRoundingDiscountMinor = pricing.totalMinor - totalMinor
     var selectedTenderedMinor by remember(totalMinor) { mutableStateOf(totalMinor) }
     var customTenderedText by remember(totalMinor) { mutableStateOf("") }
@@ -6286,11 +6574,19 @@ private fun NativeCashCheckoutDialog(
         )
     }
     val customTenderedMinor = customTenderedText.takeIf { it.isNotBlank() }?.let(::parseMoney)
-    val tenderedMinor = if (useCustomTender) customTenderedMinor else selectedTenderedMinor
-    val isTenderValid = tenderedMinor != null && tenderedMinor >= totalMinor
+    val tenderedMinor = if (!cashPayment) totalMinor else if (useCustomTender) customTenderedMinor else selectedTenderedMinor
+    val isTenderValid = !cashPayment || (tenderedMinor != null && tenderedMinor >= totalMinor)
     val changeMinor = tenderedMinor?.let { (it - totalMinor).coerceAtLeast(0) } ?: 0
     val discountValid = normalizedDiscountCode == null || discountReason.trim().length >= 3
     val pricingReady = !pricingLoading && pricingError == null
+    val balanceDueAt = if (deferredPayment) localTicketDateTimeToIso(balanceDueAtText, timeZone) else null
+    val paymentDetailsValid = when (paymentMethod) {
+        "cash" -> true
+        "wave", "orange_money" -> internetAvailable && externalReference.trim().length >= 3
+        "later" -> internetAvailable && cart.customer != null && unpaidReason.trim().length >= 3 &&
+            balanceDueAt != null && runCatching { java.time.Instant.parse(balanceDueAt).toEpochMilli() > NativeServerClock.now() }.getOrDefault(false)
+        else -> false
+    }
 
     Dialog(onDismissRequest = { if (!busy) onDismiss() }) {
         Surface(
@@ -6313,7 +6609,7 @@ private fun NativeCashCheckoutDialog(
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(copy.confirmPayment, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                        Text(copy.cashOnlyNotice, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        Text(if (internetAvailable) copy.paymentChoiceHint else copy.cashOnlyNotice, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     }
                     TextButton(onClick = onDismiss, enabled = !busy) { Text(copy.back) }
                 }
@@ -6331,6 +6627,42 @@ private fun NativeCashCheckoutDialog(
                         Text(formatMoney(totalMinor, cart.currency), color = POS_INK, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                         Text(copy.itemsCashSuffix.format(cart.itemCount), color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
                     }
+                }
+
+                if (paymentOptions.isEmpty()) {
+                    Text(copy.noPaymentMethods, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                } else {
+                    Text(copy.paymentMethodLabel, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    paymentOptions.chunked(2).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            row.forEach { option ->
+                                OutlinedButton(
+                                    onClick = { paymentMethod = option },
+                                    enabled = !busy,
+                                    modifier = Modifier.weight(1f),
+                                ) { Text((if (paymentMethod == option) "✓ " else "") + when (option) {
+                                    "cash" -> copy.cashCollection
+                                    "wave" -> "Wave"
+                                    "orange_money" -> "Orange Money"
+                                    else -> copy.payLater
+                                }) }
+                            }
+                        }
+                    }
+                }
+                if (paymentMethod == "wave" || paymentMethod == "orange_money") {
+                    TextField(
+                        value = externalReference,
+                        onValueChange = { externalReference = it },
+                        label = { Text(copy.paymentReference) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(copy.manualPaymentPendingHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                }
+                if (deferredPayment) {
+                    TextField(value = balanceDueAtText, onValueChange = { balanceDueAtText = it }, label = { Text(copy.balanceDueAt) }, placeholder = { Text("2026-10-05 18:00") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    TextField(value = unpaidReason, onValueChange = { unpaidReason = it }, label = { Text(copy.unpaidReason) }, modifier = Modifier.fillMaxWidth())
                 }
 
                 if (pricingLoading) {
@@ -6404,7 +6736,7 @@ private fun NativeCashCheckoutDialog(
                     }
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (cashPayment) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(copy.cashRoundingLine, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(copy.cashRoundingHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     listOf(1, 5, 10, 25, 50, 100).chunked(3).forEach { row ->
@@ -6426,7 +6758,7 @@ private fun NativeCashCheckoutDialog(
                     }
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (cashPayment) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(copy.cashReceivedTitle, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(copy.chooseTenderedAmount, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     cashTenderPresets(totalMinor, cart.currency).chunked(2).forEach { row ->
@@ -6520,7 +6852,7 @@ private fun NativeCashCheckoutDialog(
                     }
                 }
 
-                Card(
+                if (cashPayment) Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFE7F6EC)),
@@ -6540,7 +6872,7 @@ private fun NativeCashCheckoutDialog(
                     }
                 }
 
-                if (useCustomTender && customTenderedMinor == null) {
+                if (cashPayment && useCustomTender && customTenderedMinor == null) {
                     Text(copy.enterValidTender, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 } else if (tenderedMinor != null && tenderedMinor < totalMinor) {
                     Text(copy.tenderBelowTotal, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -6550,19 +6882,23 @@ private fun NativeCashCheckoutDialog(
                     onClick = {
                         tenderedMinor?.let { tendered ->
                             onConfirm(
-                                NativeCashCheckoutRequest(
+                                NativeCheckoutRequest(
                                     expectedTotalMinor = totalMinor,
                                     tenderedMinor = tendered,
+                                    paymentMethod = paymentMethod,
+                                    externalReference = externalReference.trim().takeIf { it.isNotEmpty() },
+                                    balanceDueAt = balanceDueAt,
+                                    unpaidReason = unpaidReason.trim().takeIf { it.isNotEmpty() },
                                     discountCode = normalizedDiscountCode,
                                     discountReason = discountReason.trim().takeIf { it.isNotEmpty() },
                                     taxExemptionReason = normalizedTaxExemption,
-                                    cashRoundingStep = cashRoundingStep.takeIf { it > 1 },
+                                    cashRoundingStep = cashRoundingStep.takeIf { cashPayment && it > 1 },
                                     receiptDelivery = receiptDelivery,
                                 ),
                             )
                         }
                     },
-                    enabled = !busy && pricingReady && isTenderValid && discountValid,
+                    enabled = !busy && pricingReady && isTenderValid && discountValid && paymentDetailsValid,
                     modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
@@ -6703,9 +7039,31 @@ private fun JSONArray?.toNativeMorePayments(): List<NativeMorePayment> = buildLi
             tenderedAmount = value.optString("tenderedAmount").takeIf { it.isNotBlank() && it != "null" },
             changeAmount = value.optString("changeAmount").takeIf { it.isNotBlank() && it != "null" },
             status = value.optString("paymentStatus", "unknown"),
+            provider = value.optString("provider").takeIf { it.isNotBlank() && it != "null" },
+            externalReference = value.optString("externalReference").takeIf { it.isNotBlank() && it != "null" },
             createdAt = value.optString("createdAt", ""),
         ))
     }
+}
+
+private fun JSONArray?.toNativeMorePaymentAdjustments(): List<NativeMorePaymentAdjustment> = buildList {
+    if (this@toNativeMorePaymentAdjustments == null) return@buildList
+    for (index in 0 until this@toNativeMorePaymentAdjustments.length()) {
+        val value = this@toNativeMorePaymentAdjustments.optJSONObject(index) ?: continue
+        value.toNativeMorePaymentAdjustment()?.let(::add)
+    }
+}
+
+private fun JSONObject.toNativeMorePaymentAdjustment(): NativeMorePaymentAdjustment? {
+    val id = optString("id").takeIf { it.isNotBlank() } ?: return null
+    return NativeMorePaymentAdjustment(
+        id = id,
+        originalPaymentId = optString("originalPaymentId").takeIf { it.isNotBlank() && it != "null" },
+        type = optString("adjustmentType"),
+        status = optString("status"),
+        amount = optString("amount", "0"),
+        reason = optString("reason"),
+    )
 }
 
 private fun JSONObject.toNativeMoreSearchResults(): List<NativeMoreSearchResult> = buildList {
@@ -6808,8 +7166,47 @@ private fun JSONArray?.toNativeMoreZReports(): List<NativeMoreZReport> = buildLi
             countedCash = value.optString("countedCash", "0"),
             variance = value.optString("variance", "0"),
             currency = value.optString("currency", "XOF"),
+            orderCount = value.optInt("orderCount"),
+            taxableAmount = value.optString("taxableAmount").takeIf { it.isNotBlank() && it != "null" },
+            taxAmount = value.optString("taxAmount").takeIf { it.isNotBlank() && it != "null" },
+            refundAmount = value.optString("refundAmount", "0"),
+            discountAmount = value.optString("discountAmount", "0"),
+            paymentBreakdown = buildList {
+                val payments = value.optJSONArray("paymentBreakdown") ?: return@buildList
+                for (paymentIndex in 0 until payments.length()) {
+                    val payment = payments.optJSONObject(paymentIndex) ?: continue
+                    add(NativeMoreZPayment(
+                        method = payment.optString("method"),
+                        provider = payment.optString("provider").takeIf { it.isNotBlank() && it != "null" },
+                        netAmount = payment.optString("netAmount", "0"),
+                    ))
+                }
+            },
         ))
     }
+}
+
+private fun buildNativeZReportCsv(report: NativeMoreZReport): String {
+    val rows = listOf(
+        listOf("Z Report", report.id),
+        listOf("Date", report.cutoffAt),
+        listOf("Currency", report.currency),
+        listOf("Orders", report.orderCount.toString()),
+        listOf("Taxable amount", report.taxableAmount.orEmpty()),
+        listOf("Tax amount", report.taxAmount.orEmpty()),
+        listOf("Discount", report.discountAmount),
+        listOf("Refund", report.refundAmount),
+        listOf("Net sales", report.netSales),
+        listOf("Expected cash", report.expectedCash),
+        listOf("Counted cash", report.countedCash),
+        listOf("Variance", report.variance),
+    ) + report.paymentBreakdown.map { payment ->
+        listOf("${payment.method}${payment.provider?.let { " / $it" }.orEmpty()}", payment.netAmount)
+    }
+    fun escape(value: String): String = if (value.any { it == ',' || it == '"' || it == '\r' || it == '\n' }) {
+        "\"${value.replace("\"", "\"\"")}\""
+    } else value
+    return "\uFEFF" + rows.joinToString("\r\n") { row -> row.joinToString(",") { escape(it) } } + "\r\n"
 }
 
 private fun JSONObject.toNativeMoreStatistics(): NativeMoreStatistics {
@@ -6863,6 +7260,7 @@ private fun canAddOffline(product: NativeProduct, quantity: Long): Boolean =
             product.availableQuantity - product.offlineStockBuffer - product.reservedOfflineQuantity >= quantity)
 private fun canAddOnline(product: NativeProduct, quantity: Long): Boolean = !product.trackInventory || product.allowNegativeStock || (product.availableQuantity ?: 0) >= quantity
 private fun parseMoney(value: String): Long? = runCatching { java.math.BigDecimal(value).movePointRight(2).setScale(0, java.math.RoundingMode.UNNECESSARY).longValueExact() }.getOrNull()
+private fun refundMinorToMoney(value: Long): String = java.math.BigDecimal.valueOf(value, 2).toPlainString()
 
 /** Same server price-preview endpoint that POS Web calls before it enables checkout. */
 private fun previewNativeCartPricing(
@@ -6974,15 +7372,19 @@ private fun localTicketDateTimeToIso(value: String, timeZone: String): String? =
     local.atZone(java.time.ZoneId.of(timeZone)).toInstant().toString()
 }.getOrNull()
 
-private fun buildNativeCashReceiptDraft(
+private fun buildNativeReceiptDraft(
     copy: NativePosCopy,
     terminal: NativeTerminal?,
     cart: NativePosCart,
     pricing: NativeCartPricing,
     amountDueMinor: Long,
     tenderedMinor: Long,
+    paymentMethod: String,
+    externalReference: String?,
+    balanceDueAt: String?,
     taxExemptionReason: String?,
     printSettings: NativeReceiptPrintSettings,
+    receiptProfile: NativeReceiptProfile,
 ): NativeReceiptPrintDraft {
     val total = amountDueMinor
     val change = (tenderedMinor - total).coerceAtLeast(0)
@@ -6996,25 +7398,31 @@ private fun buildNativeCashReceiptDraft(
         copies = printSettings.printCopies,
         content = buildList {
             add(terminal?.merchantName?.ifBlank { "CleanHub" } ?: "CleanHub")
-            add(terminal?.branchName?.ifBlank { null } ?: "")
-            add(copy.cashReceipt)
-            add(copy.orderLinePrefix.format(cart.checkoutId.takeLast(8).uppercase()))
-            add(copy.terminalLinePrefix.format(terminalName))
-            add(copy.timeLinePrefix.format(issuedAt))
-            cart.customer?.let { add(copy.receiptCustomerPrefix.format(it.name)) }
+            if (receiptProfile.shows("branch_name")) add(receiptProfile.name ?: terminal?.branchName.orEmpty())
+            if (receiptProfile.shows("receipt_address")) receiptProfile.address?.let(::add)
+            if (receiptProfile.shows("receipt_phone")) receiptProfile.phone?.let(::add)
+            if (receiptProfile.shows("receipt_title")) add(if (paymentMethod == "cash") copy.cashReceipt else copy.paymentReceipt)
+            if (receiptProfile.shows("receipt_number")) add(copy.receiptNumberLine.format(cart.checkoutId.takeLast(8).uppercase()))
+            if (receiptProfile.shows("order_number")) add(copy.orderLinePrefix.format(cart.checkoutId.takeLast(8).uppercase()))
+            if (receiptProfile.shows("terminal_name")) add(copy.terminalLinePrefix.format(terminalName))
+            if (receiptProfile.shows("issued_at")) add(copy.timeLinePrefix.format(issuedAt))
+            if (receiptProfile.shows("customer_name")) cart.customer?.let { add(copy.receiptCustomerPrefix.format(it.name)) }
             add("------------------------------")
-            cart.products.forEach { line ->
-                add("${line.name} ×${line.quantity}  ${formatMoney(line.amountMinor * line.quantity, cart.currency)}")
-            }
-            cart.ticketItems.forEach { line ->
-                add("${line.name} ×${line.quantity}  ${formatMoney(line.lineAmountMinor, cart.currency)}")
+            if (receiptProfile.shows("item_name")) {
+                cart.products.forEach { line ->
+                    add("${line.name}${if (receiptProfile.shows("item_quantity")) " ×${line.quantity}" else ""}${if (receiptProfile.shows("item_line_total")) "  ${formatMoney(line.amountMinor * line.quantity, cart.currency)}" else ""}")
+                }
+                cart.ticketItems.forEach { line ->
+                    add("${line.name}${if (receiptProfile.shows("item_quantity")) " ×${line.quantity}" else ""}${if (receiptProfile.shows("item_line_total")) "  ${formatMoney(line.lineAmountMinor, cart.currency)}" else ""}")
+                }
             }
             add("------------------------------")
-            add(copy.receiptSubtotalPrefix.format(formatMoney(pricing.subtotalMinor, cart.currency)))
-            pricing.discounts.forEach { discount ->
+            if (receiptProfile.shows("subtotal")) add(copy.receiptSubtotalPrefix.format(formatMoney(pricing.subtotalMinor, cart.currency)))
+            if (receiptProfile.shows("discount")) pricing.discounts.forEach { discount ->
                 add("${discount.title}  -${formatMoney(discount.amountMinor, cart.currency)}")
             }
-            // Include the base for every rate, including zero-rated items.
+            // Tax and registration number remain visible when present: they are
+            // part of the fiscal record even if a legacy field list hides them.
             pricing.taxBreakdown.forEach { entry ->
                 add(copy.receiptTaxableLine.format(
                     formatNativeTaxRate(entry.taxRate),
@@ -7030,17 +7438,23 @@ private fun buildNativeCashReceiptDraft(
             // System rounding plus any cash rounding the cashier chose: the
             // amount due is what was actually collected against the total.
             val roundingMinor = total - (pricing.totalMinor - pricing.roundingAdjustmentMinor)
-            if (roundingMinor != 0L) {
+            if (roundingMinor != 0L && receiptProfile.shows("rounding")) {
                 add(copy.receiptRoundingPrefix.format(formatSignedMoney(roundingMinor, cart.currency)))
             }
             add(copy.receiptDuePrefix.format(formatMoney(total, cart.currency)))
-            add(copy.receiptTenderedPrefix.format(formatMoney(tenderedMinor, cart.currency)))
-            if (change > 0) add(copy.receiptChangePrefix.format(formatMoney(change, cart.currency)))
+            if (paymentMethod == "cash") {
+                if (receiptProfile.shows("cash_tendered")) add(copy.receiptTenderedPrefix.format(formatMoney(tenderedMinor, cart.currency)))
+                if (change > 0 && receiptProfile.shows("change")) add(copy.receiptChangePrefix.format(formatMoney(change, cart.currency)))
+            } else if (paymentMethod == "later") {
+                add(copy.receiptPayLater.format(balanceDueAt.orEmpty()))
+            } else {
+                add(copy.receiptPendingPayment.format(paymentMethod, externalReference.orEmpty()))
+            }
             pricing.taxRegistrationNumber?.let { add(copy.receiptTaxNumberPrefix.format(it)) }
             taxExemptionReason?.takeIf { it.isNotBlank() }?.let {
                 add(copy.receiptTaxExemptionPrefix.format(it))
             }
-            add(copy.thankYou)
+            if (receiptProfile.shows("thank_you_message")) add(receiptProfile.thankYouMessage ?: copy.thankYou)
             add("")
         }.filter { it.isNotBlank() }.joinToString("\n"),
     )
