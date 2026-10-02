@@ -26,7 +26,17 @@ const SEED_FILES = [
 
 async function runSeeds(): Promise<void> {
   const seedsDir = dirname(fileURLToPath(import.meta.url));
-  const connection = createDbConnection({ databaseUrl: getDatabaseUrl() });
+  const databaseUrl = getDatabaseUrl();
+  const databaseHost = new URL(databaseUrl).hostname;
+  const localHosts = new Set(["localhost", "127.0.0.1", "::1", "postgres", "cleanhub-postgres"]);
+  if (
+    (process.env.NODE_ENV === "production" || !localHosts.has(databaseHost)) &&
+    process.env.CLEANHUB_ALLOW_PRODUCTION_DEMO_SEED !==
+      "I_UNDERSTAND_THIS_WRITES_DEMO_DATA"
+  ) {
+    throw new Error("Demo seed is limited to local databases unless explicitly overridden.");
+  }
+  const connection = createDbConnection({ databaseUrl });
   const client = await connection.pool.connect();
 
   try {

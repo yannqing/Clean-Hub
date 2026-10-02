@@ -3,6 +3,16 @@ import { join } from "node:path";
 
 import { createDbConnection, getDatabaseUrl } from "../packages/db/src/client.js";
 
+if (
+  process.env.NODE_ENV === "production" &&
+  process.env.CLEANHUB_ALLOW_PRODUCTION_DEMO_SEED !==
+    "I_UNDERSTAND_THIS_WRITES_DEMO_DATA"
+) {
+  throw new Error(
+    "Demo seeds are disabled in production. Set CLEANHUB_ALLOW_PRODUCTION_DEMO_SEED to the documented override only for a disposable environment.",
+  );
+}
+
 const seedsFolder = process.env.CLEANHUB_SEEDS_FOLDER ?? "./db/seeds";
 
 const seedFiles = [
