@@ -34,6 +34,7 @@ function collectThrownMessages(): Map<string, string[]> {
   const roots = [
     join(apiSrc, "modules", "pos"),
     join(apiSrc, "modules", "auth"),
+    join(apiSrc, "modules", "tax"),
     join(apiSrc, "http"),
   ];
   const files = roots
@@ -45,6 +46,9 @@ function collectThrownMessages(): Map<string, string[]> {
     /new\s+\w*Error\(\s*\n?\s*"[A-Z_]+"\s*,\s*\n?\s*"((?:[^"\\]|\\.)*)"/g,
     // { code: "CODE", message: "message" }
     /code:\s*"[A-Z_]+"\s*,\s*\n?\s*message:\s*"((?:[^"\\]|\\.)*)"/g,
+    // Tax readiness is a typed result returned from a helper, then raised by
+    // the POS order service. Keep its operator guidance in the catalogue too.
+    /missing\(\s*"POS_TAX_[A-Z_]+"\s*,\s*"((?:[^"\\]|\\.)*)"/g,
   ];
 
   for (const file of files) {

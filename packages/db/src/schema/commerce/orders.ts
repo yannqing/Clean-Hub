@@ -142,6 +142,10 @@ export const orders = pgTable(
     pricesIncludeTax: boolean("prices_include_tax").notNull().default(true),
     taxExemptionReason: text("tax_exemption_reason"),
     taxRegistrationNumberSnapshot: text("tax_registration_number_snapshot"),
+    taxLabelSnapshot: text("tax_label_snapshot"),
+    taxComponentsSnapshot: jsonb("tax_components_snapshot").$type<
+      Array<{ name: string; rate: string; parentRate: string; taxableAmount: string; taxAmount: string }>
+    >(),
     roundingAdjustmentAmount: numeric("rounding_adjustment_amount", {
       precision: 12,
       scale: 2,

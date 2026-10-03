@@ -72,7 +72,7 @@ import {
 import { usePosOfflineWrites } from "@/features/offline/lib";
 import { OfflineCashExceptionPanel } from "@/features/offline/components";
 import { MOBILE_MONEY_PROVIDER_LABELS } from "@/features/orders/constants";
-import { getPosApiErrorMessage } from "@/lib/api-error-message";
+import { getPosApiErrorMessage, getPosTaxReadinessMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
 import { formatPosMoney } from "@/lib/money";
 import { isLockedPosPaymentMethod } from "@cleanhub/domain/payment-methods";
@@ -712,6 +712,8 @@ function CartPanel({
   // cart itself with the same per-rate rules, so its taxes show there too.
   const displayedTaxBreakdown =
     effectivePreview?.taxBreakdown ?? (isOnline ? [] : localPricing.taxBreakdown);
+  const displayedTaxComponents = effectivePreview?.taxComponents ?? (isOnline ? [] : localPricing.taxComponents);
+  const displayedTaxLabel = effectivePreview?.taxLabel ?? runtime.taxLabel;
   const pricedTotal = effectivePreview?.totalAmount ?? localTotal;
   const offlineProductEligible = productLines.every(
     (line) =>
@@ -939,6 +941,10 @@ function CartPanel({
 
   function openCheckout() {
     if (!scopeReady || cart.lines.length === 0) return;
+    if (!runtime.taxReadiness?.ready) {
+      toast.error(getPosTaxReadinessMessage(runtime.taxReadiness?.code));
+      return;
+    }
     // Each sale decides for itself; a previous customer's concession must not
     // carry over silently into the next one.
     setCashRoundingStep(defaultCashRoundingStep);
@@ -1316,6 +1322,9 @@ function CartPanel({
               autoPrint: true,
               branch,
               cart,
+              pricing: localPricing,
+              totalAmount: toMoney(total),
+              taxRegistrationNumber: runtime.taxRegistrationNumber,
               copies: runtime.printCopies,
               locale,
               paymentMethod: cashTender ? "cash" : "later",
@@ -1791,6 +1800,11 @@ function CartPanel({
               : t("pos.cart.discountHint")}
           </p>
         ) : null}
+        {!runtime.taxReadiness?.ready ? (
+          <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950" role="alert">
+            {getPosTaxReadinessMessage(runtime.taxReadiness?.code)}
+          </p>
+        ) : null}
         <Button
           className="h-12 w-full text-sm font-semibold"
           disabled={
@@ -1798,7 +1812,8 @@ function CartPanel({
             !scopeReady ||
             cart.lines.length === 0 ||
             offlineCheckoutBlocked ||
-            onlinePriceUnconfirmed
+            onlinePriceUnconfirmed ||
+            !runtime.taxReadiness?.ready
           }
           onClick={openCheckout}
         >
@@ -2003,24 +2018,28 @@ function CartPanel({
               ) : null}
               {displayedTaxBreakdown
                 .filter((entry) => Number(entry.taxAmount) !== 0)
-                .map((entry) => (
-                  <div
+                .flatMap((entry) => {
+                  const components = displayedTaxComponents.filter((component) => component.parentRate === entry.taxRate);
+                  const rows = components.length > 0
+                    ? components.map((component) => ({ key: `${entry.taxRate}:${component.name}`, label: `${component.name} ${formatTaxRatePercent(component.rate)}`, amount: component.taxAmount }))
+                    : [{ key: entry.taxRate, label: displayedTaxLabel
+                      ? `${displayedTaxLabel} ${formatTaxRatePercent(entry.taxRate)}`
+                      : t("pos.cart.taxLine", { rate: formatTaxRatePercent(entry.taxRate) }), amount: entry.taxAmount }];
+                  return rows.map((row) => <div
                     className="flex justify-between text-xs text-muted-foreground"
-                    key={entry.taxRate}
+                    key={row.key}
                   >
                     <span>
-                      {t("pos.cart.taxLine", {
-                        rate: formatTaxRatePercent(entry.taxRate),
-                      })}
+                      {row.label}
                       {(effectivePreview?.pricesIncludeTax ?? runtime.pricesIncludeTax)
                         ? t("pos.cart.taxInclusiveSuffix")
                         : ""}
                     </span>
                     <span>
-                      {formatPosMoney(entry.taxAmount, cart.currency, locale)}
+                      {formatPosMoney(row.amount, cart.currency, locale)}
                     </span>
-                  </div>
-                ))}
+                  </div>);
+                })}
               {effectivePreview &&
               Number(effectivePreview.roundingAdjustmentAmount) !== 0 ? (
                 <div className="flex justify-between text-xs text-muted-foreground">

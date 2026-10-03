@@ -9,7 +9,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private const val DATABASE_NAME = "cleanhub_native_pos.db"
-private const val DATABASE_VERSION = 20
+private const val DATABASE_VERSION = 22
 private const val MAX_RUNTIME_AGE_MS = 8 * 60 * 60 * 1_000L
 private const val MAX_CATALOG_AGE_MS = 24 * 60 * 60 * 1_000L
 private const val MAX_CASH_STATE_AGE_MS = 2 * 60 * 60 * 1_000L
@@ -209,6 +209,14 @@ class NativePosDatabase(
             db.execSQL("ALTER TABLE checkout_settings ADD COLUMN mobile_money_providers_enabled TEXT NOT NULL DEFAULT '[]'")
             db.execSQL("ALTER TABLE checkout_settings ADD COLUMN receipt_profile_json TEXT NOT NULL DEFAULT '{}'")
         }
+        if (oldVersion in 14..20) {
+            db.execSQL("ALTER TABLE checkout_settings ADD COLUMN tax_label TEXT")
+            db.execSQL("ALTER TABLE checkout_settings ADD COLUMN tax_components_json TEXT NOT NULL DEFAULT '[]'")
+        }
+        if (oldVersion in 14..21) {
+            db.execSQL("ALTER TABLE checkout_settings ADD COLUMN tax_ready INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE checkout_settings ADD COLUMN tax_readiness_code TEXT")
+        }
     }
 
     fun snapshot(now: Long = System.currentTimeMillis()): NativePosSnapshot {
@@ -270,9 +278,17 @@ class NativePosDatabase(
                 put("fields", JSONArray(settings.receiptProfile.fields.toList()))
             }.toString())
             put("tax_enabled", if (settings.taxEnabled) 1 else 0)
+            put("tax_ready", if (settings.taxReady) 1 else 0)
+            if (settings.taxReadinessCode == null) putNull("tax_readiness_code") else put("tax_readiness_code", settings.taxReadinessCode)
             put("default_tax_rate", settings.defaultTaxRate)
             put("prices_include_tax", if (settings.pricesIncludeTax) 1 else 0)
             if (settings.taxRegistrationNumber.isNullOrBlank()) putNull("tax_registration_number") else put("tax_registration_number", settings.taxRegistrationNumber)
+            if (settings.taxLabel.isNullOrBlank()) putNull("tax_label") else put("tax_label", settings.taxLabel)
+            put("tax_components_json", JSONArray().apply {
+                settings.taxComponents.forEach { component ->
+                    put(JSONObject().put("name", component.name).put("rate", component.rate))
+                }
+            }.toString())
             put("email_receipt_enabled", if (settings.emailReceiptEnabled) 1 else 0)
             put("auto_print_receipt", if (settings.autoPrintReceipt) 1 else 0)
             put("lock_timeout_seconds", settings.lockTimeoutSeconds.coerceAtLeast(0))
@@ -281,7 +297,7 @@ class NativePosDatabase(
     }
 
     fun checkoutSettings(): NativeCheckoutSettings = readableDatabase.rawQuery(
-        "SELECT rounding_rule, cash_rounding_step, tax_enabled, default_tax_rate, prices_include_tax, tax_registration_number, email_receipt_enabled, auto_print_receipt, lock_timeout_seconds, default_payment_method, payment_methods_enabled, mobile_money_providers_enabled, receipt_profile_json FROM checkout_settings WHERE singleton = 1",
+        "SELECT rounding_rule, cash_rounding_step, tax_enabled, default_tax_rate, prices_include_tax, tax_registration_number, email_receipt_enabled, auto_print_receipt, lock_timeout_seconds, default_payment_method, payment_methods_enabled, mobile_money_providers_enabled, receipt_profile_json, tax_label, tax_components_json, tax_ready, tax_readiness_code FROM checkout_settings WHERE singleton = 1",
         null,
     ).use { cursor ->
         if (!cursor.moveToFirst()) return@use NativeCheckoutSettings()
@@ -289,9 +305,20 @@ class NativePosDatabase(
             roundingRule = cursor.getString(0),
             cashRoundingStep = cursor.getInt(1).coerceIn(1, 100),
             taxEnabled = cursor.getInt(2) == 1,
+            taxReady = cursor.getInt(15) == 1,
+            taxReadinessCode = cursor.getStringOrNull(16),
             defaultTaxRate = cursor.getString(3),
             pricesIncludeTax = cursor.getInt(4) == 1,
             taxRegistrationNumber = cursor.getStringOrNull(5),
+            taxLabel = cursor.getStringOrNull(13),
+            taxComponents = runCatching {
+                val components = JSONArray(cursor.getString(14))
+                (0 until components.length()).mapNotNull { index ->
+                    components.optJSONObject(index)?.let { component ->
+                        NativeTaxComponent(component.optString("name"), component.optString("rate", "0.0000"))
+                    }
+                }
+            }.getOrDefault(emptyList()),
             emailReceiptEnabled = cursor.getInt(6) == 1,
             autoPrintReceipt = cursor.getInt(7) == 1,
             lockTimeoutSeconds = cursor.getInt(8).coerceAtLeast(0),
@@ -574,6 +601,8 @@ class NativePosDatabase(
         require(!cart.isEmpty) { copy.cartIsEmpty }
         val now = System.currentTimeMillis()
         val terminal = snapshot(now).terminal ?: throw NativePosValidationException(copy.localDataExpired)
+        val taxSettings = checkoutSettings()
+        if (!taxSettings.taxReady) throw NativePosValidationException(copy.taxReadinessMessage(taxSettings.taxReadinessCode))
         val paymentMethod = checkoutRequest.paymentMethod
         require(paymentMethod in setOf("cash", "wave", "orange_money", "later")) { "Unsupported payment method" }
         val cashState = if (paymentMethod == "cash") {
@@ -1268,9 +1297,13 @@ class NativePosDatabase(
               rounding_rule TEXT NOT NULL DEFAULT 'none',
               cash_rounding_step INTEGER NOT NULL DEFAULT 1,
               tax_enabled INTEGER NOT NULL DEFAULT 0,
+              tax_ready INTEGER NOT NULL DEFAULT 0,
+              tax_readiness_code TEXT,
               default_tax_rate TEXT NOT NULL DEFAULT '0.0000',
               prices_include_tax INTEGER NOT NULL DEFAULT 1,
               tax_registration_number TEXT,
+              tax_label TEXT,
+              tax_components_json TEXT NOT NULL DEFAULT '[]',
               email_receipt_enabled INTEGER NOT NULL DEFAULT 0,
               auto_print_receipt INTEGER NOT NULL DEFAULT 1,
               lock_timeout_seconds INTEGER NOT NULL DEFAULT 0,

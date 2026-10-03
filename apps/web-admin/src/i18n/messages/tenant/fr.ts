@@ -2150,6 +2150,8 @@ export const tenantMessagesFr: TenantMessages = {
         closingFloat: "Caisse de clôture",
         netSales: "Ventes nettes",
         cashVariance: "Variance",
+        taxAmount: "Taxe sur ventes (brute)",
+        taxComponents: "Composantes fiscales",
       },
       statuses: {
         open: "Ouvrir",
@@ -2183,6 +2185,9 @@ export const tenantMessagesFr: TenantMessages = {
         netSales: "Ventes nettes",
         cashVariance: "Écart de caisse",
         currency: "Devise",
+        taxableAmount: "Base imposable (brute)",
+        taxAmount: "Taxe sur ventes (brute)",
+        taxComponents: "Composantes fiscales (brutes)",
       },
     },
     settings: {
@@ -3225,7 +3230,8 @@ export const tenantMessagesFr: TenantMessages = {
   taxRates: {
     title: "Taux de taxe",
     description:
-      "Des taux nommés à appliquer à certains services et produits, par exemple un taux réduit ou un article exonéré. Tout article sans taux propre utilise le taux de TVA par défaut ci-dessus.",
+      "Des taux nommés à appliquer à certains services et produits, par exemple un taux réduit ou un article exonéré. Tout article sans taux propre utilise le taux de taxe par défaut ci-dessus.",
+    templateOverride: "Modifier un taux issu du modèle du pays arrête la synchronisation fiscale automatique pour ce locataire.",
     empty: "Aucun taux pour l'instant. Tous les articles sont vendus au taux par défaut.",
     add: "Ajouter un taux",
     name: "Nom",

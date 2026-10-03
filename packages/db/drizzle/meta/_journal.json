@@ -463,6 +463,34 @@
       "when": 1790182440287,
       "tag": "0065_regular_mongu",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1791034923265,
+      "tag": "0066_lonely_the_renegades",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1791036594850,
+      "tag": "0067_needy_spitfire",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1791037119488,
+      "tag": "0068_previous_whirlwind",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1791039490357,
+      "tag": "0069_futuristic_the_hood",
+      "breakpoints": true
     }
   ]
 }

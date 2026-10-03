@@ -32,6 +32,7 @@ import {
 } from "@cleanhub/db";
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import { templateTaxRateKey } from "../../tax/tax.template-key.js";
 import {
   findPosCatalogProducts,
   findPosCatalogServices,
@@ -62,14 +63,26 @@ export type CreateSaasTenantRecordInput = Omit<CreateSaasTenantRequest, "default
   defaultLanguage: SaasTenantLanguage;
   defaultCurrency: string;
   timezone: string;
+  taxTemplate?: typeof platformTaxTemplates.$inferSelect | null;
 };
 
-function countryCodeForTaxTemplate(country: string): string | null {
-  const normalized = country.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+function normalizedCountry(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .toLowerCase().replace(/[^a-z]/g, "");
-  if (normalized === "sn" || normalized === "senegal") return "SN";
-  if (["ci", "cotedivoire", "ivorycoast"].includes(normalized)) return "CI";
-  return /^[a-z]{2}$/.test(normalized) ? normalized.toUpperCase() : null;
+}
+
+export async function findPlatformTaxTemplateForCountry(
+  db: Database,
+  country: string,
+): Promise<typeof platformTaxTemplates.$inferSelect | null> {
+  const normalized = normalizedCountry(country);
+  const templates = await db.select().from(platformTaxTemplates);
+  return templates.find((template) =>
+    normalizedCountry(template.countryCode) === normalized ||
+    normalizedCountry(template.name) === normalized ||
+    normalizedCountry(template.name.split(/\s[-–—]\s/, 1)[0] ?? "") === normalized ||
+    (template.countryCode === "CI" && normalized === "ivorycoast")
+  ) ?? null;
 }
 
 export type UpdateSaasTenantRecordInput = {
@@ -330,11 +343,7 @@ export async function createSaasTenantRecord(
     updatedBy: input.actorUserId,
   });
 
-  const countryCode = countryCodeForTaxTemplate(input.country);
-  const [taxTemplate] = countryCode
-    ? await db.select().from(platformTaxTemplates)
-      .where(eq(platformTaxTemplates.countryCode, countryCode)).limit(1)
-    : [];
+  const taxTemplate = input.taxTemplate;
   if (taxTemplate) {
     const defaultRate = taxTemplate.rates.find((rate) => rate.isDefault)
       ?? taxTemplate.rates[0];
@@ -344,6 +353,10 @@ export async function createSaasTenantRecord(
       taxEnabled: taxTemplate.taxEnabled,
       defaultTaxRate: defaultRate?.rate ?? "0",
       pricesIncludeTax: taxTemplate.pricesIncludeTax,
+      taxLabel: taxTemplate.taxLabel,
+      defaultTaxComponents: defaultRate?.components ?? null,
+      taxTemplateCountryCode: taxTemplate.countryCode,
+      taxTemplateVersion: taxTemplate.version,
       createdBy: input.actorUserId,
       updatedBy: input.actorUserId,
     });
@@ -352,6 +365,7 @@ export async function createSaasTenantRecord(
         id: createId(),
         tenantId,
         name: rate.name,
+        templateRateKey: templateTaxRateKey(rate, index),
         rate: rate.rate,
         displayOrder: index,
         createdBy: input.actorUserId,

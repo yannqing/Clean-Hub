@@ -194,10 +194,23 @@ class NativePosSyncEngine(context: Context) {
                         ?: NativeReceiptProfile().fields,
                 ),
                 taxEnabled = settings.optBoolean("taxEnabled"),
+                taxReady = settings.optJSONObject("taxReadiness")?.optBoolean("ready") == true,
+                taxReadinessCode = settings.optJSONObject("taxReadiness")?.optString("code")?.takeIf { it.isNotBlank() && it != "null" },
                 defaultTaxRate = settings.optString("defaultTaxRate", "0.0000"),
                 pricesIncludeTax = settings.optBoolean("pricesIncludeTax", true),
                 taxRegistrationNumber = settings.optString("taxRegistrationNumber")
                     .takeIf { it.isNotBlank() && it != "null" },
+                taxLabel = settings.optString("taxLabel").takeIf { it.isNotBlank() && it != "null" },
+                taxComponents = settings.optJSONArray("taxComponents")?.let { components ->
+                    (0 until components.length()).mapNotNull { index ->
+                        components.optJSONObject(index)?.let { component ->
+                            NativeTaxComponent(
+                                name = component.optString("name"),
+                                rate = component.optString("rate", "0.0000"),
+                            )
+                        }
+                    }
+                } ?: emptyList(),
                 emailReceiptEnabled = settings.optBoolean("emailReceiptEnabled"),
                 autoPrintReceipt = settings.optBoolean("autoPrintReceipt", true),
                 lockTimeoutSeconds = settings.optInt("lockTimeoutSeconds", 0),

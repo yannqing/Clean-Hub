@@ -17,7 +17,10 @@ import {
 
 import type { AuthContext } from "../../auth/auth.types.js";
 import {
+  allocateProportionally,
   calculateTaxedTotals,
+  normalizeTaxRate,
+  taxRateToScale,
   type TaxLineAllocation,
 } from "@cleanhub/domain/tax";
 import {
@@ -32,6 +35,8 @@ export type PosFinancialRules = {
   taxRate: string;
   pricesIncludeTax: boolean;
   taxRegistrationNumber: string | null;
+  taxLabel?: string | null;
+  taxComponents?: Array<{ name: string; rate: string }> | null;
   /**
    * Settlement currency. Totals must land on an amount the customer can
    * actually pay: XOF has no sub-franc coin, so a 52.25 total is not a real
@@ -46,6 +51,14 @@ export type PosTaxBreakdownEntry = {
   taxMinor: bigint;
 };
 
+export type PosTaxComponentEntry = {
+  name: string;
+  rate: string;
+  parentRate: string;
+  taxableMinor: bigint;
+  taxMinor: bigint;
+};
+
 export type PosFinancialTotals = {
   taxableMinor: bigint;
   taxMinor: bigint;
@@ -56,11 +69,13 @@ export type PosFinancialTotals = {
    */
   taxRate: string;
   taxBreakdown: PosTaxBreakdownEntry[];
+  taxComponents: PosTaxComponentEntry[];
   /** Per-line allocation, in the order of the lines passed in. */
   lineTaxes: TaxLineAllocation[];
   pricesIncludeTax: boolean;
   taxExemptionReason: string | null;
   taxRegistrationNumber: string | null;
+  taxLabel: string | null;
   roundingAdjustmentMinor: bigint;
   totalMinor: bigint;
 };
@@ -156,15 +171,42 @@ export function calculatePosFinancialTotals(input: {
       taxableMinor: group.taxableMinor,
       taxMinor: group.taxMinor,
     }));
+  const componentGroup = taxed.groups.find(
+    (group) =>
+      group.taxRate === normalizeTaxRate(input.rules.taxRate) &&
+      group.taxMinor > BigInt(0),
+  );
+  const candidates = input.rules.taxComponents ?? [];
+  const configuredComponents = candidates.reduce(
+    (sum, component) => sum + taxRateToScale(component.rate),
+    BigInt(0),
+  ) === taxRateToScale(input.rules.taxRate) ? candidates : [];
+  const componentAmounts = componentGroup && configuredComponents.length > 0
+    ? allocateProportionally(
+        componentGroup.taxMinor,
+        configuredComponents.map((component) => taxRateToScale(component.rate)),
+      )
+    : [];
+  const taxComponents: PosTaxComponentEntry[] = componentGroup
+    ? configuredComponents.map((component, index) => ({
+        name: component.name,
+        rate: normalizeTaxRate(component.rate),
+        parentRate: componentGroup.taxRate,
+        taxableMinor: componentGroup.taxableMinor,
+        taxMinor: componentAmounts[index] ?? BigInt(0),
+      }))
+    : [];
   return {
     taxableMinor: taxed.taxableMinor,
     taxMinor: taxed.taxMinor,
     taxRate: taxed.groups[0]?.taxRate ?? "0.0000",
     taxBreakdown,
+    taxComponents,
     lineTaxes: taxed.lines,
     pricesIncludeTax: input.rules.pricesIncludeTax,
     taxExemptionReason: exemption,
     taxRegistrationNumber: input.rules.taxRegistrationNumber,
+    taxLabel: input.rules.taxLabel ?? null,
     roundingAdjustmentMinor: rounded - beforeRounding,
     totalMinor: rounded,
   };
@@ -183,6 +225,8 @@ export async function resolvePosFinancialRules(
       taxRate: posChannelSettings.defaultTaxRate,
       pricesIncludeTax: posChannelSettings.pricesIncludeTax,
       taxRegistrationNumber: posChannelSettings.taxRegistrationNumber,
+      taxLabel: posChannelSettings.taxLabel,
+      taxComponents: posChannelSettings.defaultTaxComponents,
     })
     .from(posChannelSettings)
     .where(eq(posChannelSettings.tenantId, tenantId))
@@ -194,6 +238,8 @@ export async function resolvePosFinancialRules(
       taxRate: "0.0000",
       pricesIncludeTax: true,
       taxRegistrationNumber: null,
+      taxLabel: null,
+      taxComponents: null,
     }),
     currency: currency ?? null,
   };
@@ -362,6 +408,14 @@ export async function applyPosOrderFinancialRules(
       pricesIncludeTax: totals.pricesIncludeTax,
       taxExemptionReason: totals.taxExemptionReason,
       taxRegistrationNumberSnapshot: totals.taxRegistrationNumber,
+      taxLabelSnapshot: totals.taxLabel,
+      taxComponentsSnapshot: totals.taxComponents.map((entry) => ({
+        name: entry.name,
+        rate: entry.rate,
+        parentRate: entry.parentRate,
+        taxableAmount: minorToMoney(entry.taxableMinor),
+        taxAmount: minorToMoney(entry.taxMinor),
+      })),
       roundingAdjustmentAmount: signedMinorToMoney(
         totals.roundingAdjustmentMinor,
       ),
@@ -390,6 +444,14 @@ export function financialTotalsToMoney(totals: PosFinancialTotals) {
       taxableAmount: minorToMoney(entry.taxableMinor),
       taxAmount: minorToMoney(entry.taxMinor),
     })),
+    taxComponents: totals.taxComponents.map((entry) => ({
+      name: entry.name,
+      rate: entry.rate,
+      parentRate: entry.parentRate,
+      taxableAmount: minorToMoney(entry.taxableMinor),
+      taxAmount: minorToMoney(entry.taxMinor),
+    })),
+    taxLabel: totals.taxLabel,
     pricesIncludeTax: totals.pricesIncludeTax,
     taxExemptionReason: totals.taxExemptionReason,
     taxRegistrationNumber: totals.taxRegistrationNumber,

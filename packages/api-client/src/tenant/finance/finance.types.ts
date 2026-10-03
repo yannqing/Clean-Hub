@@ -13,6 +13,7 @@ export type FinanceAvailableBranch = {
 export type FinanceSummaryMetrics = {
   orderTaxableAmount: number;
   orderTaxAmount: number;
+  orderTaxComponents: Array<{ name: string; rate: string; taxableAmount: number; taxAmount: number }>;
   grossCollected: number;
   refundAmount: number;
   correctionAmount: number;

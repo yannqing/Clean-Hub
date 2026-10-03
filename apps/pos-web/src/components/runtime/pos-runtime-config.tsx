@@ -44,6 +44,9 @@ export type PosRuntimeConfig = {
   defaultTaxRate: string;
   pricesIncludeTax: boolean;
   taxRegistrationNumber: string | null;
+  taxLabel: string | null;
+  taxComponents: Array<{ name: string; rate: string }> | null;
+  taxReadiness: { ready: boolean; code: string | null; message: string | null };
   merchantName: string;
   branchName: string;
   receiptName: string | null;
@@ -81,6 +84,9 @@ const PosRuntimeConfigContext = createContext<PosRuntimeConfig>({
   defaultTaxRate: "0.0000",
   pricesIncludeTax: true,
   taxRegistrationNumber: null,
+  taxLabel: null,
+  taxComponents: null,
+  taxReadiness: { ready: false, code: "POS_TAX_STATUS_UNAVAILABLE", message: null },
   merchantName: "CleanHub",
   branchName: "",
   receiptName: null,
@@ -115,6 +121,9 @@ export function PosRuntimeConfigProvider({
   defaultTaxRate,
   pricesIncludeTax,
   taxRegistrationNumber,
+  taxLabel,
+  taxComponents,
+  taxReadiness,
   merchantName,
   branchName,
   receiptName,
@@ -148,6 +157,9 @@ export function PosRuntimeConfigProvider({
   defaultTaxRate?: string | null;
   pricesIncludeTax?: boolean | null;
   taxRegistrationNumber?: string | null;
+  taxLabel?: string | null;
+  taxComponents?: Array<{ name: string; rate: string }> | null;
+  taxReadiness?: { ready: boolean; code: string | null; message: string | null } | null;
   merchantName?: string | null;
   branchName?: string | null;
   receiptName?: string | null;
@@ -182,6 +194,9 @@ export function PosRuntimeConfigProvider({
       defaultTaxRate: defaultTaxRate ?? "0.0000",
       pricesIncludeTax: pricesIncludeTax ?? true,
       taxRegistrationNumber: taxRegistrationNumber ?? null,
+      taxLabel: taxLabel ?? null,
+      taxComponents: taxComponents ?? null,
+      taxReadiness: taxReadiness ?? { ready: false, code: "POS_TAX_STATUS_UNAVAILABLE", message: null },
       merchantName: merchantName || "CleanHub",
       branchName: branchName ?? "",
       receiptName: receiptName ?? null,
@@ -215,6 +230,9 @@ export function PosRuntimeConfigProvider({
       defaultTaxRate,
       pricesIncludeTax,
       taxRegistrationNumber,
+      taxLabel,
+      taxComponents,
+      taxReadiness,
       merchantName,
       branchName,
       receiptName,

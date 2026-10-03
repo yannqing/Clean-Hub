@@ -228,6 +228,8 @@ function toOrderSummary(row: OrderJoinedRow): PosOrderSummary {
     pricesIncludeTax: row.pricesIncludeTax,
     taxExemptionReason: row.taxExemptionReason,
     taxRegistrationNumberSnapshot: row.taxRegistrationNumberSnapshot,
+    taxLabelSnapshot: row.taxLabelSnapshot,
+    taxComponentsSnapshot: row.taxComponentsSnapshot,
     roundingAdjustmentAmount: row.roundingAdjustmentAmount,
     totalAmount: row.totalAmount,
     paymentStatus: row.paymentStatus,

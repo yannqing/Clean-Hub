@@ -68,6 +68,10 @@ export function buildReportCsv(
     [labels.grossSales, summary.grossSales],
     [labels.taxableAmount, summary.taxableAmount],
     [labels.taxAmount, summary.taxAmount],
+    ...summary.taxComponents.flatMap((component): CsvRow[] => [
+      [`${component.name} ${Number(component.rate) * 100}% — ${labels.taxableAmount}`, component.taxableAmount],
+      [`${component.name} ${Number(component.rate) * 100}% — ${labels.taxAmount}`, component.taxAmount],
+    ]),
     [labels.orderCount, summary.orderCount],
     [labels.pendingPickup, summary.pendingPickupCount],
     [labels.inProgress, summary.inProgressCount],
@@ -145,6 +149,10 @@ export function buildZReportCsv(
     ],
     [labels.taxableAmount, `${summary.taxableAmount} ${currency}`.trim()],
     [labels.taxAmount, `${summary.taxAmount} ${currency}`.trim()],
+    ...summary.taxComponents.flatMap((component): CsvRow[] => [
+      [`${component.name} ${Number(component.rate) * 100}% — ${labels.taxableAmount}`, `${component.taxableAmount} ${currency}`.trim()],
+      [`${component.name} ${Number(component.rate) * 100}% — ${labels.taxAmount}`, `${component.taxAmount} ${currency}`.trim()],
+    ]),
     [labels.orderCount, summary.orderCount],
     [labels.pendingPickup, summary.pendingPickupCount],
     [labels.inProgress, summary.inProgressCount],

@@ -10,7 +10,9 @@ export type SaasTenantsErrorCode =
   | "SAAS_TENANT_RETENTION_ELAPSED"
   | "SAAS_TENANT_USER_NOT_FOUND"
   | "OWNER_ALREADY_EXISTS"
-  | "TENANT_USER_EMAIL_CONFLICT";
+  | "TENANT_USER_EMAIL_CONFLICT"
+  | "SAAS_TENANT_TAX_TEMPLATE_REQUIRED"
+  | "SAAS_TENANT_CURRENCY_MISMATCH";
 
 export class SaasTenantsError extends Error {
   constructor(

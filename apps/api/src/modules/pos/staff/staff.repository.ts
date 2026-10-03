@@ -36,6 +36,7 @@ import {
   type Database,
 } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
+import { sumOrderTaxComponents } from "../../tax/tax-reporting.repository.js";
 
 import type {
   HandoverRecord,
@@ -153,6 +154,7 @@ function toZReport(row: typeof posZReports.$inferSelect): PosZReport {
     discountAmount: row.discountAmount,
     taxableAmount: row.taxableAmount,
     taxAmount: row.taxAmount,
+    taxComponents: row.taxComponents,
     refundAmount: row.refundAmount,
     correctionAmount: row.correctionAmount,
     unsettledPaymentCount: row.unsettledPaymentCount,
@@ -912,6 +914,7 @@ export type HandoverSnapshot = {
   discountAmount: string;
   taxableAmount: string;
   taxAmount: string;
+  taxComponents: Array<{ name: string; rate: string; taxableAmount: string; taxAmount: string }>;
   refundAmount: string;
   correctionAmount: string;
   unsettledPaymentCount: number;
@@ -1119,6 +1122,15 @@ export async function calculateHandoverSnapshot(
         ),
       ),
   ]);
+  const taxComponents = await sumOrderTaxComponents(db, [
+    eq(orders.tenantId, input.tenantId),
+    eq(orders.branchId, input.branchId),
+    eq(orders.currency, input.currency),
+    gte(orders.createdAt, input.startedAt),
+    lte(orders.createdAt, input.cutoffAt),
+    inArray(orders.status, ["received", "paid", "delivered"]),
+    isNull(orders.deletedAt),
+  ]);
 
   const breakdown = new Map<string, PosZReportPaymentBreakdown>();
   for (const payment of paymentRows) {
@@ -1189,6 +1201,7 @@ export async function calculateHandoverSnapshot(
     discountAmount: money(discountAmount),
     taxableAmount: orderRows[0]?.taxable ?? "0.00",
     taxAmount: orderRows[0]?.tax ?? "0.00",
+    taxComponents,
     refundAmount: money(refundAmount),
     correctionAmount: money(correctionAmount),
     unsettledPaymentCount: unsettledPaymentRows[0]?.count ?? 0,
@@ -1273,6 +1286,7 @@ export async function createHandoverAndZReport(
       discountAmount: input.snapshot.discountAmount,
       taxableAmount: input.snapshot.taxableAmount,
       taxAmount: input.snapshot.taxAmount,
+      taxComponents: input.snapshot.taxComponents,
       refundAmount: input.snapshot.refundAmount,
       correctionAmount: input.snapshot.correctionAmount,
       unsettledPaymentCount: input.snapshot.unsettledPaymentCount,
@@ -1350,6 +1364,7 @@ export async function insertRegisterZReport(
       discountAmount: input.snapshot.discountAmount,
       taxableAmount: input.snapshot.taxableAmount,
       taxAmount: input.snapshot.taxAmount,
+      taxComponents: input.snapshot.taxComponents,
       refundAmount: input.snapshot.refundAmount,
       correctionAmount: input.snapshot.correctionAmount,
       unsettledPaymentCount: input.snapshot.unsettledPaymentCount,

@@ -4,12 +4,14 @@ import {
   check,
   index,
   integer,
+  jsonb,
   numeric,
   pgTable,
   smallint,
   text,
   timestamp,
   uniqueIndex,
+  varchar,
 } from "drizzle-orm/pg-core";
 
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
@@ -56,6 +58,13 @@ export const posChannelSettings = pgTable(
       .default("0"),
     pricesIncludeTax: boolean("prices_include_tax").notNull().default(true),
     taxRegistrationNumber: text("tax_registration_number"),
+    taxLabel: text("tax_label"),
+    /** Component rates for the default tax rate; captured on each order. */
+    defaultTaxComponents: jsonb("default_tax_components").$type<
+      Array<{ name: string; rate: string }>
+    >(),
+    taxTemplateCountryCode: varchar("tax_template_country_code", { length: 2 }),
+    taxTemplateVersion: integer("tax_template_version"),
     defaultAutoPrintReceipt: boolean("default_auto_print_receipt")
       .notNull()
       .default(true),

@@ -163,6 +163,11 @@ export function RegisterSessionsView({
       session.netSales,
       session.cashVariance,
       session.currency,
+      session.zReport?.taxableAmount ?? null,
+      session.zReport?.taxAmount ?? null,
+      session.zReport?.taxComponents.map((component) =>
+        `${component.name} ${component.rate}: ${component.taxAmount}`,
+      ).join("; ") ?? null,
     ]);
     const csv = [
       [
@@ -178,6 +183,9 @@ export function RegisterSessionsView({
         headers.netSales,
         headers.cashVariance,
         headers.currency,
+        headers.taxableAmount,
+        headers.taxAmount,
+        headers.taxComponents,
       ],
       ...rows,
     ]
@@ -433,6 +441,7 @@ export function RegisterSessionsView({
                       m.pointOfSale.registerSessions.columns.openingFloat,
                       m.pointOfSale.registerSessions.columns.closingFloat,
                       m.pointOfSale.registerSessions.columns.netSales,
+                      m.pointOfSale.registerSessions.columns.taxAmount,
                       m.pointOfSale.registerSessions.columns.cashVariance,
                     ].map((label) => (
                       <TableHead className="text-[10px]" key={label}>
@@ -528,6 +537,24 @@ export function RegisterSessionsView({
                               session.currency,
                               locale,
                             )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap py-3 text-right text-xs">
+                        {session.zReport ? (
+                          <div>
+                            {formatMoney(session.zReport.taxAmount, session.currency, locale)}
+                            {session.zReport.taxComponents.length > 0 ? (
+                              <details className="mt-1 text-left text-[11px] text-muted-foreground">
+                                <summary className="cursor-pointer">{m.pointOfSale.registerSessions.columns.taxComponents}</summary>
+                                {session.zReport.taxComponents.map((component) => (
+                                  <div className="flex justify-between gap-2" key={`${component.name}:${component.rate}`}>
+                                    <span>{component.name}</span>
+                                    <span>{formatMoney(Number(component.taxAmount), session.currency, locale)}</span>
+                                  </div>
+                                ))}
+                              </details>
+                            ) : null}
+                          </div>
+                        ) : m.pointOfSale.registerSessions.unavailable}
                       </TableCell>
                       <TableCell
                         className={cn(

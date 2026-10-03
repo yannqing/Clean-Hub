@@ -115,6 +115,23 @@ internal fun calculateNativeLinePricing(
         .sortedByDescending { it.second }
 
     val tax = groups.sumOf { it.first.taxMinor }
+    val components = settings.taxComponents
+    val componentGroup = groups.firstOrNull {
+        it.first.taxRate == normalizeNativeTaxRate(settings.defaultTaxRate) && it.first.taxMinor > 0L
+    }?.first
+    val configuredRates = components.map { nativeTaxRateToScale(it.rate) }
+    val componentAmounts = if (componentGroup != null && components.isNotEmpty() &&
+        configuredRates.sum() == nativeTaxRateToScale(settings.defaultTaxRate)) {
+        val weightSum = configuredRates.sum()
+        val floors = configuredRates.map { componentGroup.taxMinor * it / weightSum }.toMutableList()
+        val remainders = configuredRates.mapIndexed { index, weight ->
+            componentGroup.taxMinor * weight - floors[index] * weightSum
+        }
+        var leftover = componentGroup.taxMinor - floors.sum()
+        remainders.indices.sortedWith(compareByDescending<Int> { remainders[it] }.thenBy { it })
+            .forEach { index -> if (leftover > 0L) { floors[index]++; leftover-- } }
+        floors
+    } else emptyList()
     val beforeRounding = if (settings.pricesIncludeTax) subtotal else subtotal + tax
     val configuredStep = when (settings.roundingRule) {
         "round_yuan" -> 100L
@@ -133,6 +150,17 @@ internal fun calculateNativeLinePricing(
         taxBreakdown = groups
             .filter { (_, base) -> base != 0L || groups.size == 1 }
             .map { it.first },
+        taxLabel = settings.taxLabel,
+        taxComponents = if (componentGroup == null) emptyList() else components.mapIndexedNotNull { index, component ->
+            componentAmounts.getOrNull(index)?.let { amount ->
+                component.copy(
+                    rate = normalizeNativeTaxRate(component.rate),
+                    parentRate = componentGroup.taxRate,
+                    taxableMinor = componentGroup.taxableMinor,
+                    taxMinor = amount,
+                )
+            }
+        },
         pricesIncludeTax = settings.pricesIncludeTax,
         taxRegistrationNumber = settings.taxRegistrationNumber,
         roundingAdjustmentMinor = total - beforeRounding,

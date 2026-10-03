@@ -175,6 +175,14 @@ export type PosOrderSummary = {
   pricesIncludeTax: boolean;
   taxExemptionReason: string | null;
   taxRegistrationNumberSnapshot: string | null;
+  taxLabelSnapshot?: string | null;
+  taxComponentsSnapshot?: Array<{
+    name: string;
+    rate: string;
+    parentRate: string;
+    taxableAmount: string;
+    taxAmount: string;
+  }> | null;
   roundingAdjustmentAmount: string;
   totalAmount: string;
   paymentStatus: PosOrderPaymentStatus;

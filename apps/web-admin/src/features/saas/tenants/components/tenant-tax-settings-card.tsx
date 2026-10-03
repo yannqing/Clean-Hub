@@ -14,10 +14,10 @@ export function TenantTaxSettingsCard({ tenantId, canEdit, onSaved }: {
 }) {
   const { locale } = useSaasI18n();
   const copy = locale === "zh-CN"
-    ? { title: "租户税务配置", enabled: "启用税务", included: "价格含税", rate: "默认税率（0.18 = 18%）", number: "税务登记号", save: "保存税务配置", saved: "已保存", loadError: "无法加载税务配置" }
+    ? { title: "租户税务配置", enabled: "启用税务", included: "价格含税", rate: "默认税率（小数形式）", number: "税务登记号", override: "手动修改税率或含税方式会解除该租户与国家模板的自动同步。", save: "保存税务配置", saved: "已保存", loadError: "无法加载税务配置" }
     : locale === "fr"
-      ? { title: "Fiscalité du locataire", enabled: "Taxe activée", included: "Prix TTC", rate: "Taux par défaut (saisir 0.18 pour 18 %)", number: "Numéro fiscal", save: "Enregistrer", saved: "Enregistré", loadError: "Chargement impossible" }
-      : { title: "Tenant tax settings", enabled: "Tax enabled", included: "Prices include tax", rate: "Default rate (0.18 = 18%)", number: "Tax registration number", save: "Save tax settings", saved: "Saved", loadError: "Could not load tax settings" };
+      ? { title: "Fiscalité du locataire", enabled: "Taxe activée", included: "Prix TTC", rate: "Taux par défaut (fraction)", number: "Numéro fiscal", override: "Modifier le taux ou le mode TTC rompt la synchronisation automatique avec le modèle du pays.", save: "Enregistrer", saved: "Enregistré", loadError: "Chargement impossible" }
+      : { title: "Tenant tax settings", enabled: "Tax enabled", included: "Prices include tax", rate: "Default rate (fraction)", number: "Tax registration number", override: "Changing the rate or tax mode detaches this tenant from automatic country-template updates.", save: "Save tax settings", saved: "Saved", loadError: "Could not load tax settings" };
   const [form, setForm] = useState<SaasTenantTaxSettings | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -59,6 +59,7 @@ export function TenantTaxSettingsCard({ tenantId, canEdit, onSaved }: {
           <label className="flex items-center gap-2 text-sm"><Checkbox checked={form.pricesIncludeTax} disabled={!canEdit} onCheckedChange={(value) => setForm({ ...form, pricesIncludeTax: value === true })} />{copy.included}</label>
           <div className="grid gap-1"><Label htmlFor="saas-tax-rate">{copy.rate}</Label><Input disabled={!canEdit} id="saas-tax-rate" inputMode="decimal" onChange={(e) => setForm({ ...form, defaultTaxRate: e.target.value })} value={form.defaultTaxRate} /></div>
           <div className="grid gap-1"><Label htmlFor="saas-tax-number">{copy.number}</Label><Input disabled={!canEdit} id="saas-tax-number" onChange={(e) => setForm({ ...form, taxRegistrationNumber: e.target.value || null })} value={form.taxRegistrationNumber ?? ""} /></div>
+          <p className="text-xs text-muted-foreground">{copy.override}</p>
           {canEdit ? <Button disabled={saving} onClick={() => void save()} size="sm" type="button">{copy.save}</Button> : null}
         </> : null}
         {error ? <p className="text-xs text-destructive">{error}</p> : null}

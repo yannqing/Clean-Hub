@@ -21,6 +21,36 @@ import type { SupportedLocale } from "@cleanhub/i18n/locales";
 const POS_ERROR_MESSAGES: Readonly<
   Record<string, Readonly<Record<SupportedLocale, string>>>
 > = {
+  "Platform maintenance is in progress. Please retry later.": {
+    en: "Platform maintenance is in progress. Please retry later.",
+    fr: "Une maintenance de la plateforme est en cours. Veuillez réessayer plus tard.",
+    "zh-CN": "平台正在维护，请稍后重试。",
+  },
+  "The tenant's country is missing. Ask a SaaS administrator to set the country before taking a sale.": {
+    en: "The tenant's country is missing. Ask a SaaS administrator to set the country before taking a sale.",
+    fr: "Le pays du locataire manque. Demandez à l'administrateur SaaS de le renseigner avant toute vente.",
+    "zh-CN": "尚未设置租户国家，暂不能收银。请联系 SaaS 管理员填写国家。",
+  },
+  "The country tax template is unavailable or incomplete. Ask a SaaS administrator to complete its form or import the tax template file, then ask the owner to apply it.": {
+    en: "The country tax template is unavailable or incomplete. Ask a SaaS administrator to complete its form or import the tax template file, then ask the owner to apply it.",
+    fr: "Le modèle fiscal du pays est absent ou incomplet. Demandez à l'administrateur SaaS de le saisir ou l'importer, puis au propriétaire de l'appliquer.",
+    "zh-CN": "国家税务模板缺失或不完整，暂不能收银。请 SaaS 管理员填写或上传模板，再由店主应用。",
+  },
+  "The current country tax template has not been applied. Ask the owner or manager to select and apply it in tenant settings, then sync the terminal.": {
+    en: "The current country tax template has not been applied. Ask the owner or manager to select and apply it in tenant settings, then sync the terminal.",
+    fr: "Le modèle fiscal actuel n'est pas appliqué. Demandez au propriétaire ou responsable de l'appliquer dans les paramètres, puis de synchroniser le terminal.",
+    "zh-CN": "当前国家税务模板尚未应用。请店主或店长在租户设置中应用模板，然后同步终端。",
+  },
+  "Tax configuration is incomplete. Ask the owner or manager to enable tax and enter the tax registration number in POS settings.": {
+    en: "Tax configuration is incomplete. Ask the owner or manager to enable tax and enter the tax registration number in POS settings.",
+    fr: "Les paramètres fiscaux sont incomplets. Demandez au propriétaire ou responsable d'activer la taxe et de saisir le numéro fiscal dans les paramètres POS.",
+    "zh-CN": "税务设置不完整。请店主或店长在 POS 设置中启用税务并填写税务登记号。",
+  },
+  "The tenant or store currency does not match the country tax template. Ask an administrator to correct the currency before checkout.": {
+    en: "The tenant or store currency does not match the country tax template. Ask an administrator to correct the currency before checkout.",
+    fr: "La devise du locataire ou du magasin ne correspond pas au modèle fiscal. Demandez à l'administrateur de la corriger avant l'encaissement.",
+    "zh-CN": "租户或门店币种与国家税务模板不一致。请管理员核对币种后再结款。",
+  },
   "A POS terminal session cannot access back-office resources.": {
     en: "A POS terminal session cannot access back-office resources.",
     fr: "Une session de caisse ne peut pas accéder aux ressources d'administration.",

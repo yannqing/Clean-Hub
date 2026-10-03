@@ -13,6 +13,8 @@ export type PointOfSaleSettingsFormValues = Omit<
   | "updatedBy"
   | "canManage"
   | "mobileMoneyProvidersEnabled"
+  | "taxTemplateCountryCode"
+  | "taxTemplateVersion"
 >;
 
 export type PointOfSaleSettingsValidationResult =
@@ -40,7 +42,7 @@ export function validatePointOfSaleSettings(
   if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 1) {
     return {
       ok: false,
-      message: "VAT rate must be between 0% and 100%.",
+      message: "Tax rate must be between 0% and 100%.",
     };
   }
   if (!isWholeNumberInRange(input.syncIntervalSeconds, 5, 3600)) {

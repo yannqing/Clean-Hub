@@ -196,4 +196,31 @@ assert.equal(
   BigInt(0),
 );
 
+// A configured composite rate is split on the same taxable base while the
+// components still reconcile exactly to the amount charged and saved.
+const composite = totalsFor("GHS", BigInt(1_000_000), BigInt(0), {
+  taxEnabled: true,
+  taxRate: "0.2000",
+  taxLabel: "VAT/NHIL/GETFund",
+  taxComponents: [
+    { name: "VAT", rate: "0.1500" },
+    { name: "NHIL", rate: "0.0250" },
+    { name: "GETFund", rate: "0.0250" },
+  ],
+  pricesIncludeTax: false,
+});
+assert.equal(composite.taxMinor, BigInt(200_000));
+assert.deepEqual(composite.taxComponents.map((entry) => entry.taxMinor),
+  [BigInt(150_000), BigInt(25_000), BigInt(25_000)]);
+assert.equal(composite.taxComponents.reduce((sum, entry) => sum + entry.taxMinor, BigInt(0)), composite.taxMinor);
+assert.equal(composite.totalMinor, BigInt(1_200_000));
+const exemptComposite = calculatePosFinancialTotals({
+  subtotalMinor: BigInt(1_000_000),
+  discountMinor: BigInt(0),
+  rules: { ...noTax, currency: "GHS", taxEnabled: true, taxRate: "0.2000", taxComponents: [{ name: "Tax", rate: "0.2000" }] },
+  taxExemptionReason: "Exempt",
+});
+assert.equal(exemptComposite.taxMinor, BigInt(0));
+assert.deepEqual(exemptComposite.taxComponents, []);
+
 console.log("POS order financial smoke passed.");

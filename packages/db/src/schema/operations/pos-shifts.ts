@@ -377,6 +377,9 @@ export const posZReports = pgTable(
     /** Null on reports closed before tax snapshots were introduced. */
     taxableAmount: numeric("taxable_amount", { precision: 12, scale: 2 }),
     taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }),
+    taxComponents: jsonb("tax_components").$type<Array<{
+      name: string; rate: string; taxableAmount: string; taxAmount: string;
+    }>>().notNull().default([]),
     refundAmount: numeric("refund_amount", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),

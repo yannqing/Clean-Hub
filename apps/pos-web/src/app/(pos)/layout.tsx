@@ -58,6 +58,9 @@ export default async function PosLayout({
       defaultTaxRate={terminalSettings?.defaultTaxRate}
       pricesIncludeTax={terminalSettings?.pricesIncludeTax}
       taxRegistrationNumber={terminalSettings?.taxRegistrationNumber}
+      taxLabel={terminalSettings?.taxLabel}
+      taxComponents={terminalSettings?.taxComponents}
+      taxReadiness={terminalSettings?.taxReadiness}
       merchantName={branch?.merchantName}
       branchName={branch?.name}
       receiptName={branch?.receiptName}

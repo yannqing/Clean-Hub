@@ -13,11 +13,13 @@ import {
   getDb,
   orderItems,
   posChannelSettings,
+  platformTaxTemplates,
   prices,
   serviceCategories,
   services,
   tenantFeatureFlags,
   tenants,
+  tenantSettings,
   userProfiles,
   users,
   type Database,
@@ -25,8 +27,11 @@ import {
 import { createId } from "@cleanhub/id";
 
 import type { AuthContext } from "../auth/auth.types.js";
+import { sumOrderTaxComponents } from "./tax-reporting.repository.js";
+import { resolvePosTaxReadiness } from "./pos-tax-readiness.js";
 import { applyPosOrderFinancialRules } from "../pos/orders/orders.financial.js";
-import { createPosOrder } from "../pos/orders/orders.service.js";
+import { checkoutPosOrder, createPosOrder } from "../pos/orders/orders.service.js";
+import { PosOrderError } from "../pos/orders/orders.errors.js";
 import { TenantServicesError } from "../tenant/services/services.errors.js";
 import { updateTenantService } from "../tenant/services/services.service.js";
 import { TenantTaxRateError } from "../tenant/tax-rates/tax-rates.errors.js";
@@ -103,7 +108,19 @@ async function insertFixtures(db: Database): Promise<void> {
     name: "Tax integration tenant",
     pressingCode: `TAX-${suffix}`,
     status: "active",
+    country: "ZZ",
   });
+  await db.insert(platformTaxTemplates).values({
+    id: createId(),
+    countryCode: "ZZ",
+    name: "Integration test country",
+    currencyCode: "XOF",
+    taxLabel: "TEST",
+    taxEnabled: true,
+    pricesIncludeTax: false,
+    rates: [{ key: "standard", name: "Standard", rate: "0.1800", isDefault: true }],
+  });
+  await db.insert(tenantSettings).values({ id: createId(), tenantId: ids.tenantId, defaultCurrency: "XOF" });
   await db.insert(tenantFeatureFlags).values({
     id: createId(),
     tenantId: ids.tenantId,
@@ -161,6 +178,9 @@ async function insertFixtures(db: Database): Promise<void> {
     defaultTaxRate: "0.1800",
     pricesIncludeTax: false,
     taxRegistrationNumber: "SN-NINEA-TEST",
+    taxLabel: "TEST",
+    taxTemplateCountryCode: "ZZ",
+    taxTemplateVersion: 1,
   });
   await db.insert(serviceCategories).values({
     id: ids.categoryId,
@@ -204,6 +224,44 @@ async function insertFixtures(db: Database): Promise<void> {
 
 async function runAssertions(db: Database): Promise<void> {
   await insertFixtures(db);
+  assert.equal((await resolvePosTaxReadiness(db, ids.tenantId, ids.branchId)).ready, true);
+  await db.update(posChannelSettings).set({ taxTemplateVersion: null })
+    .where(eq(posChannelSettings.tenantId, ids.tenantId));
+  assert.equal((await resolvePosTaxReadiness(db, ids.tenantId, ids.branchId)).code, "POS_TAX_TEMPLATE_NOT_APPLIED");
+  const blockedOrderId = createId();
+  await assert.rejects(
+    createPosOrder({
+      authContext: owner,
+      data: {
+        id: blockedOrderId,
+        orderType: "manual",
+        branchId: ids.branchId,
+        customerId: ids.customerId,
+        items: [{ serviceId: ids.standardServiceId, quantity: "1" }],
+      },
+    }, db),
+    (error: unknown) => error instanceof PosOrderError &&
+      error.code === "POS_TAX_TEMPLATE_NOT_APPLIED" && error.status === 409,
+  );
+  assert.deepEqual(await db.select({ id: orders.id }).from(orders).where(eq(orders.id, blockedOrderId)), []);
+  await assert.rejects(
+    checkoutPosOrder(owner, {
+      order: {
+        id: blockedOrderId,
+        orderType: "manual",
+        branchId: ids.branchId,
+        customerId: ids.customerId,
+        items: [{ serviceId: ids.standardServiceId, quantity: "1" }],
+      },
+      expectedTotalAmount: "0.00",
+      settlementIntent: "pay_now",
+    }, {}, db),
+    (error: unknown) => error instanceof PosOrderError &&
+      error.code === "POS_TAX_TEMPLATE_NOT_APPLIED" && error.status === 409,
+  );
+  assert.deepEqual(await db.select({ id: orders.id }).from(orders).where(eq(orders.id, blockedOrderId)), []);
+  await db.update(posChannelSettings).set({ taxTemplateVersion: 1 })
+    .where(eq(posChannelSettings.tenantId, ids.tenantId));
   const meta = { ipAddress: "127.0.0.1", userAgent: "tax-integration" };
 
   const standard = await createTenantTaxRate(
@@ -269,6 +327,12 @@ async function runAssertions(db: Database): Promise<void> {
     (error: unknown) =>
       error instanceof TenantServicesError && error.code === "SERVICE_TAX_RATE_NOT_FOUND",
   );
+
+  // The manual tax-class lifecycle deliberately detaches a real tenant from
+  // SaaS control. This transaction's synthetic fixture restores the marker so
+  // the legacy calculation assertions below can still exercise order pricing.
+  await db.update(posChannelSettings).set({ taxTemplateCountryCode: "ZZ", taxTemplateVersion: 1 })
+    .where(eq(posChannelSettings.tenantId, ids.tenantId));
 
   // 10,000 at 18% + 5,000 exempt + 2,000 at the default 18%, tax-exclusive:
   // tax is 1,800 + 0 + 360 = 2,160; the customer pays 19,160.
@@ -341,6 +405,33 @@ async function runAssertions(db: Database): Promise<void> {
     "a service with no rate of its own takes the tenant default",
   );
   assert.equal(byService.get(ids.defaultServiceId)?.taxAmount, "360.00");
+
+  // The named component summary must read the order snapshot, not whatever
+  // country template or tenant setting happens to be current later.
+  await db.update(posChannelSettings).set({
+    taxLabel: "Test tax",
+    defaultTaxComponents: [
+      { name: "Part A", rate: "0.1000" },
+      { name: "Part B", rate: "0.0800" },
+    ],
+  }).where(eq(posChannelSettings.tenantId, ids.tenantId));
+  await applyPosOrderFinancialRules(db, {
+    authContext: owner,
+    tenantId: ids.tenantId,
+    orderId: created.id,
+    actorUserId: ids.userId,
+  });
+  const components = await sumOrderTaxComponents(db, [
+    eq(orders.tenantId, ids.tenantId),
+    eq(orders.id, created.id),
+  ]);
+  assert.deepEqual(components.map((part) => [part.name, part.rate, part.taxAmount]), [
+    ["Part A", "0.1000", "1200.00"],
+    ["Part B", "0.0800", "960.00"],
+  ]);
+  await db.update(posChannelSettings).set({ defaultTaxComponents: null })
+    .where(eq(posChannelSettings.tenantId, ids.tenantId));
+  assert.equal((await sumOrderTaxComponents(db, [eq(orders.id, created.id)])).length, 2);
 
   // A rate still carried by a service cannot be deleted: that would silently
   // move the service to the default rate. It can be archived instead.

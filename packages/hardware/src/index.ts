@@ -406,6 +406,8 @@ export type PosReceiptDocument = {
    * each, as a VAT receipt must; with one it prints the single pair as before.
    */
   taxBreakdown?: readonly PosReceiptTaxLine[];
+  taxLabel?: string;
+  taxComponents?: readonly (PosReceiptTaxLine & { name: string; parentRate: string })[];
   roundingMinor?: number;
   taxRegistrationNumber?: string;
   taxExemptionReason?: string;
@@ -1000,7 +1002,33 @@ function buildPosReceiptLines(
     has("discount") && receipt.discountMinor !== undefined
       ? keyValue(labels.discount, `-${amount(receipt.discountMinor)}`)
       : undefined,
-    ...((receipt.taxBreakdown?.length ?? 0) > 1
+    ...(receipt.taxComponents?.length
+      ? (receipt.taxBreakdown ?? []).flatMap((entry) => {
+          const components = (receipt.taxComponents ?? [])
+            .filter((component) => component.parentRate === entry.taxRate);
+          return (components.length > 0
+            ? components.map((component) => ({
+                name: component.name,
+                rate: component.taxRate,
+                taxableMinor: component.taxableMinor,
+                taxMinor: component.taxMinor,
+              }))
+            : [{
+                name: receipt.taxLabel || labels.tax,
+                rate: entry.taxRate,
+                taxableMinor: entry.taxableMinor,
+                taxMinor: entry.taxMinor,
+              }]
+          ).flatMap((line) => [
+            has("taxable_amount")
+              ? keyValue(`${labels.taxable} ${formatTaxRatePercent(line.rate)}`, amount(line.taxableMinor))
+              : undefined,
+            has("tax")
+              ? keyValue(`${line.name} ${formatTaxRatePercent(line.rate)}`, amount(line.taxMinor))
+              : undefined,
+          ]);
+        })
+      : (receipt.taxBreakdown?.length ?? 0) > 1
       ? (receipt.taxBreakdown ?? []).flatMap((entry) => {
           const rate = formatTaxRatePercent(entry.taxRate);
           return [
@@ -1008,7 +1036,7 @@ function buildPosReceiptLines(
               ? keyValue(`${labels.taxable} ${rate}`, amount(entry.taxableMinor))
               : undefined,
             has("tax")
-              ? keyValue(`${labels.tax} ${rate}`, amount(entry.taxMinor))
+              ? keyValue(`${receipt.taxLabel || labels.tax} ${rate}`, amount(entry.taxMinor))
               : undefined,
           ];
         })
@@ -1018,7 +1046,7 @@ function buildPosReceiptLines(
             : undefined,
           has("tax") && receipt.taxMinor !== undefined
             ? keyValue(
-                `${labels.tax}${receipt.taxRate ? ` ${formatTaxRatePercent(receipt.taxRate)}` : ""}`,
+                `${receipt.taxLabel || labels.tax}${receipt.taxRate ? ` ${formatTaxRatePercent(receipt.taxRate)}` : ""}`,
                 amount(receipt.taxMinor),
               )
             : undefined,

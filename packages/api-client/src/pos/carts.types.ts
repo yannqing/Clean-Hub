@@ -159,6 +159,8 @@ export type PosCartPricePreview = {
   /** The dominant rate (largest taxable base); see taxBreakdown for mixed baskets. */
   taxRate: string;
   taxBreakdown: PosTaxBreakdownEntry[];
+  taxLabel: string | null;
+  taxComponents: Array<{ name: string; rate: string; parentRate: string; taxableAmount: string; taxAmount: string }>;
   pricesIncludeTax: boolean;
   taxExemptionReason: string | null;
   taxRegistrationNumber: string | null;

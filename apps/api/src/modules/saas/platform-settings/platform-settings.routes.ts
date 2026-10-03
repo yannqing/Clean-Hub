@@ -6,6 +6,7 @@ import {
   updatePlatformSettingsController,
 } from "./platform-settings.controller.js";
 import {
+  bulkUpsertPlatformTaxTemplatesController,
   listPlatformTaxTemplatesController,
   upsertPlatformTaxTemplateController,
 } from "./platform-tax-templates.controller.js";
@@ -16,6 +17,7 @@ export function createSaasPlatformSettingsRoutes() {
   routes.get("/", getPlatformSettingsController);
   routes.patch("/", updatePlatformSettingsController);
   routes.get("/tax-templates", listPlatformTaxTemplatesController);
+  routes.put("/tax-templates/bulk", bulkUpsertPlatformTaxTemplatesController);
   routes.put("/tax-templates", upsertPlatformTaxTemplateController);
 
   return routes;

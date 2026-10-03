@@ -95,6 +95,7 @@ export type PosCurrentShiftReconciliation = {
   discountAmount: string;
   taxableAmount: string;
   taxAmount: string;
+  taxComponents: Array<{ name: string; rate: string; taxableAmount: string; taxAmount: string }>;
   refundAmount: string;
   correctionAmount: string;
   unsettledPaymentCount: number;
@@ -175,6 +176,7 @@ export type PosZReport = {
   discountAmount: string;
   taxableAmount: string | null;
   taxAmount: string | null;
+  taxComponents: Array<{ name: string; rate: string; taxableAmount: string; taxAmount: string }>;
   refundAmount: string;
   correctionAmount: string;
   unsettledPaymentCount: number;

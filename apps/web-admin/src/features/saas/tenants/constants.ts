@@ -30,7 +30,7 @@ export const tenantDefaultValues = {
   contactEmail: "",
   contactName: "",
   contactPhone: "",
-  country: "Senegal",
+  country: "",
   defaultCurrency: "",
   defaultLanguage: "platform-default",
   initialOwnerDisplayName: "",

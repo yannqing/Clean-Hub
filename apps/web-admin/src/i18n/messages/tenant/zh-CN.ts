@@ -1996,6 +1996,8 @@ export const tenantMessagesZhCN: TenantMessages = {
         closingFloat: "关台现金",
         netSales: "净销售额",
         cashVariance: "现金差异",
+        taxAmount: "销售税额（退款前）",
+        taxComponents: "税种分项",
       },
       statuses: {
         open: "营业中",
@@ -2028,6 +2030,9 @@ export const tenantMessagesZhCN: TenantMessages = {
         netSales: "净销售额",
         cashVariance: "现金差异",
         currency: "币种",
+        taxableAmount: "应税金额（退款前）",
+        taxAmount: "销售税额（退款前）",
+        taxComponents: "税种分项（退款前）",
       },
     },
     settings: {
@@ -2986,7 +2991,8 @@ export const tenantMessagesZhCN: TenantMessages = {
   taxRates: {
     title: "税率",
     description:
-      "可单独设置到服务和商品上的命名税率，例如优惠税率或免税项目。没有单独设置税率的项目使用上方的默认 VAT 税率。",
+      "可单独设置到服务和商品上的命名税率，例如优惠税率或免税项目。没有单独设置税率的项目使用上方的默认税率。",
+    templateOverride: "修改国家模板中的税类后，该租户将停止自动接收 SaaS 税务更新。",
     empty: "还没有税率，所有项目都按默认税率计税。",
     add: "新增税率",
     name: "名称",

@@ -339,11 +339,19 @@ function buildOrderReceiptContent(
       taxableMinor: moneyToReceiptMinor(order.taxableAmount, order.currency),
       taxMinor: moneyToReceiptMinor(order.taxAmount, order.currency),
       taxRate: order.taxRateSnapshot,
-      taxBreakdown: (order.taxBreakdown ?? []).map((entry) => ({
+        taxBreakdown: (order.taxBreakdown ?? []).map((entry) => ({
         taxRate: entry.taxRate,
         taxableMinor: moneyToReceiptMinor(entry.taxableAmount, order.currency),
         taxMinor: moneyToReceiptMinor(entry.taxAmount, order.currency),
-      })),
+        })),
+        taxLabel: order.taxLabelSnapshot ?? undefined,
+        taxComponents: (order.taxComponentsSnapshot ?? []).map((entry) => ({
+          name: entry.name,
+          parentRate: entry.parentRate,
+          taxRate: entry.rate,
+          taxableMinor: moneyToReceiptMinor(entry.taxableAmount, order.currency),
+          taxMinor: moneyToReceiptMinor(entry.taxAmount, order.currency),
+        })),
       roundingMinor: moneyToReceiptMinor(
         order.roundingAdjustmentAmount,
         order.currency,

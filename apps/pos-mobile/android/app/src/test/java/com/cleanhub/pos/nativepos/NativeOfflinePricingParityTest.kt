@@ -216,4 +216,28 @@ class NativeOfflinePricingParityTest {
         assertEquals("7.35%", formatNativeTaxRate("0.0735"))
         assertEquals("0.1800", normalizeNativeTaxRate("0.18"))
     }
+
+    @Test
+    fun compositeTaxUsesConfiguredComponentsOffline() {
+        val pricing = calculateNativeLinePricing(
+            lines = listOf(NativePricedLine(1_000_000L, null)),
+            currency = "GHS",
+            settings = NativeCheckoutSettings(
+                taxEnabled = true,
+                defaultTaxRate = "0.2000",
+                pricesIncludeTax = false,
+                taxLabel = "VAT/NHIL/GETFund",
+                taxComponents = listOf(
+                    NativeTaxComponent("VAT", "0.1500"),
+                    NativeTaxComponent("NHIL", "0.0250"),
+                    NativeTaxComponent("GETFund", "0.0250"),
+                ),
+            ),
+            taxExemptionReason = null,
+        )
+        assertEquals(200_000L, pricing.taxMinor)
+        assertEquals(listOf(150_000L, 25_000L, 25_000L), pricing.taxComponents.map { it.taxMinor })
+        assertEquals(pricing.taxMinor, pricing.taxComponents.sumOf { it.taxMinor })
+        assertEquals(1_200_000L, pricing.totalMinor)
+    }
 }

@@ -181,6 +181,9 @@ export type PosChannelZReportSummary = {
   cutoffAt: string;
   orderCount: number;
   grossSales: number;
+  taxableAmount: number;
+  taxAmount: number;
+  taxComponents: Array<{ name: string; rate: string; taxableAmount: string; taxAmount: string }>;
   refundAmount: number;
   correctionAmount: number;
   netSales: number;
@@ -291,6 +294,8 @@ export type PosChannelSettings = {
   defaultTaxRate: string;
   pricesIncludeTax: boolean;
   taxRegistrationNumber: string | null;
+  taxTemplateCountryCode: string | null;
+  taxTemplateVersion: number | null;
   defaultAutoPrintReceipt: boolean;
   defaultPrintCopies: number;
   defaultLockTimeoutSeconds: number;

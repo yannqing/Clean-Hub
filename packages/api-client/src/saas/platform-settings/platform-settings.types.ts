@@ -22,9 +22,18 @@ export type PlatformTaxTemplate = {
   id: string;
   countryCode: string;
   name: string;
+  currencyCode: string | null;
+  taxLabel: string | null;
+  exemptionNotes: string | null;
   taxEnabled: boolean;
   pricesIncludeTax: boolean;
-  rates: Array<{ name: string; rate: string; isDefault: boolean }>;
+  rates: Array<{
+    key?: string;
+    name: string;
+    rate: string;
+    isDefault: boolean;
+    components?: Array<{ name: string; rate: string }>;
+  }>;
   version: number;
   updatedAt: string;
 };

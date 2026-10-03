@@ -395,22 +395,28 @@ export function OrderActionsPanel({
               },
             ])
               .filter((entry) => Number(entry.taxAmount) !== 0)
-              .map((entry) => (
+              .flatMap((entry) => {
+                const components = (order.taxComponentsSnapshot ?? []).filter((component) => component.parentRate === entry.taxRate);
+                const rows = components.length > 0
+                  ? components.map((component) => ({ key: `${entry.taxRate}:${component.name}`, label: `${component.name} ${formatTaxRatePercent(component.rate)}`, amount: component.taxAmount }))
+                  : [{ key: entry.taxRate, label: order.taxLabelSnapshot
+                    ? `${order.taxLabelSnapshot} ${formatTaxRatePercent(entry.taxRate)}`
+                    : t("pos.cart.taxLine", { rate: formatTaxRatePercent(entry.taxRate) }), amount: entry.taxAmount }];
+                return rows.map((row) => (
                 <div
                   className="flex items-center justify-between gap-3 text-muted-foreground"
-                  key={entry.taxRate}
+                  key={row.key}
                 >
                   <span>
-                    {t("pos.cart.taxLine", {
-                      rate: formatTaxRatePercent(entry.taxRate),
-                    })}
+                    {row.label}
                     {order.pricesIncludeTax ? t("pos.cart.taxInclusiveSuffix") : ""}
                   </span>
                   <span className="font-semibold text-foreground">
-                    {formatOrderMoney(entry.taxAmount, order.currency, locale)}
+                    {formatOrderMoney(row.amount, order.currency, locale)}
                   </span>
                 </div>
-              ))}
+                ));
+              })}
             {order.taxExemptionReason ? (
               <div className="flex items-center justify-between gap-3 text-muted-foreground">
                 <span>{text("税务豁免原因")}</span>

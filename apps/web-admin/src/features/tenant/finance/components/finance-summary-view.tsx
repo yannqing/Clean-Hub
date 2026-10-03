@@ -509,6 +509,10 @@ export function FinanceSummaryView({
               toCsvDocument(["Metric", "Amount", "Currency", "From", "To", "Branch"], [
                 [taxCopy.taxable, summary.summary.orderTaxableAmount, summary.currency, summary.filters.from, summary.filters.to, summary.filters.branchId],
                 [taxCopy.tax, summary.summary.orderTaxAmount, summary.currency, summary.filters.from, summary.filters.to, summary.filters.branchId],
+                ...summary.summary.orderTaxComponents.flatMap((component) => [
+                  [`${component.name} ${Number(component.rate) * 100}% — ${taxCopy.taxable}`, component.taxableAmount, summary.currency, summary.filters.from, summary.filters.to, summary.filters.branchId],
+                  [`${component.name} ${Number(component.rate) * 100}% — ${taxCopy.tax}`, component.taxAmount, summary.currency, summary.filters.from, summary.filters.to, summary.filters.branchId],
+                ]),
               ]),
             );
           }} size="sm" type="button" variant="outline">
@@ -798,6 +802,9 @@ export function FinanceSummaryView({
                     <SmallMetric icon={ReceiptText} label={taxCopy.taxable} value={formatMoney(summary.summary.orderTaxableAmount, currency, locale)} />
                     <SmallMetric icon={ReceiptText} label={taxCopy.tax} value={formatMoney(summary.summary.orderTaxAmount, currency, locale)} />
                   </div>
+                  {summary.summary.orderTaxComponents.length > 0 ? <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
+                    {summary.summary.orderTaxComponents.map((component) => <SmallMetric key={`${component.name}:${component.rate}`} icon={ReceiptText} label={`${component.name} ${Number(component.rate) * 100}%`} value={formatMoney(component.taxAmount, currency, locale)} />)}
+                  </div> : null}
                   <p className="mt-2 text-xs text-muted-foreground">{taxCopy.basis}</p>
                 </div>
                 <div className="px-5 py-5 sm:px-6">

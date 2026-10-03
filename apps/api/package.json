@@ -12,6 +12,8 @@
     "e2e:mobile": "tsx src/e2e/mobile.e2e.ts",
     "test:integration:tenant-orders": "tsx src/modules/tenant/orders/orders.integration.ts",
     "test:integration:tax": "tsx src/modules/tax/tax.integration.ts",
+    "test:integration:tax-template": "tsx src/modules/tenant/tax-rates/tax-template.integration.ts",
+    "check:tax-readiness": "tsx src/scripts/check-tax-readiness.ts",
     "smoke:auth-concurrency": "tsx src/modules/auth/auth.concurrency.repository.smoke.ts",
     "smoke:email-retry": "tsx src/modules/notifications/email-retry.smoke.ts",
     "smoke:email-capability": "tsx src/modules/notifications/email-capability.smoke.ts",

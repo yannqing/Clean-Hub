@@ -41,12 +41,16 @@ function buildFiscalReceipt(order: PosOrderDetail): {
     "",
     `Subtotal: ${order.subtotalAmount} ${order.currency}`,
     `Discount: ${order.discountAmount} ${order.currency}`,
-    // One line per rate, as a VAT receipt states them.
-    ...order.taxBreakdown.map(
-        (entry) =>
-          `VAT ${formatTaxRatePercent(entry.taxRate)} on ${entry.taxableAmount}: ${entry.taxAmount} ${order.currency}`,
-      ),
-    `VAT total: ${order.taxAmount} ${order.currency}`,
+    ...order.taxBreakdown.flatMap((entry) => {
+      const components = (order.taxComponentsSnapshot ?? [])
+        .filter((component) => component.parentRate === entry.taxRate);
+      return components.length > 0
+        ? components.map((component) =>
+            `${component.name} ${formatTaxRatePercent(component.rate)} on ${component.taxableAmount}: ${component.taxAmount} ${order.currency}`,
+          )
+        : [`${order.taxLabelSnapshot || "Tax"} ${formatTaxRatePercent(entry.taxRate)} on ${entry.taxableAmount}: ${entry.taxAmount} ${order.currency}`];
+    }),
+    `${order.taxLabelSnapshot || "Tax"} total: ${order.taxAmount} ${order.currency}`,
     ...(order.taxExemptionReason
       ? [`Tax exemption: ${order.taxExemptionReason}`]
       : []),

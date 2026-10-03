@@ -75,27 +75,4 @@ AS PERMISSIVE
 FOR ALL
 TO PUBLIC
 USING (public.cleanhub_rls_bypass_enabled())
-WITH CHECK (public.cleanhub_rls_bypass_enabled());--> statement-breakpoint
-
--- The two markets CleanHub launches in. Both levy 18% VAT (TVA) at the
--- standard rate. Rates are fractions. SaaS administrators can edit these and
--- add other countries from Platform Settings.
-INSERT INTO public.platform_tax_templates (id, country_code, name, tax_enabled, prices_include_tax, rates)
-VALUES
-  (
-    '01KSNTX0000000000000000001',
-    'SN',
-    'Sénégal - TVA',
-    true,
-    true,
-    '[{"name":"TVA 18%","rate":"0.1800","isDefault":true},{"name":"Exonéré","rate":"0.0000","isDefault":false}]'::jsonb
-  ),
-  (
-    '01KC0TX0000000000000000002',
-    'CI',
-    'Côte d''Ivoire - TVA',
-    true,
-    true,
-    '[{"name":"TVA 18%","rate":"0.1800","isDefault":true},{"name":"TVA réduite 9%","rate":"0.0900","isDefault":false},{"name":"Exonéré","rate":"0.0000","isDefault":false}]'::jsonb
-  )
-ON CONFLICT (country_code) DO NOTHING;
+WITH CHECK (public.cleanhub_rls_bypass_enabled());

@@ -307,6 +307,10 @@ data class NativeCheckoutSettings(
     val defaultTaxRate: String = "0.0000",
     val pricesIncludeTax: Boolean = true,
     val taxRegistrationNumber: String? = null,
+    val taxLabel: String? = null,
+    val taxComponents: List<NativeTaxComponent> = emptyList(),
+    val taxReady: Boolean = false,
+    val taxReadinessCode: String? = "POS_TAX_STATUS_UNAVAILABLE",
     val emailReceiptEnabled: Boolean = false,
     val autoPrintReceipt: Boolean = true,
     /**
@@ -322,6 +326,14 @@ data class NativeCartPricingDiscount(
     val amountMinor: Long,
 )
 
+data class NativeTaxComponent(
+    val name: String,
+    val rate: String,
+    val parentRate: String? = null,
+    val taxableMinor: Long = 0L,
+    val taxMinor: Long = 0L,
+)
+
 /** A server preview is the authority while online; the same fields have a local fallback for offline cash. */
 data class NativeCartPricing(
     val subtotalMinor: Long,
@@ -332,6 +344,8 @@ data class NativeCartPricing(
     /** The dominant rate (largest taxable base); taxBreakdown holds every rate. */
     val taxRate: String,
     val taxBreakdown: List<NativeTaxBreakdownEntry>,
+    val taxLabel: String? = null,
+    val taxComponents: List<NativeTaxComponent> = emptyList(),
     val pricesIncludeTax: Boolean,
     val taxRegistrationNumber: String?,
     val roundingAdjustmentMinor: Long,

@@ -14,6 +14,7 @@ export type FinanceSummaryMetrics = {
   /** Order-created basis, separate from the payment cash ledger below. */
   orderTaxableAmount: number;
   orderTaxAmount: number;
+  orderTaxComponents: Array<{ name: string; rate: string; taxableAmount: number; taxAmount: number }>;
   grossCollected: number;
   refundAmount: number;
   correctionAmount: number;

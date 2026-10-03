@@ -35,6 +35,7 @@ export const taxRates = pgTable(
       .notNull()
       .references(() => tenants.id),
     name: varchar("name", { length: 80 }).notNull(),
+    templateRateKey: varchar("template_rate_key", { length: 64 }),
     rate: numeric("rate", { precision: 7, scale: 4 }).notNull(),
     displayOrder: integer("display_order").notNull().default(0),
     archivedAt: timestamp("archived_at", { withTimezone: true }),

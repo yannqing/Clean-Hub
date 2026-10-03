@@ -3,6 +3,7 @@
 import { Badge, Button, Checkbox, Input, Label, toast } from "@cleanhub/ui";
 import { Receipt } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   fractionToPercent,
@@ -125,6 +126,7 @@ export function TaxSettingsSection({
   initialError?: string;
 }) {
   const { locale } = useTenantI18n();
+  const router = useRouter();
   const text = copy[locale];
   const [settings, setSettings] = useState(initialSettings);
   const [form, setForm] = useState<TaxForm | null>(
@@ -160,6 +162,7 @@ export function TaxSettingsSection({
       setSettings(result.data);
       setForm(toForm(result.data));
       toast.success(text.saved);
+      router.refresh();
     } catch {
       toast.error(text.loadError);
     } finally {

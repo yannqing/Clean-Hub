@@ -6,6 +6,36 @@ import { posMessage } from "@/lib/pos-message";
 type PosErrorLocale = "zh-CN" | "en" | "fr";
 
 const POS_API_ERROR_MESSAGES: Record<string, Record<PosErrorLocale, string>> = {
+  POS_TAX_STATUS_UNAVAILABLE: {
+    "zh-CN": "暂时无法验证税务设置，收银结款已暂停。请连接网络并同步终端；如仍无法使用，请联系店主或店长。",
+    en: "Tax settings cannot be verified, so checkout is paused. Connect and sync the terminal; contact the owner or manager if this continues.",
+    fr: "Les paramètres fiscaux ne peuvent pas être vérifiés ; l'encaissement est suspendu. Connectez et synchronisez le terminal, puis contactez le responsable si nécessaire.",
+  },
+  POS_TAX_COUNTRY_REQUIRED: {
+    "zh-CN": "尚未设置租户国家，暂不能收银。请联系 SaaS 管理员填写国家。",
+    en: "The tenant country is missing. Ask a SaaS administrator to set it before checkout.",
+    fr: "Le pays du locataire manque. Demandez à l'administrateur SaaS de le renseigner avant l'encaissement.",
+  },
+  POS_TAX_TEMPLATE_REQUIRED: {
+    "zh-CN": "国家税务模板尚未配置，暂不能收银。请 SaaS 管理员在平台设置中填写或上传模板，再由店主应用。",
+    en: "The country tax template is missing. Ask a SaaS administrator to complete or import it, then ask the owner to apply it.",
+    fr: "Le modèle fiscal du pays manque. Demandez à l'administrateur SaaS de le saisir ou l'importer, puis au propriétaire de l'appliquer.",
+  },
+  POS_TAX_TEMPLATE_NOT_APPLIED: {
+    "zh-CN": "当前国家税务模板尚未应用或已更新，暂不能收银。请店主在租户设置中应用模板并同步终端。",
+    en: "The current tax template is not applied. Ask the owner to apply it in tenant settings and sync the terminal.",
+    fr: "Le modèle fiscal actuel n'est pas appliqué. Demandez au propriétaire de l'appliquer dans les paramètres et de synchroniser le terminal.",
+  },
+  POS_TAX_CONFIGURATION_INCOMPLETE: {
+    "zh-CN": "税务设置不完整，暂不能收银。请店主在 POS 设置中启用税务并填写税务登记号。",
+    en: "Tax settings are incomplete. Ask the owner to enable tax and enter the tax registration number in POS settings.",
+    fr: "Les paramètres fiscaux sont incomplets. Demandez au propriétaire d'activer la taxe et de saisir le numéro fiscal dans les paramètres POS.",
+  },
+  POS_TAX_CURRENCY_MISMATCH: {
+    "zh-CN": "租户或门店币种与国家税务模板不一致，暂不能收银。请管理员核对币种。",
+    en: "The tenant or store currency differs from the tax template. Ask an administrator to correct it.",
+    fr: "La devise du locataire ou du magasin diffère du modèle fiscal. Demandez à l'administrateur de la corriger.",
+  },
   INVALID_CREDENTIALS: {
     "zh-CN": "PIN 码不正确，请重新输入。",
     en: "The PIN is incorrect. Try again.",
@@ -132,6 +162,11 @@ const POS_API_ERROR_MESSAGES: Record<string, Record<PosErrorLocale, string>> = {
     fr: "Ouvrez une session d'espèces suivie avant d'enregistrer des mouvements.",
   },
 };
+
+export function getPosTaxReadinessMessage(code: string | null | undefined): string {
+  const locale = getPosRuntimeLocale();
+  return (code && POS_API_ERROR_MESSAGES[code]?.[locale]) ?? POS_API_ERROR_MESSAGES.POS_TAX_STATUS_UNAVAILABLE[locale];
+}
 
 const POS_ACCOUNT_LOCKED_UNTIL_MESSAGES: Record<
   PosErrorLocale,

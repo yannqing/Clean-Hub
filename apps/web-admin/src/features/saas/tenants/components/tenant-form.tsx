@@ -14,7 +14,9 @@ import {
   SelectValue,
   toast,
 } from "@cleanhub/ui";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import type { PlatformTaxTemplate } from "@cleanhub/api-client";
+import { webAdminApi } from "@/lib/api-client";
 
 import { useSaasI18n } from "@/i18n";
 
@@ -72,7 +74,16 @@ export function TenantForm({
   >({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [taxTemplates, setTaxTemplates] = useState<PlatformTaxTemplate[]>([]);
   const showDefaults = mode === "create";
+  useEffect(() => {
+    if (mode !== "create") return;
+    let active = true;
+    webAdminApi.saas.platformSettings.listTaxTemplates()
+      .then(({ data }) => { if (active) setTaxTemplates(data.filter((entry) => entry.currencyCode && entry.taxLabel && entry.rates.some((rate) => rate.isDefault))); })
+      .catch(() => { /* Country can still be entered when templates are unavailable. */ });
+    return () => { active = false; };
+  }, [mode]);
   const languageOptions = showDefaults
     ? tenantCreateLanguageOptions
     : tenantLanguageOptions;
@@ -203,15 +214,20 @@ export function TenantForm({
                   <Label htmlFor="tenant-country">
                     {m.tenants.form.fields.country}
                   </Label>
-                  <Input
-                    aria-invalid={Boolean(errors.country)}
-                    disabled={disabled || submitting}
-                    id="tenant-country"
-                    onChange={(event) =>
-                      updateValue("country", event.target.value)
-                    }
-                    value={values.country}
-                  />
+                  {mode === "create" ? (
+                    <Select disabled={disabled || submitting} onValueChange={(countryCode) => {
+                      const template = taxTemplates.find((entry) => entry.countryCode === countryCode);
+                      setValues((current) => ({ ...current, country: countryCode, defaultCurrency: template?.currencyCode ?? "" }));
+                      setErrors((current) => ({ ...current, country: undefined, defaultCurrency: undefined }));
+                    }} value={values.country}>
+                      <SelectTrigger aria-invalid={Boolean(errors.country)} id="tenant-country"><SelectValue placeholder={m.tenants.form.fields.country} /></SelectTrigger>
+                      <SelectContent>
+                        {taxTemplates.map((template) => <SelectItem key={template.countryCode} value={template.countryCode}>{template.name} ({template.countryCode})</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input aria-invalid={Boolean(errors.country)} disabled={disabled || submitting} id="tenant-country" onChange={(event) => updateValue("country", event.target.value)} value={values.country} />
+                  )}
                   {errors.country ? (
                     <p className="text-xs text-destructive">{errors.country}</p>
                   ) : null}
@@ -481,10 +497,7 @@ export function TenantForm({
                       disabled={disabled || submitting}
                       id="default-currency"
                       maxLength={3}
-                      placeholder="Platform default"
-                      onChange={(event) =>
-                        updateValue("defaultCurrency", event.target.value)
-                      }
+                      readOnly
                       value={values.defaultCurrency}
                     />
                     {errors.defaultCurrency ? (

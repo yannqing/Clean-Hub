@@ -12,6 +12,7 @@ import {
 } from "@cleanhub/domain/currency";
 
 import type { PosCartSnapshot } from "@/features/cart/cart.types";
+import type { LocalCartPricing } from "@/features/cart/lib/local-pricing";
 import {
   buildPosOrderReceipt,
   getPosReceiptCopy,
@@ -73,6 +74,9 @@ export async function queuePosOfflineCartReceipt(input: {
   autoPrint: boolean;
   branch: PosBranchSummary | null;
   cart: PosCartSnapshot;
+  pricing: LocalCartPricing;
+  totalAmount: string;
+  taxRegistrationNumber?: string | null;
   copies: number;
   locale: string;
   paymentMethod: "cash" | "later";
@@ -96,11 +100,12 @@ export async function queuePosOfflineCartReceipt(input: {
     (sum, amount) => sum + Number(amount || 0),
     0,
   );
-  const totalMinor = moneyToReceiptMinor(totalAmount, input.cart.currency);
+  const subtotalMinor = moneyToReceiptMinor(totalAmount, input.cart.currency);
+  const totalMinor = moneyToReceiptMinor(input.totalAmount, input.cart.currency);
   const lineAmountsMinor = allocateReceiptLineMinor(
     lineAmounts,
     input.cart.currency,
-    totalMinor,
+    subtotalMinor,
   );
   const title = `OFF-${input.cart.checkoutId.slice(-8).toUpperCase()}`;
   const copy = getPosReceiptCopy(input.locale);
@@ -131,8 +136,26 @@ export async function queuePosOfflineCartReceipt(input: {
         barcode:
           line.kind === "product" ? (line.barcode ?? undefined) : undefined,
       })),
-      subtotalMinor: totalMinor,
+      subtotalMinor,
       discountMinor: 0,
+      taxableMinor: input.pricing.taxBreakdown.reduce((sum, entry) => sum + moneyToReceiptMinor(entry.taxableAmount, input.cart.currency), 0),
+      taxMinor: moneyToReceiptMinor(input.pricing.taxAmount, input.cart.currency),
+      taxBreakdown: input.pricing.taxBreakdown.map((entry) => ({
+        taxRate: entry.taxRate,
+        taxableMinor: moneyToReceiptMinor(entry.taxableAmount, input.cart.currency),
+        taxMinor: moneyToReceiptMinor(entry.taxAmount, input.cart.currency),
+      })),
+      taxLabel: input.pricing.taxLabel ?? undefined,
+      taxComponents: input.pricing.taxComponents.map((entry) => ({
+        name: entry.name,
+        parentRate: entry.parentRate,
+        taxRate: entry.rate,
+        taxableMinor: moneyToReceiptMinor(entry.taxableAmount, input.cart.currency),
+        taxMinor: moneyToReceiptMinor(entry.taxAmount, input.cart.currency),
+      })),
+      roundingMinor: moneyToReceiptMinor(input.pricing.roundingAdjustmentAmount, input.cart.currency)
+        + totalMinor - moneyToReceiptMinor(input.pricing.totalAmount, input.cart.currency),
+      taxRegistrationNumber: input.taxRegistrationNumber ?? undefined,
       totalMinor,
       paidMinor: input.paymentMethod === "cash" ? totalMinor : 0,
       cashTenderedMinor:

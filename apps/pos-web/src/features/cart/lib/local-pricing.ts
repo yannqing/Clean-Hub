@@ -1,7 +1,7 @@
 import type { PosRoundingRule } from "@cleanhub/api-client";
 import { getCurrencyPayableStep, roundToStep } from "@cleanhub/domain/currency";
 import { amountToCents, centsToAmount } from "@cleanhub/domain/money";
-import { calculateTaxedTotals } from "@cleanhub/domain/tax";
+import { allocateProportionally, calculateTaxedTotals, normalizeTaxRate, taxRateToScale } from "@cleanhub/domain/tax";
 
 import type { PosCartSnapshot } from "../cart.types";
 
@@ -10,6 +10,8 @@ export type LocalPricingRules = {
   taxEnabled: boolean;
   /** Fraction, e.g. "0.1800"; applies to lines without a rate of their own. */
   defaultTaxRate: string;
+  taxLabel?: string | null;
+  taxComponents?: Array<{ name: string; rate: string }> | null;
   pricesIncludeTax: boolean;
   roundingRule: PosRoundingRule;
 };
@@ -24,6 +26,8 @@ export type LocalCartPricing = {
   subtotalAmount: string;
   taxAmount: string;
   taxBreakdown: LocalTaxBreakdownEntry[];
+  taxLabel: string | null;
+  taxComponents: Array<{ name: string; rate: string; parentRate: string; taxableAmount: string; taxAmount: string }>;
   roundingAdjustmentAmount: string;
   totalAmount: string;
 };
@@ -78,6 +82,13 @@ export function calculateLocalCartPricing(
   const currencyStep = getCurrencyPayableStep(rules.currency);
   const step = configuredStep > currencyStep ? configuredStep : currencyStep;
   const totalMinor = roundToStep(beforeRounding, step);
+  const componentGroup = taxed.groups.find((group) =>
+    group.taxRate === normalizeTaxRate(rules.defaultTaxRate) && group.taxMinor > BigInt(0));
+  const candidates = rules.taxComponents ?? [];
+  const configured = candidates.reduce((sum, component) => sum + taxRateToScale(component.rate), BigInt(0)) === taxRateToScale(rules.defaultTaxRate)
+    ? candidates : [];
+  const componentAmounts = componentGroup && configured.length > 0
+    ? allocateProportionally(componentGroup.taxMinor, configured.map((component) => taxRateToScale(component.rate))) : [];
 
   return {
     subtotalAmount: centsToAmount(subtotalMinor),
@@ -89,6 +100,14 @@ export function calculateLocalCartPricing(
         taxableAmount: centsToAmount(group.taxableMinor),
         taxAmount: centsToAmount(group.taxMinor),
       })),
+    taxLabel: rules.taxLabel ?? null,
+    taxComponents: componentGroup ? configured.map((component, index) => ({
+      name: component.name,
+      rate: normalizeTaxRate(component.rate),
+      parentRate: componentGroup.taxRate,
+      taxableAmount: centsToAmount(componentGroup.taxableMinor),
+      taxAmount: centsToAmount(componentAmounts[index] ?? BigInt(0)),
+    })) : [],
     roundingAdjustmentAmount: signedCentsToAmount(totalMinor - beforeRounding),
     totalAmount: centsToAmount(totalMinor),
   };

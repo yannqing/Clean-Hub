@@ -70,6 +70,7 @@ import { PosStaffError } from "../staff/staff.errors.js";
 import { ensurePaymentRegisterContext } from "../staff/staff.service.js";
 import { findTerminalSettingsById } from "../terminal-settings/terminal-settings.repository.js";
 import { applyPosOrderFinancialRules } from "./orders.financial.js";
+import { resolvePosTaxReadiness } from "../../tax/pos-tax-readiness.js";
 import {
   consumeProductInventoryForPaidOrder,
   releaseExpiredProductReservations,
@@ -693,6 +694,11 @@ export async function createPosOrder(
       requirePosBranchAccess(input.authContext, existing.branchId);
       return existing;
     }
+  }
+
+  const taxReadiness = await resolvePosTaxReadiness(db, tenantId);
+  if (!taxReadiness.ready) {
+    throw new PosOrderError(taxReadiness.code, taxReadiness.message, 409);
   }
 
   return db.transaction(async (tx) => {
@@ -1801,6 +1807,12 @@ export async function checkoutPosOrder(
       tenantId,
       orderId: data.order.id!,
     });
+    // A draft created before tax setup (or while a template was current) must
+    // not bypass the sale gate merely because its stable order id exists.
+    const checkoutTaxReadiness = await resolvePosTaxReadiness(tx, tenantId);
+    if (!checkoutTaxReadiness.ready) {
+      throw new PosOrderError(checkoutTaxReadiness.code, checkoutTaxReadiness.message, 409);
+    }
     let order = await createPosOrder(
       { authContext, data: data.order, requestMeta },
       tx,

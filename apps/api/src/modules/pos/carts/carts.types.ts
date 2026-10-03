@@ -121,6 +121,9 @@ export type PosCartPricePreview = {
   taxableAmount: string;
   taxAmount: string;
   taxRate: string;
+  taxBreakdown: Array<{ taxRate: string; taxableAmount: string; taxAmount: string }>;
+  taxLabel: string | null;
+  taxComponents: Array<{ name: string; rate: string; parentRate: string; taxableAmount: string; taxAmount: string }>;
   pricesIncludeTax: boolean;
   taxExemptionReason: string | null;
   taxRegistrationNumber: string | null;

@@ -5,6 +5,7 @@ export type ReportSummary = {
   grossSales: number;
   taxableAmount: number;
   taxAmount: number;
+  taxComponents: Array<{ name: string; rate: string; taxableAmount: number; taxAmount: number }>;
   orderCount: number;
   averageOrderValue: number;
   uniqueCustomerCount: number;

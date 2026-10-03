@@ -256,6 +256,7 @@ function downloadZReport(report: PosZReport, labels: typeof COPY[Locale]) {
     ["Orders", report.orderCount],
     [labels.taxableAmount, report.taxableAmount],
     [labels.taxAmount, report.taxAmount],
+    ...report.taxComponents.map((component) => [`${component.name} ${Number(component.rate) * 100}%`, component.taxAmount]),
     [labels.netSales, report.netSales],
     [labels.expectedCash, report.expectedCash],
     [labels.confirmVariance, report.variance],
@@ -498,6 +499,7 @@ export function PosOperationsView({
                   <p className="font-medium">{dateTime(report.cutoffAt, locale, timeZone)}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{report.orderCount} orders · {report.paymentBreakdown.length} methods</p>
                   <p className="mt-1 text-xs text-muted-foreground">{report.taxAmount === null ? copy.taxUnavailable : `${copy.taxableAmount}: ${money(report.taxableAmount, report.currency, locale)} · ${copy.taxAmount}: ${money(report.taxAmount, report.currency, locale)}`}</p>
+                  {report.taxComponents.map((component) => <p className="mt-1 text-xs text-muted-foreground" key={`${component.name}:${component.rate}`}>{component.name} {Number(component.rate) * 100}%: {money(component.taxAmount, report.currency, locale)}</p>)}
                   <Button className="mt-2" onClick={() => downloadZReport(report, copy)} size="sm" type="button" variant="outline">{copy.exportCsv}</Button>
                 </div>
                 <div className="text-right">

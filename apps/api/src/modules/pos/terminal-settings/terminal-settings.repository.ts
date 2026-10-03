@@ -51,6 +51,9 @@ function toSummary(
     defaultTaxRate: "0.0000",
     pricesIncludeTax: true,
     taxRegistrationNumber: null,
+    taxLabel: null,
+    taxComponents: null,
+    taxReadiness: { ready: false, code: "POS_TAX_TEMPLATE_REQUIRED", message: "The country tax template is unavailable or incomplete. Ask a SaaS administrator to complete its form or import the tax template file, then ask the owner to apply it." },
     // Safe placeholder: withTenantFinancialDefaults resolves the real value
     // from the platform SMTP configuration and the tenant's feature flag.
     // Defaulting to false means a path that somehow skips the overlay hides
@@ -116,6 +119,8 @@ export async function findTenantPosTerminalDefaults(
   defaultTaxRate: string;
   pricesIncludeTax: boolean;
   taxRegistrationNumber: string | null;
+  taxLabel: string | null;
+  taxComponents: Array<{ name: string; rate: string }> | null;
 }> {
   const rows = await db
     .select({
@@ -130,6 +135,8 @@ export async function findTenantPosTerminalDefaults(
       defaultTaxRate: posChannelSettings.defaultTaxRate,
       pricesIncludeTax: posChannelSettings.pricesIncludeTax,
       taxRegistrationNumber: posChannelSettings.taxRegistrationNumber,
+      taxLabel: posChannelSettings.taxLabel,
+      taxComponents: posChannelSettings.defaultTaxComponents,
     })
     .from(posChannelSettings)
     .where(eq(posChannelSettings.tenantId, tenantId))
@@ -148,6 +155,8 @@ export async function findTenantPosTerminalDefaults(
       defaultTaxRate: "0.0000",
       pricesIncludeTax: true,
       taxRegistrationNumber: null,
+      taxLabel: null,
+      taxComponents: null,
     }
   );
 }

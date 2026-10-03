@@ -9,6 +9,7 @@ import { writeAuditLog } from "../../audit/audit.helper.js";
 import { isEmailConfigured } from "../../notifications/email-config.js";
 import { findEnabledTenantPaymentProviders } from "../../tenant/payment-integrations/payment-integrations.repository.js";
 import { requirePosTerminalContext } from "../access-control.helper.js";
+import { resolvePosTaxReadiness } from "../../tax/pos-tax-readiness.js";
 import { findOpenRegisterSession } from "../staff/staff.repository.js";
 import { PosTerminalSettingsError } from "./terminal-settings.errors.js";
 import {
@@ -38,7 +39,7 @@ async function withTenantFinancialDefaults(
   db: Database,
   settings: PosTerminalSettingsSummary,
 ): Promise<PosTerminalSettingsSummary> {
-  const [defaults, mobileMoneyProvidersEnabled, branchPolicy] =
+  const [defaults, mobileMoneyProvidersEnabled, branchPolicy, taxReadiness] =
     await Promise.all([
       findTenantPosTerminalDefaults(db, settings.tenantId),
       findEnabledTenantPaymentProviders(db, settings.tenantId),
@@ -46,6 +47,7 @@ async function withTenantFinancialDefaults(
         tenantId: settings.tenantId,
         branchId: settings.branchId,
       }),
+      resolvePosTaxReadiness(db, settings.tenantId),
     ]);
   // Two conditions, both required: the platform must have SMTP at all (it is a
   // single global configuration), and this tenant must be entitled to use it.
@@ -82,6 +84,9 @@ async function withTenantFinancialDefaults(
     defaultTaxRate: defaults.defaultTaxRate,
     pricesIncludeTax: defaults.pricesIncludeTax,
     taxRegistrationNumber: defaults.taxRegistrationNumber,
+    taxLabel: defaults.taxLabel,
+    taxComponents: defaults.taxComponents,
+    taxReadiness,
     emailReceiptEnabled,
   };
 }

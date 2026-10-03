@@ -1,4 +1,5 @@
-import { getDb, type Database } from "@cleanhub/db";
+import { getDb, posChannelSettings, type Database } from "@cleanhub/db";
+import { and, eq, isNotNull, sql } from "drizzle-orm";
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import type { AuthContext } from "../../auth/auth.types.js";
@@ -40,6 +41,26 @@ function notFound(): TenantTaxRateError {
   );
 }
 
+async function detachTemplateForManualRateChange(
+  db: Database,
+  tenantId: string,
+  actorUserId: string,
+): Promise<void> {
+  // Lock settings before mutating rates, in the same order as a SaaS sync.
+  // Any manual change to a tax class is an explicit override of the template.
+  await db.update(posChannelSettings).set({
+    taxTemplateCountryCode: null,
+    taxTemplateVersion: null,
+    defaultTaxComponents: null,
+    updatedAt: new Date(),
+    updatedBy: actorUserId,
+    version: sql`${posChannelSettings.version} + 1`,
+  }).where(and(
+    eq(posChannelSettings.tenantId, tenantId),
+    isNotNull(posChannelSettings.taxTemplateCountryCode),
+  ));
+}
+
 export async function listTenantTaxRates(
   authContext: AuthContext,
   query: TenantTaxRateListQuery,
@@ -67,6 +88,7 @@ export async function createTenantTaxRate(
 
   try {
     return await db.transaction(async (tx) => {
+      await detachTemplateForManualRateChange(tx, tenantId, input.authContext.userId);
       const created = await insertTenantTaxRate(tx, {
         tenantId,
         actorUserId: input.authContext.userId,
@@ -109,6 +131,7 @@ export async function updateTenantTaxRate(
         taxRateId: input.taxRateId,
       });
       if (!before) throw notFound();
+      await detachTemplateForManualRateChange(tx, tenantId, input.authContext.userId);
 
       const updated = await updateTenantTaxRateRecord(tx, {
         tenantId,
@@ -161,6 +184,7 @@ export async function deleteTenantTaxRate(
       taxRateId: input.taxRateId,
     });
     if (!current) throw notFound();
+    await detachTemplateForManualRateChange(tx, tenantId, input.authContext.userId);
 
     // Deleting a rate that services still carry would silently move them to
     // the default rate. Archive instead: the items keep their rate, and the

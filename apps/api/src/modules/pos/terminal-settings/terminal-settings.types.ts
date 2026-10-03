@@ -1,5 +1,6 @@
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 import type { PosMobileMoneyProvider } from "../orders/orders.types.js";
+import type { PosTaxReadiness } from "../../tax/pos-tax-readiness.js";
 
 /**
  * POS terminal settings — DTOs.
@@ -48,6 +49,9 @@ export type PosTerminalSettingsSummary = {
   defaultTaxRate: string;
   pricesIncludeTax: boolean;
   taxRegistrationNumber: string | null;
+  taxLabel: string | null;
+  taxComponents: Array<{ name: string; rate: string }> | null;
+  taxReadiness: PosTaxReadiness;
   /**
    * Whether this till may offer an emailed receipt. False when the platform has
    * no SMTP configured, or when the tenant is not entitled to email.

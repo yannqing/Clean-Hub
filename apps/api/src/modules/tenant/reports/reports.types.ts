@@ -60,6 +60,8 @@ export type ReportSummary = {
   /** Tax on non-cancelled, non-draft orders created in this period. */
   taxableAmount: number;
   taxAmount: number;
+  /** Gross tax components captured on orders in this period. */
+  taxComponents: Array<{ name: string; rate: string; taxableAmount: number; taxAmount: number }>;
   orderCount: number;
   averageOrderValue: number;
   uniqueCustomerCount: number;

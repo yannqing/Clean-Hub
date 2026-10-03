@@ -17,6 +17,7 @@ import {
   tenantSettings,
   type Database,
 } from "@cleanhub/db";
+import { sumOrderTaxComponents } from "../../tax/tax-reporting.repository.js";
 
 import type {
   OrderStatusBreakdown,
@@ -604,6 +605,7 @@ function createEmptySummary(
     grossSales: 0,
     taxableAmount: 0,
     taxAmount: 0,
+    taxComponents: [],
     orderCount: 0,
     averageOrderValue: 0,
     uniqueCustomerCount: 0,
@@ -654,6 +656,10 @@ export async function getTenantReportSummaryRecord(
     findWorkloadMetrics(db, input, new Date(generatedAt)),
     findPaymentTrend(db, input, range),
   ]);
+  const taxComponents = await sumOrderTaxComponents(db, [
+    ...createOrderFilters(input, range),
+    inArray(orders.status, ["received", "paid", "delivered"]),
+  ]);
   const [
     orderTrend,
     branchPayments,
@@ -684,6 +690,11 @@ export async function getTenantReportSummaryRecord(
     ...current,
     taxableAmount: currentOrders.taxableAmount,
     taxAmount: currentOrders.taxAmount,
+    taxComponents: taxComponents.map((component) => ({
+      ...component,
+      taxableAmount: toMoney(component.taxableAmount),
+      taxAmount: toMoney(component.taxAmount),
+    })),
     pendingPickupCount: workload.pendingPickupCount,
     inProgressCount: workload.inProgressCount,
     overdueCount: workload.overdueCount,

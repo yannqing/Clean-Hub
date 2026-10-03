@@ -272,11 +272,13 @@ private data class NativeMoreZReport(
     val orderCount: Int,
     val taxableAmount: String?,
     val taxAmount: String?,
+    val taxComponents: List<NativeMoreZTaxComponent>,
     val refundAmount: String,
     val discountAmount: String,
     val paymentBreakdown: List<NativeMoreZPayment>,
 )
 private data class NativeMoreZPayment(val method: String, val provider: String?, val netAmount: String)
+private data class NativeMoreZTaxComponent(val name: String, val rate: String, val taxAmount: String)
 
 private enum class NativePosTab(val symbol: String) {
     Workspace("⌂"),
@@ -2399,6 +2401,11 @@ fun NativePosApp(applicationContext: Context) {
                             onCheckout = { checkoutRequest ->
                                 val cartAtCheckout = cart
                                 val terminalAtCheckout = current.terminal
+                                if (!checkoutSettings.taxReady) {
+                                    checkoutFailure = copy.taxReadinessMessage(checkoutSettings.taxReadinessCode)
+                                    message = checkoutFailure
+                                    return@NativeSaleView
+                                }
                                 if (checkoutRequest.paymentMethod == "cash" && checkoutRequest.tenderedMinor < checkoutRequest.expectedTotalMinor) {
                                     checkoutFailure = copy.tenderBelowTotal
                                     message = checkoutFailure
@@ -4592,6 +4599,9 @@ private fun NativeShiftHandoverView(
                             NativeReferenceRow("${report.netSales} ${report.currency}", "${report.cutoffAt} · ${copy.varianceLabel} ${report.variance}", copy.orderCountLabel.format(report.orderCount))
                             report.taxableAmount?.let { NativeReferenceRow(copy.taxableAmountLabel, it, report.currency) }
                             report.taxAmount?.let { NativeReferenceRow(copy.taxAmountLabel, it, report.currency) }
+                            report.taxComponents.forEach { component ->
+                                NativeReferenceRow("${component.name} ${formatNativeTaxRate(component.rate)}", component.taxAmount, report.currency)
+                            }
                             NativeReferenceRow(copy.discountAmountLabel, report.discountAmount, report.currency)
                             NativeReferenceRow(copy.refundAmountLabel, report.refundAmount, report.currency)
                             report.paymentBreakdown.forEach { payment ->
@@ -6028,6 +6038,14 @@ private fun NativeSaleView(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
+        if (!checkoutSettings.taxReady) {
+            Text(
+                copy.taxReadinessMessage(checkoutSettings.taxReadinessCode),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
 
         if (expanded) {
             Row(
@@ -6686,8 +6704,16 @@ private fun NativeCheckoutDialog(
                             // One row per rate, as the receipt prints them: a basket of
                             // standard-rated and exempt items shows only the tax it pays.
                             pricing.taxBreakdown.filter { it.taxMinor != 0L }.forEach { entry ->
-                                val taxLabel = copy.taxLabelWithRate.format(formatNativeTaxRate(entry.taxRate)) + if (pricing.pricesIncludeTax) copy.taxIncluded else ""
-                                NativeCheckoutAmountRow(taxLabel, entry.taxMinor, cart.currency)
+                                val components = pricing.taxComponents.filter { it.parentRate == entry.taxRate }
+                                if (components.isNotEmpty()) {
+                                    components.forEach { component ->
+                                        NativeCheckoutAmountRow("${component.name} ${formatNativeTaxRate(component.rate)}" + if (pricing.pricesIncludeTax) copy.taxIncluded else "", component.taxMinor, cart.currency)
+                                    }
+                                } else {
+                                    val taxLabel = (pricing.taxLabel?.let { "$it ${formatNativeTaxRate(entry.taxRate)}" }
+                                        ?: copy.taxLabelWithRate.format(formatNativeTaxRate(entry.taxRate))) + if (pricing.pricesIncludeTax) copy.taxIncluded else ""
+                                    NativeCheckoutAmountRow(taxLabel, entry.taxMinor, cart.currency)
+                                }
                             }
                             if (pricing.roundingAdjustmentMinor != 0L) {
                                 NativeCheckoutAmountRow(copy.systemRounding, pricing.roundingAdjustmentMinor, cart.currency)
@@ -7169,17 +7195,30 @@ private fun JSONArray?.toNativeMoreZReports(): List<NativeMoreZReport> = buildLi
             orderCount = value.optInt("orderCount"),
             taxableAmount = value.optString("taxableAmount").takeIf { it.isNotBlank() && it != "null" },
             taxAmount = value.optString("taxAmount").takeIf { it.isNotBlank() && it != "null" },
+            taxComponents = buildList {
+                value.optJSONArray("taxComponents")?.let { components ->
+                    for (componentIndex in 0 until components.length()) {
+                        val component = components.optJSONObject(componentIndex) ?: continue
+                        add(NativeMoreZTaxComponent(
+                            name = component.optString("name"),
+                            rate = component.optString("rate"),
+                            taxAmount = component.optString("taxAmount", "0"),
+                        ))
+                    }
+                }
+            },
             refundAmount = value.optString("refundAmount", "0"),
             discountAmount = value.optString("discountAmount", "0"),
             paymentBreakdown = buildList {
-                val payments = value.optJSONArray("paymentBreakdown") ?: return@buildList
-                for (paymentIndex in 0 until payments.length()) {
-                    val payment = payments.optJSONObject(paymentIndex) ?: continue
-                    add(NativeMoreZPayment(
-                        method = payment.optString("method"),
-                        provider = payment.optString("provider").takeIf { it.isNotBlank() && it != "null" },
-                        netAmount = payment.optString("netAmount", "0"),
-                    ))
+                value.optJSONArray("paymentBreakdown")?.let { payments ->
+                    for (paymentIndex in 0 until payments.length()) {
+                        val payment = payments.optJSONObject(paymentIndex) ?: continue
+                        add(NativeMoreZPayment(
+                            method = payment.optString("method"),
+                            provider = payment.optString("provider").takeIf { it.isNotBlank() && it != "null" },
+                            netAmount = payment.optString("netAmount", "0"),
+                        ))
+                    }
                 }
             },
         ))
@@ -7200,7 +7239,9 @@ private fun buildNativeZReportCsv(report: NativeMoreZReport): String {
         listOf("Expected cash", report.expectedCash),
         listOf("Counted cash", report.countedCash),
         listOf("Variance", report.variance),
-    ) + report.paymentBreakdown.map { payment ->
+    ) + report.taxComponents.map { component ->
+        listOf("${component.name} ${formatNativeTaxRate(component.rate)}", component.taxAmount)
+    } + report.paymentBreakdown.map { payment ->
         listOf("${payment.method}${payment.provider?.let { " / $it" }.orEmpty()}", payment.netAmount)
     }
     fun escape(value: String): String = if (value.any { it == ',' || it == '"' || it == '\r' || it == '\n' }) {
@@ -7324,6 +7365,20 @@ private fun JSONObject.toNativeCartPricing(): NativeCartPricing = NativeCartPric
             )
         }
     },
+    taxLabel = if (isNull("taxLabel")) null else optString("taxLabel").ifBlank { null },
+    taxComponents = buildList {
+        val source = optJSONArray("taxComponents") ?: return@buildList
+        for (index in 0 until source.length()) {
+            val entry = source.optJSONObject(index) ?: continue
+            add(NativeTaxComponent(
+                name = entry.optString("name"),
+                rate = entry.optString("rate", "0.0000"),
+                parentRate = entry.optString("parentRate"),
+                taxableMinor = parseMoney(entry.optString("taxableAmount", "0")) ?: 0,
+                taxMinor = parseMoney(entry.optString("taxAmount", "0")) ?: 0,
+            ))
+        }
+    },
     pricesIncludeTax = optBoolean("pricesIncludeTax", true),
     taxRegistrationNumber = if (isNull("taxRegistrationNumber")) null else optString("taxRegistrationNumber").ifBlank { null },
     roundingAdjustmentMinor = parseSignedMoney(optString("roundingAdjustmentAmount", "0")),
@@ -7428,12 +7483,16 @@ private fun buildNativeReceiptDraft(
                     formatNativeTaxRate(entry.taxRate),
                     formatMoney(entry.taxableMinor, cart.currency),
                 ))
-                add(
-                    copy.receiptTaxLine.format(
-                        formatNativeTaxRate(entry.taxRate),
-                        formatMoney(entry.taxMinor, cart.currency),
-                    ) + if (pricing.pricesIncludeTax) copy.taxIncluded else "",
-                )
+                val components = pricing.taxComponents.filter { it.parentRate == entry.taxRate }
+                if (components.isNotEmpty()) {
+                    components.forEach { component ->
+                        add("${component.name} ${formatNativeTaxRate(component.rate)}: ${formatMoney(component.taxMinor, cart.currency)}" + if (pricing.pricesIncludeTax) copy.taxIncluded else "")
+                    }
+                } else {
+                    val label = pricing.taxLabel?.let { "$it ${formatNativeTaxRate(entry.taxRate)}" }
+                        ?: copy.taxLabelWithRate.format(formatNativeTaxRate(entry.taxRate))
+                    add("$label: ${formatMoney(entry.taxMinor, cart.currency)}" + if (pricing.pricesIncludeTax) copy.taxIncluded else "")
+                }
             }
             // System rounding plus any cash rounding the cashier chose: the
             // amount due is what was actually collected against the total.

@@ -1729,6 +1729,8 @@ export type TenantMessages = {
         closingFloat: string;
         netSales: string;
         cashVariance: string;
+        taxAmount: string;
+        taxComponents: string;
       };
       statuses: {
         open: string;
@@ -1761,6 +1763,9 @@ export type TenantMessages = {
         netSales: string;
         cashVariance: string;
         currency: string;
+        taxableAmount: string;
+        taxAmount: string;
+        taxComponents: string;
       };
     };
     settings: {
@@ -2697,6 +2702,7 @@ export type TenantMessages = {
   taxRates: {
     title: string;
     description: string;
+    templateOverride: string;
     empty: string;
     add: string;
     name: string;

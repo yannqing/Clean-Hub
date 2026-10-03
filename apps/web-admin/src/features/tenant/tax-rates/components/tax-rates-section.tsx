@@ -148,6 +148,9 @@ export function TaxRatesSection({
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
               {text.description}
             </p>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-amber-700">
+              {text.templateOverride}
+            </p>
           </div>
         </div>
         {canManage ? (

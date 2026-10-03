@@ -10,5 +10,7 @@ export function createSaasPlatformSettingsApi(client: ApiClient) {
       client.get<{ data: PlatformTaxTemplate[] }>("/saas/platform-settings/tax-templates"),
     upsertTaxTemplate: (input: UpsertPlatformTaxTemplateRequest) =>
       client.put<PlatformTaxTemplate>("/saas/platform-settings/tax-templates", input),
+    importTaxTemplates: (input: UpsertPlatformTaxTemplateRequest[]) =>
+      client.put<{ data: PlatformTaxTemplate[] }>("/saas/platform-settings/tax-templates/bulk", input),
   };
 }

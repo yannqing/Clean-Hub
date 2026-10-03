@@ -49,10 +49,14 @@ export const platformSettings = pgTable(
 );
 
 export type PlatformTaxTemplateRate = {
+  /** Stable across display-name and rate changes; legacy rows receive a positional key. */
+  key?: string;
   name: string;
-  /** Fraction: 0.1800 is 18%. */
+  /** Fraction configured by a SaaS administrator. */
   rate: string;
   isDefault: boolean;
+  /** Optional additive taxes on the same taxable base (their rates sum to rate). */
+  components?: Array<{ name: string; rate: string }>;
 };
 
 /**
@@ -69,6 +73,9 @@ export const platformTaxTemplates = pgTable(
     /** ISO 3166-1 alpha-2, upper case. */
     countryCode: varchar("country_code", { length: 2 }).notNull(),
     name: varchar("name", { length: 120 }).notNull(),
+    currencyCode: varchar("currency_code", { length: 3 }),
+    taxLabel: varchar("tax_label", { length: 80 }),
+    exemptionNotes: text("exemption_notes"),
     taxEnabled: boolean("tax_enabled").notNull().default(true),
     pricesIncludeTax: boolean("prices_include_tax").notNull().default(true),
     rates: jsonb("rates").$type<PlatformTaxTemplateRate[]>().notNull(),

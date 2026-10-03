@@ -19,6 +19,7 @@ import type { TaxRate } from "@/features/tenant/tax-rates/types";
 
 import { TenantDefaultCurrencyField } from "./tenant-default-currency-field";
 import { TenantSettingsSurface } from "./tenant-settings-surface";
+import { TenantTaxTemplateSection } from "./tenant-tax-template-section";
 import { useTenantSettingsWorkspace } from "./tenant-settings-workspace";
 import { useTenantI18n } from "@/i18n";
 
@@ -141,16 +142,28 @@ export function PricingSettingsView({
           </div>
         </section>
 
+        <TenantTaxTemplateSection
+          canManage={canUpdateSettings}
+          settingsVersion={taxSettings?.version}
+          appliedCountryCode={taxSettings?.taxTemplateCountryCode}
+          appliedTemplateVersion={taxSettings?.taxTemplateVersion}
+          taxEnabled={taxSettings?.taxEnabled}
+          taxRegistrationNumber={taxSettings?.taxRegistrationNumber}
+          key={`${taxSettings?.version}:${taxSettings?.taxTemplateCountryCode}:${taxSettings?.taxTemplateVersion}`}
+        />
+
         <TaxSettingsSection
           canManage={canUpdateSettings}
           initialError={taxError}
           initialSettings={taxSettings}
+          key={taxSettings?.version}
         />
 
         <TaxRatesSection
           canManage={canUpdateSettings}
           initialRates={taxRates}
           loadFailed={taxRatesLoadFailed}
+          key={taxRates.map((rate) => `${rate.id}:${rate.version}`).join(",")}
         />
 
         <section className="flex flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-5">

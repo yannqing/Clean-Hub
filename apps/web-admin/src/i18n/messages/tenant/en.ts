@@ -2110,6 +2110,8 @@ export const tenantMessagesEn: TenantMessages = {
         closingFloat: "Closing cash",
         netSales: "Net sales",
         cashVariance: "Variance",
+        taxAmount: "Sales tax (gross)",
+        taxComponents: "Tax components",
       },
       statuses: {
         open: "Open",
@@ -2143,6 +2145,9 @@ export const tenantMessagesEn: TenantMessages = {
         netSales: "Net sales",
         cashVariance: "Cash variance",
         currency: "Currency",
+        taxableAmount: "Taxable amount (gross)",
+        taxAmount: "Sales tax (gross)",
+        taxComponents: "Tax components (gross)",
       },
     },
     settings: {
@@ -3158,7 +3163,8 @@ export const tenantMessagesEn: TenantMessages = {
   taxRates: {
     title: "Tax rates",
     description:
-      "Named rates you can put on individual services and products, for example a reduced rate or an exempt item. Anything without its own rate uses the default VAT rate above.",
+      "Named rates you can put on individual services and products, for example a reduced rate or an exempt item. Anything without its own rate uses the default tax rate above.",
+    templateOverride: "Editing a country-template rate stops automatic SaaS tax updates for this tenant.",
     empty: "No tax rates yet. Every item is sold at the default rate.",
     add: "Add tax rate",
     name: "Name",

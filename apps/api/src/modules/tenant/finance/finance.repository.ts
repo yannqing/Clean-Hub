@@ -19,6 +19,7 @@ import {
   tenantSettings,
   type Database,
 } from "@cleanhub/db";
+import { sumOrderTaxComponents } from "../../tax/tax-reporting.repository.js";
 
 import type {
   FinanceAvailableBranch,
@@ -493,7 +494,7 @@ async function findOrderTaxMetrics(
   db: Database,
   input: FinanceRepositoryInput,
   range: DateRange,
-): Promise<{ taxableAmount: number; taxAmount: number }> {
+): Promise<{ taxableAmount: number; taxAmount: number; components: Array<{ name: string; rate: string; taxableAmount: number; taxAmount: number }> }> {
   const filters: SQL[] = [
     eq(orders.tenantId, input.tenantId),
     eq(orders.currency, input.currency),
@@ -506,9 +507,13 @@ async function findOrderTaxMetrics(
     taxableAmount: sql<string>`coalesce(sum(${orders.taxableAmount}), 0)::text`,
     taxAmount: sql<string>`coalesce(sum(${orders.taxAmount}), 0)::text`,
   }).from(orders).where(and(...filters));
+  const components = await sumOrderTaxComponents(db, filters);
   return {
     taxableAmount: toMoney(row?.taxableAmount),
     taxAmount: toMoney(row?.taxAmount),
+    components: components.map((component) => ({ ...component,
+      taxableAmount: toMoney(component.taxableAmount), taxAmount: toMoney(component.taxAmount),
+    })),
   };
 }
 
@@ -1014,7 +1019,7 @@ function createSummary(
   paidOrderCount: number,
   pendingRefunds: { amount: number; count: number },
   outstandingOrders: { amount: number; count: number },
-): Omit<FinanceSummaryMetrics, "orderTaxableAmount" | "orderTaxAmount"> {
+): Omit<FinanceSummaryMetrics, "orderTaxableAmount" | "orderTaxAmount" | "orderTaxComponents"> {
   const ledger = emptyLedger();
 
   for (const group of methodGroups) {
@@ -1144,6 +1149,7 @@ function createEmptySummary(
     summary: {
       orderTaxableAmount: 0,
       orderTaxAmount: 0,
+      orderTaxComponents: [],
       grossCollected: 0,
       refundAmount: 0,
       correctionAmount: 0,
@@ -1236,6 +1242,7 @@ export async function getTenantFinanceSummaryRecord(
       ...createSummary(paymentMethods, methodGroups, paidOrderCount, pendingRefunds, outstandingOrders),
       orderTaxableAmount: orderTax.taxableAmount,
       orderTaxAmount: orderTax.taxAmount,
+      orderTaxComponents: orderTax.components,
     },
     paymentMethods,
     dailyTrend: combineDailyTrend([

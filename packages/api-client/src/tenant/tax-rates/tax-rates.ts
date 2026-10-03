@@ -5,6 +5,7 @@ import type {
   TenantTaxRateListQuery,
   UpdateTenantTaxRateRequest,
 } from "./tax-rates.types";
+import type { PlatformTaxTemplate } from "../../saas/platform-settings";
 
 type TenantTaxRatesRequestOptions = Omit<
   ApiRequestOptions,
@@ -13,6 +14,17 @@ type TenantTaxRatesRequestOptions = Omit<
 
 export function createTenantTaxRatesApi(client: ApiClient) {
   return {
+    listTemplates: (options: TenantTaxRatesRequestOptions = {}) =>
+      client.get<{ data: PlatformTaxTemplate[] }>("/tenant/tax-rates/templates", options),
+    applyTemplate: (
+      input: { countryCode: string; templateVersion: number; settingsVersion: number },
+      options: TenantTaxRatesRequestOptions = {},
+    ) =>
+      client.post<{ template: PlatformTaxTemplate; settingsVersion: number; defaultTaxRate: string }>(
+        "/tenant/tax-rates/templates/apply",
+        input,
+        options,
+      ),
     list: (
       query?: TenantTaxRateListQuery,
       options: TenantTaxRatesRequestOptions = {},

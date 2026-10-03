@@ -53,6 +53,22 @@ const senegal: LocalPricingRules = {
   roundingRule: "none",
 };
 
+const composite = calculateLocalCartPricing(cart([productLine("combined", "10000.00", 1)]), {
+  currency: "GHS",
+  taxEnabled: true,
+  defaultTaxRate: "0.2000",
+  taxLabel: "VAT/NHIL/GETFund",
+  taxComponents: [
+    { name: "VAT", rate: "0.1500" },
+    { name: "NHIL", rate: "0.0250" },
+    { name: "GETFund", rate: "0.0250" },
+  ],
+  pricesIncludeTax: false,
+  roundingRule: "none",
+});
+assert.equal(composite.totalAmount, "12000.00");
+assert.deepEqual(composite.taxComponents.map((component) => component.taxAmount), ["1500.00", "250.00", "250.00"]);
+
 // 10,000 standard-rated, 5,000 exempt, 2,000 on the default: 1,800 + 0 + 360.
 const mixed = calculateLocalCartPricing(
   cart([

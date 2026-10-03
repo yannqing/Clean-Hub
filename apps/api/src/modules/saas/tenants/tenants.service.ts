@@ -1,4 +1,5 @@
 import { getDb, type Database } from "@cleanhub/db";
+import { isReadyTaxTemplate } from "../../tax/tax-template-readiness.js";
 
 import { AuthError } from "../../auth/auth.errors.js";
 import type { AuthContext } from "../../auth/auth.types.js";
@@ -29,6 +30,7 @@ import {
 import { SaasTenantsError } from "./tenants.errors.js";
 import {
   createSaasTenantRecord,
+  findPlatformTaxTemplateForCountry,
   findSaasTenantFeatureFlagsByTenantId,
   findOtherTenantByPressingCode,
   findPlatformDefaultLanguage,
@@ -219,6 +221,21 @@ export async function createSaasTenant(
       }
 
       const platformDefaults = await findPlatformSettings(tx);
+      const taxTemplate = await findPlatformTaxTemplateForCountry(tx, input.data.country);
+      if (!taxTemplate || !isReadyTaxTemplate(taxTemplate)) {
+        throw new SaasTenantsError(
+          "SAAS_TENANT_TAX_TEMPLATE_REQUIRED",
+          "Configure the country's tax template before creating a tenant.",
+          422,
+        );
+      }
+      if (input.data.defaultCurrency && input.data.defaultCurrency !== taxTemplate.currencyCode) {
+        throw new SaasTenantsError(
+          "SAAS_TENANT_CURRENCY_MISMATCH",
+          "Tenant currency must match the selected country's tax template.",
+          422,
+        );
+      }
       const defaultLanguage = await resolveDefaultLanguage(
         tx,
         input.data.defaultLanguage,
@@ -228,8 +245,9 @@ export async function createSaasTenant(
         actorUserId: input.authContext.userId,
         pressingCode,
         defaultLanguage,
-        defaultCurrency: input.data.defaultCurrency ?? platformDefaults?.defaultCurrency ?? "XOF",
+        defaultCurrency: taxTemplate.currencyCode!,
         timezone: platformDefaults?.timezone ?? "UTC",
+        taxTemplate,
       });
       const initialOwner = input.data.initialOwner
         ? await createTenantOwnerUser(tx, {

@@ -880,6 +880,9 @@ export function ReportSummaryView({
               <Metric change={null} icon={ReceiptText} label={taxCopy.taxable} locale={locale} value={formatMoney(summary.taxableAmount, currency, locale)} />
               <Metric change={null} icon={ReceiptText} label={taxCopy.tax} locale={locale} value={formatMoney(summary.taxAmount, currency, locale)} />
             </div>
+            {summary.taxComponents.length > 0 ? <div className="grid gap-3 sm:grid-cols-3">
+              {summary.taxComponents.map((component) => <Metric key={`${component.name}:${component.rate}`} change={null} icon={ReceiptText} label={`${component.name} ${Number(component.rate) * 100}%`} locale={locale} value={formatMoney(component.taxAmount, currency, locale)} />)}
+            </div> : null}
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="gap-0 rounded-xl py-0 shadow-xs">

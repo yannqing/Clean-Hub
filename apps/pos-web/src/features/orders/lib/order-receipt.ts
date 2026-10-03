@@ -126,6 +126,14 @@ export function buildPosOrderReceipt(input: {
           taxableMinor: moneyToReceiptMinor(entry.taxableAmount, order.currency),
           taxMinor: moneyToReceiptMinor(entry.taxAmount, order.currency),
         })),
+        taxLabel: order.taxLabelSnapshot ?? undefined,
+        taxComponents: (order.taxComponentsSnapshot ?? []).map((entry) => ({
+          name: entry.name,
+          parentRate: entry.parentRate,
+          taxRate: entry.rate,
+          taxableMinor: moneyToReceiptMinor(entry.taxableAmount, order.currency),
+          taxMinor: moneyToReceiptMinor(entry.taxAmount, order.currency),
+        })),
         roundingMinor: moneyToReceiptMinor(
           order.roundingAdjustmentAmount,
           order.currency,

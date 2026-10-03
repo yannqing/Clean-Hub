@@ -43,6 +43,7 @@ import {
   type PosTerminalServiceHealth,
 } from "@cleanhub/domain/pos-terminal-status";
 import { createId } from "@cleanhub/id";
+import { taxRateToScale } from "@cleanhub/domain/tax";
 
 import type {
   PosChannelAvailableBranch,
@@ -138,6 +139,8 @@ const DEFAULT_POS_CHANNEL_SETTINGS = {
   defaultTaxRate: "0.0000",
   pricesIncludeTax: true,
   taxRegistrationNumber: null,
+  taxTemplateCountryCode: null,
+  taxTemplateVersion: null,
   defaultAutoPrintReceipt: true,
   defaultPrintCopies: 1,
   defaultLockTimeoutSeconds: 300,
@@ -206,6 +209,8 @@ function toSettingsRecord(
     defaultTaxRate: row.defaultTaxRate,
     pricesIncludeTax: row.pricesIncludeTax,
     taxRegistrationNumber: row.taxRegistrationNumber,
+    taxTemplateCountryCode: row.taxTemplateCountryCode,
+    taxTemplateVersion: row.taxTemplateVersion,
     defaultAutoPrintReceipt: row.defaultAutoPrintReceipt,
     defaultPrintCopies: row.defaultPrintCopies,
     defaultLockTimeoutSeconds: row.defaultLockTimeoutSeconds,
@@ -434,6 +439,12 @@ export async function updatePosChannelSettingsRecord(
   },
 ): Promise<PosChannelSettingsRecord | null> {
   const { version: _version, ...requestedValues } = input.data;
+  const rateChanged = requestedValues.defaultTaxRate !== undefined &&
+    taxRateToScale(requestedValues.defaultTaxRate) !== taxRateToScale(input.current.defaultTaxRate);
+  const taxTemplateDetached =
+    rateChanged ||
+    (requestedValues.taxEnabled !== undefined && requestedValues.taxEnabled !== input.current.taxEnabled) ||
+    (requestedValues.pricesIncludeTax !== undefined && requestedValues.pricesIncludeTax !== input.current.pricesIncludeTax);
   const values = {
     cashTrackingEnabled:
       requestedValues.cashTrackingEnabled ?? input.current.cashTrackingEnabled,
@@ -458,6 +469,11 @@ export async function updatePosChannelSettingsRecord(
     taxEnabled: requestedValues.taxEnabled ?? input.current.taxEnabled,
     defaultTaxRate:
       requestedValues.defaultTaxRate ?? input.current.defaultTaxRate,
+    // A manual tax override detaches the SaaS template. Do not leave an old
+    // multi-tax split behind for a later enable/disable cycle.
+    defaultTaxComponents: taxTemplateDetached ? null : undefined,
+    taxTemplateCountryCode: taxTemplateDetached ? null : undefined,
+    taxTemplateVersion: taxTemplateDetached ? null : undefined,
     pricesIncludeTax:
       requestedValues.pricesIncludeTax ?? input.current.pricesIncludeTax,
     taxRegistrationNumber:
@@ -1010,6 +1026,9 @@ export async function findPosChannelRegisterSessions(
         zReportOrderCount: posZReports.orderCount,
         zReportGrossSales: posZReports.grossSales,
         zReportDiscountAmount: posZReports.discountAmount,
+        zReportTaxableAmount: posZReports.taxableAmount,
+        zReportTaxAmount: posZReports.taxAmount,
+        zReportTaxComponents: posZReports.taxComponents,
         zReportRefundAmount: posZReports.refundAmount,
         zReportCorrectionAmount: posZReports.correctionAmount,
         zReportExpectedCash: posZReports.expectedCash,
@@ -1185,6 +1204,9 @@ export async function findPosChannelRegisterSessions(
               cutoffAt: row.zReportCutoffAt.toISOString(),
               orderCount: row.zReportOrderCount ?? 0,
               grossSales: toMoney(row.zReportGrossSales),
+              taxableAmount: toMoney(row.zReportTaxableAmount),
+              taxAmount: toMoney(row.zReportTaxAmount),
+              taxComponents: row.zReportTaxComponents ?? [],
               refundAmount: toMoney(row.zReportRefundAmount),
               correctionAmount: toMoney(row.zReportCorrectionAmount),
               netSales: toMoney(
