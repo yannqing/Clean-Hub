@@ -2,7 +2,7 @@ import { webAdminApi } from "@/lib/api-client";
 
 import type {
   PlatformSettingsActionResult,
-  PlatformSettingsFormValues,
+  UpdatePlatformSettingsRequest,
 } from "../types";
 
 function getErrorMessage(error: unknown): string {
@@ -12,7 +12,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export async function updatePlatformSettingsAction(
-  input: PlatformSettingsFormValues,
+  input: UpdatePlatformSettingsRequest,
 ): Promise<PlatformSettingsActionResult> {
   try {
     const settings = await webAdminApi.saas.platformSettings.update(input);

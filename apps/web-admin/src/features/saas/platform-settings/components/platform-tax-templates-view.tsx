@@ -65,7 +65,7 @@ export function PlatformTaxTemplatesView() {
   }
 
   return (
-    <section className="space-y-4 border-y bg-background px-5 py-6">
+    <section className="space-y-4 rounded-xl border bg-background px-5 py-6 shadow-sm">
       <div>
         <h2 className="text-sm font-semibold">{copy.title}</h2>
         <p className="mt-1 text-xs text-muted-foreground">{copy.hint}</p>

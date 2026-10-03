@@ -4,7 +4,6 @@ import {
   Button,
   Checkbox,
   Icon,
-  Input,
   Label,
   Select,
   SelectContent,
@@ -12,10 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@cleanhub/ui";
-import { RefreshCw, Settings } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
-import { SaasPageHeader } from "@/features/saas/shared";
 import { useSaasI18n } from "@/i18n";
 import { updatePlatformSettingsAction } from "../actions";
 import {
@@ -23,12 +21,34 @@ import {
   platformSettingsDefaultValues,
 } from "../constants";
 import { getPlatformSettingsQuery } from "../queries";
-import type { PlatformSettings, PlatformSettingsFormValues } from "../types";
-import { PlatformTaxTemplatesView } from "./platform-tax-templates-view";
+import type {
+  PlatformSettings,
+  PlatformSettingsFormValues,
+  UpdatePlatformSettingsRequest,
+} from "../types";
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "";
-}
+const preferredCurrencies = ["XOF", "XAF", "EUR", "USD", "CNY", "GBP"];
+const currencies = [
+  ...preferredCurrencies,
+  ...Intl.supportedValuesOf("currency")
+    .filter((value) => !preferredCurrencies.includes(value))
+    .sort(),
+];
+const preferredTimezones = [
+  "UTC",
+  "Africa/Dakar",
+  "Africa/Abidjan",
+  "Africa/Bamako",
+  "Africa/Lagos",
+  "Europe/Paris",
+  "Asia/Shanghai",
+];
+const timezones = [
+  ...preferredTimezones,
+  ...Intl.supportedValuesOf("timeZone")
+    .filter((value) => !preferredTimezones.includes(value))
+    .sort(),
+];
 
 function toFormValues(settings: PlatformSettings): PlatformSettingsFormValues {
   return {
@@ -39,11 +59,15 @@ function toFormValues(settings: PlatformSettings): PlatformSettingsFormValues {
   };
 }
 
-export function PlatformSettingsView() {
+export function PlatformSettingsView({
+  section = "defaults",
+}: {
+  section?: "defaults" | "maintenance";
+}) {
   const { m, formatDateTime } = useSaasI18n();
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState<PlatformSettingsFormValues>(
     platformSettingsDefaultValues,
   );
@@ -53,15 +77,16 @@ export function PlatformSettingsView() {
 
   const loadSettings = useCallback(async () => {
     setLoading(true);
-    setSettingsError(null);
-
+    setLoadError(null);
     try {
       const data = await getPlatformSettingsQuery();
       setSettings(data);
       setForm(toFormValues(data));
-    } catch (loadError) {
-      setSettingsError(
-        getErrorMessage(loadError) || m.platformSettings.loadError,
+      setFormError(null);
+      setNotice(null);
+    } catch (error) {
+      setLoadError(
+        error instanceof Error ? error.message : m.platformSettings.loadError,
       );
     } finally {
       setLoading(false);
@@ -69,33 +94,27 @@ export function PlatformSettingsView() {
   }, [m.platformSettings.loadError]);
 
   useEffect(() => {
-    let isCurrent = true;
-
+    let current = true;
     getPlatformSettingsQuery()
       .then((data) => {
-        if (!isCurrent) {
-          return;
-        }
-
+        if (!current) return;
         setSettings(data);
         setForm(toFormValues(data));
-        setSettingsError(null);
+        setLoadError(null);
       })
-      .catch((loadError: unknown) => {
-        if (isCurrent) {
-          setSettingsError(
-            getErrorMessage(loadError) || m.platformSettings.loadError,
+      .catch((error: unknown) => {
+        if (current)
+          setLoadError(
+            error instanceof Error
+              ? error.message
+              : m.platformSettings.loadError,
           );
-        }
       })
       .finally(() => {
-        if (isCurrent) {
-          setLoading(false);
-        }
+        if (current) setLoading(false);
       });
-
     return () => {
-      isCurrent = false;
+      current = false;
     };
   }, [m.platformSettings.loadError]);
 
@@ -105,8 +124,15 @@ export function PlatformSettingsView() {
     setFormError(null);
     setNotice(null);
 
-    const result = await updatePlatformSettingsAction(form);
-
+    const input: UpdatePlatformSettingsRequest =
+      section === "maintenance"
+        ? { maintenanceMode: form.maintenanceMode }
+        : {
+            defaultLanguage: form.defaultLanguage,
+            defaultCurrency: form.defaultCurrency,
+            timezone: form.timezone,
+          };
+    const result = await updatePlatformSettingsAction(input);
     if (result.ok) {
       setSettings(result.data);
       setForm(toFormValues(result.data));
@@ -114,157 +140,174 @@ export function PlatformSettingsView() {
     } else {
       setFormError(result.error);
     }
-
     setSubmitting(false);
   }
 
-  return (
-    <section className="mx-auto w-full max-w-[860px] space-y-7 pb-16">
-      <SaasPageHeader
-        actions={
-          <Button
-            className="h-8 gap-1.5 px-2.5 text-xs"
-            disabled={loading}
-            onClick={loadSettings}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            <Icon
-              aria-hidden
-              className={loading ? "animate-spin" : undefined}
-              icon={RefreshCw}
-              size={14}
-            />
-            {m.common.refresh}
-          </Button>
-        }
-        icon={Settings}
-        title={m.platformSettings.title}
-      />
+  const currencyOptions = [
+    form.defaultCurrency,
+    ...currencies.filter((value) => value !== form.defaultCurrency),
+  ].filter(Boolean);
+  const timezoneOptions = [
+    form.timezone,
+    ...timezones.filter((value) => value !== form.timezone),
+  ].filter(Boolean);
 
+  return (
+    <section className="space-y-4">
+      <div className="flex justify-end">
+        <Button
+          className="h-8 gap-1.5 px-2.5 text-xs"
+          disabled={loading}
+          onClick={() => void loadSettings()}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          <Icon
+            aria-hidden
+            className={loading ? "animate-spin" : undefined}
+            icon={RefreshCw}
+            size={14}
+          />
+          {m.common.refresh}
+        </Button>
+      </div>
       {notice ? (
         <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-700">
           {notice}
         </div>
       ) : null}
-
       {loading ? (
-        <div className="grid gap-3 border-y bg-background px-5 py-6">
+        <div className="grid gap-3 rounded-xl border bg-background px-5 py-6">
           <div className="h-9 animate-pulse rounded-md bg-muted" />
           <div className="h-36 animate-pulse rounded-md bg-muted" />
         </div>
-      ) : settingsError ? (
+      ) : loadError ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {settingsError}
+          {loadError}
         </div>
       ) : (
         <form
-          className="grid gap-5 border-y bg-background px-5 py-6"
-          noValidate
+          className="grid gap-5 rounded-xl border bg-background px-5 py-6 shadow-sm"
           onSubmit={handleSubmit}
         >
-          <p className="text-sm font-semibold">
-            {m.platformSettings.defaultConfig}
-          </p>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="platform-language">
-                {m.platformSettings.defaultLanguage}
-              </Label>
-              <Select
-                onValueChange={(value) => {
-                  setForm((current) => ({
-                    ...current,
-                    defaultLanguage:
-                      value as PlatformSettingsFormValues["defaultLanguage"],
-                  }));
-                }}
-                value={form.defaultLanguage}
-              >
-                <SelectTrigger id="platform-language">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {platformLanguageOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.value === "en"
-                        ? m.common.languageLabels.en
-                        : option.value === "zh-CN"
-                          ? m.common.languageLabels.zhCN
-                          : option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="platform-currency">
-                {m.platformSettings.defaultCurrency}
-              </Label>
-              <Input
-                id="platform-currency"
-                maxLength={8}
-                onChange={(event) => {
-                  setForm((current) => ({
-                    ...current,
-                    defaultCurrency: event.target.value,
-                  }));
-                }}
-                placeholder="XOF"
-                value={form.defaultCurrency}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="platform-timezone">
-                {m.platformSettings.timezone}
-              </Label>
-              <Input
-                id="platform-timezone"
-                maxLength={64}
-                onChange={(event) => {
-                  setForm((current) => ({
-                    ...current,
-                    timezone: event.target.value,
-                  }));
-                }}
-                placeholder="Africa/Dakar"
-                value={form.timezone}
-              />
-            </div>
-
-            <label className="flex min-h-10 items-center gap-3 rounded-md border px-3 py-2 text-sm">
-              <Checkbox
-                checked={form.maintenanceMode}
-                onCheckedChange={(checked) => {
-                  setForm((current) => ({
-                    ...current,
-                    maintenanceMode: checked === true,
-                  }));
-                }}
-              />
-              {m.platformSettings.maintenanceMode}
-            </label>
-          </div>
-
+          {section === "defaults" ? (
+            <>
+              <p className="text-sm font-semibold">
+                {m.platformSettings.defaultConfig}
+              </p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="platform-language">
+                    {m.platformSettings.defaultLanguage}
+                  </Label>
+                  <Select
+                    onValueChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        defaultLanguage:
+                          value as PlatformSettingsFormValues["defaultLanguage"],
+                      }))
+                    }
+                    value={form.defaultLanguage}
+                  >
+                    <SelectTrigger id="platform-language">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {platformLanguageOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.value === "en"
+                            ? m.common.languageLabels.en
+                            : option.value === "zh-CN"
+                              ? m.common.languageLabels.zhCN
+                              : option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="platform-currency">
+                    {m.platformSettings.defaultCurrency}
+                  </Label>
+                  <Select
+                    onValueChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        defaultCurrency: value,
+                      }))
+                    }
+                    value={form.defaultCurrency}
+                  >
+                    <SelectTrigger id="platform-currency">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {currencyOptions.map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor="platform-timezone">
+                    {m.platformSettings.timezone}
+                  </Label>
+                  <Select
+                    onValueChange={(value) =>
+                      setForm((current) => ({ ...current, timezone: value }))
+                    }
+                    value={form.timezone}
+                  >
+                    <SelectTrigger id="platform-timezone">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {timezoneOptions.map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <label className="flex min-h-12 items-center gap-3 rounded-md border px-4 py-3 text-sm">
+                <Checkbox
+                  checked={form.maintenanceMode}
+                  onCheckedChange={(checked) =>
+                    setForm((current) => ({
+                      ...current,
+                      maintenanceMode: checked === true,
+                    }))
+                  }
+                />
+                {m.platformSettings.maintenanceMode}
+              </label>
+              <p className="text-sm text-muted-foreground">
+                {m.platformSettings.workspace.maintenanceHint}
+              </p>
+            </>
+          )}
           {settings ? (
-            <div className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {m.platformSettings.lastUpdated}{" "}
               {settings.updatedAt
                 ? formatDateTime(settings.updatedAt)
                 : m.common.never}
-            </div>
+            </p>
           ) : null}
-
           {formError ? (
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               {formError}
             </div>
           ) : null}
-
           <div className="flex justify-end">
             <Button
               className="h-9"
@@ -277,7 +320,6 @@ export function PlatformSettingsView() {
           </div>
         </form>
       )}
-      <PlatformTaxTemplatesView />
     </section>
   );
 }

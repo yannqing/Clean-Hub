@@ -549,11 +549,26 @@ export const saasMessagesEn: SaasMessages = {
     maintenanceMode: "Maintenance mode",
     lastUpdated: "Last updated:",
     saveSettings: "Save settings",
+    workspace: {
+      subtitle: "SaaS settings",
+      searchLabel: "Search settings",
+      searchPlaceholder: "Find a setting",
+      noResults: "No matching settings",
+      closeLabel: "Close settings",
+      sections: {
+        defaults: { title: "Platform defaults", description: "Language, currency and timezone for new tenants." },
+        taxTemplates: { title: "Tax templates", description: "Country tax defaults applied when tenants are created." },
+        security: { title: "Security policy", description: "Password requirements and login lockout rules." },
+        maintenance: { title: "Maintenance mode", description: "Control tenant write access during maintenance." },
+      },
+      maintenanceHint: "When enabled, tenant write requests are blocked. SaaS administrators can still manage the platform.",
+      securityEvents: "View security events",
+    },
   },
   security: {
     page: {
       badge: "SaaS security",
-      title: "Security Management",
+      title: "Security Events",
       refreshSettings: "Refresh settings",
       loadError: "Failed to load security settings.",
     },

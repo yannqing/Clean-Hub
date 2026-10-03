@@ -62,7 +62,7 @@ export function SecuritySettingsForm({
 
   return (
     <form
-      className="grid gap-5 border-y bg-background px-5 py-6"
+      className="grid gap-5 rounded-xl border bg-background px-5 py-6 shadow-sm"
       onSubmit={handleSubmit}
     >
       <p className="text-sm font-semibold">{m.security.settings.title}</p>

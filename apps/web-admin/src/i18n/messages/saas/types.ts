@@ -510,6 +510,21 @@ export type SaasMessages = {
     maintenanceMode: string;
     lastUpdated: string;
     saveSettings: string;
+    workspace: {
+      subtitle: string;
+      searchLabel: string;
+      searchPlaceholder: string;
+      noResults: string;
+      closeLabel: string;
+      sections: {
+        defaults: { title: string; description: string };
+        taxTemplates: { title: string; description: string };
+        security: { title: string; description: string };
+        maintenance: { title: string; description: string };
+      };
+      maintenanceHint: string;
+      securityEvents: string;
+    };
   };
   security: {
     page: {

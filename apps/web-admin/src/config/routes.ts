@@ -28,6 +28,12 @@ export const webAdminRoutes = {
       featureFlags: "/saas/config/feature-flags",
       localization: "/saas/config/localization",
       platformSettings: "/saas/config/platform-settings",
+      platformSettingsSections: {
+        defaults: "/saas/config/platform-settings",
+        taxTemplates: "/saas/config/platform-settings/tax-templates",
+        security: "/saas/config/platform-settings/security",
+        maintenance: "/saas/config/platform-settings/maintenance",
+      },
     },
     system: {
       logs: "/saas/system/logs",

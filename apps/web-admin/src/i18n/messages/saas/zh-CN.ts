@@ -533,11 +533,26 @@ export const saasMessagesZhCN: SaasMessages = {
     maintenanceMode: "维护模式",
     lastUpdated: "最后更新：",
     saveSettings: "保存设置",
+    workspace: {
+      subtitle: "SaaS 设置",
+      searchLabel: "搜索设置",
+      searchPlaceholder: "查找设置项",
+      noResults: "没有匹配的设置项",
+      closeLabel: "关闭设置",
+      sections: {
+        defaults: { title: "平台默认值", description: "新租户继承的语言、货币和时区。" },
+        taxTemplates: { title: "税务模板", description: "创建租户时按国家带入的税务默认配置。" },
+        security: { title: "安全策略", description: "密码要求与登录锁定规则。" },
+        maintenance: { title: "维护模式", description: "维护期间控制租户端写入。" },
+      },
+      maintenanceHint: "开启后，租户端的写入请求会被拦截；SaaS 管理员仍可管理平台。",
+      securityEvents: "查看安全事件",
+    },
   },
   security: {
     page: {
       badge: "SaaS 安全",
-      title: "安全管理",
+      title: "安全事件",
       refreshSettings: "刷新设置",
       loadError: "加载安全设置失败。",
     },
