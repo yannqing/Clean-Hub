@@ -675,7 +675,7 @@ export const saasMessagesZhCN: SaasMessages = {
     phone: "手机号",
     language: "语言",
     timezone: "时区",
-    timezoneHint: "请输入 IANA 时区，例如 Africa/Dakar。",
+    timezoneHint: "从列表中选择时区。",
     currentPassword: "当前密码",
     newPassword: "新密码",
     confirmPassword: "确认新密码",

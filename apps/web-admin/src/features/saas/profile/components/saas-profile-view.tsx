@@ -66,7 +66,7 @@ const EMPTY_PASSWORD: PasswordForm = {
   newPassword: "",
   confirmPassword: "",
 };
-const TIMEZONES = [
+const PREFERRED_TIMEZONES = [
   "UTC",
   "Africa/Dakar",
   "Africa/Abidjan",
@@ -75,6 +75,12 @@ const TIMEZONES = [
   "Africa/Accra",
   "Europe/Paris",
   "Asia/Shanghai",
+];
+const TIMEZONES = [
+  ...PREFERRED_TIMEZONES,
+  ...Intl.supportedValuesOf("timeZone")
+    .filter((timezone) => !PREFERRED_TIMEZONES.includes(timezone))
+    .sort((left, right) => left.localeCompare(right)),
 ];
 
 function profileToForm(profile: SaasProfile): ProfileForm {
@@ -386,6 +392,10 @@ export function SaasProfileView() {
             : role,
       )
       .join("、") || m.common.roleLabels.unassigned;
+  const timezoneOptions = [
+    form.timezone,
+    ...TIMEZONES.filter((timezone) => timezone !== form.timezone),
+  ].filter(Boolean);
   return (
     <section
       className="mx-auto w-full max-w-5xl space-y-6 pb-20"
@@ -540,26 +550,32 @@ export function SaasProfileView() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="profile-timezone">{copy.timezone}</Label>
-                  <Input
-                    id="profile-timezone"
-                    list="profile-timezones"
-                    maxLength={64}
-                    aria-invalid={Boolean(profileErrors.timezone)}
-                    aria-describedby={
-                      profileErrors.timezone
-                        ? "profile-timezone-error"
-                        : "profile-timezone-hint"
-                    }
+                  <Select
                     value={form.timezone}
-                    onChange={(event) =>
-                      setProfileField("timezone", event.target.value)
+                    onValueChange={(value) =>
+                      setProfileField("timezone", value)
                     }
-                  />
-                  <datalist id="profile-timezones">
-                    {TIMEZONES.map((zone) => (
-                      <option key={zone} value={zone} />
-                    ))}
-                  </datalist>
+                  >
+                    <SelectTrigger
+                      id="profile-timezone"
+                      className="w-full"
+                      aria-invalid={Boolean(profileErrors.timezone)}
+                      aria-describedby={
+                        profileErrors.timezone
+                          ? "profile-timezone-error"
+                          : "profile-timezone-hint"
+                      }
+                    >
+                      <SelectValue placeholder="UTC" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {timezoneOptions.map((zone) => (
+                        <SelectItem key={zone} value={zone}>
+                          {zone}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <p
                     id="profile-timezone-hint"
                     className="text-xs text-muted-foreground"

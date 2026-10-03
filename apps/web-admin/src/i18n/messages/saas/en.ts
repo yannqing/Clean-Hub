@@ -694,7 +694,7 @@ export const saasMessagesEn: SaasMessages = {
     phone: "Phone",
     language: "Language",
     timezone: "Time zone",
-    timezoneHint: "Use an IANA time zone, such as Africa/Dakar.",
+    timezoneHint: "Choose your time zone from the list.",
     currentPassword: "Current password",
     newPassword: "New password",
     confirmPassword: "Confirm new password",
