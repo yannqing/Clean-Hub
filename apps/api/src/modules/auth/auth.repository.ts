@@ -6,6 +6,7 @@ import {
   authRefreshTokens,
   branches,
   permissions,
+  platformSettings,
   posTerminalSettings,
   rolePermissions,
   roles,
@@ -20,6 +21,7 @@ import {
 
 import { writeAuditLog } from "../audit/audit.helper.js";
 import { writeSecurityEvent } from "../saas/security/security-events.helper.js";
+import { resolveSaasInterfaceLanguage } from "../saas/platform-settings/saas-language.js";
 import type {
   AuthRequestMeta,
   AuthenticatedUser,
@@ -219,6 +221,7 @@ export class AuthRepository {
       .select({
         displayName: userProfiles.displayName,
         language: userProfiles.language,
+        metadata: userProfiles.metadata,
         timezone: userProfiles.timezone,
       })
       .from(userProfiles)
@@ -240,6 +243,12 @@ export class AuthRepository {
           })
           .from(tenantSettings)
           .where(eq(tenantSettings.tenantId, user.tenantId))
+          .limit(1)
+      : [];
+    const platformLanguageRows = user.userType === "saas"
+      ? await this.db.select({ language: platformSettings.defaultLanguage })
+          .from(platformSettings)
+          .where(eq(platformSettings.settingKey, "default"))
           .limit(1)
       : [];
 
@@ -294,11 +303,17 @@ export class AuthRepository {
       ],
       branchIds: activeBranchRows.map((row) => row.id),
       displayName,
-      language: resolveTenantLanguage(
-        tenantSettingsRows[0]?.defaultLanguage ??
-          profileRows[0]?.language ??
-          "en",
-      ),
+      language: user.userType === "saas"
+        ? resolveSaasInterfaceLanguage(
+            profileRows[0]?.language,
+            profileRows[0]?.metadata,
+            platformLanguageRows[0]?.language,
+          )
+        : resolveTenantLanguage(
+            tenantSettingsRows[0]?.defaultLanguage ??
+              profileRows[0]?.language ??
+              "en",
+          ),
       timezone:
         tenantSettingsRows[0]?.timezone ?? profileRows[0]?.timezone ?? "UTC",
       identityConsistent:

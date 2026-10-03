@@ -1,9 +1,10 @@
 "use server";
 
 import type { AuthContext } from "@cleanhub/api-client";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { getWebAdminHomePath } from "@/config/auth-routing";
+import { isWebAdminLocale, webAdminLocaleCookieName } from "@/i18n";
 import { webAdminApi } from "@/lib/api-client";
 
 import {
@@ -112,6 +113,16 @@ export async function loginAction(
       throw new Error(
         "The API did not establish an authenticated browser session.",
       );
+    }
+
+    // The API resolves an explicit account preference or the current platform
+    // default. Use that value on the first authenticated server render too.
+    if (result.authContext.language && isWebAdminLocale(result.authContext.language)) {
+      (await cookies()).set(webAdminLocaleCookieName, result.authContext.language, {
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: "lax",
+      });
     }
 
     return {

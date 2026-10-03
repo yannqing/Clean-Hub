@@ -20,6 +20,7 @@ import {
   permissions,
   rolePermissions,
   roles,
+  platformSettings,
   userProfiles,
   userRoles,
   users,
@@ -27,6 +28,7 @@ import {
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import { isNormalizedEmailUniqueViolation } from "../../auth/email-identity.helper.js";
+import { resolveSaasInterfaceLanguage, saasLanguagePreferenceKey } from "../platform-settings/saas-language.js";
 
 import { SaasUsersError } from "./saas-users.errors.js";
 import type {
@@ -413,6 +415,7 @@ export async function findSaasUserAuditSnapshotById(
       displayName: userProfiles.displayName,
       status: users.status,
       language: userProfiles.language,
+      metadata: userProfiles.metadata,
       timezone: userProfiles.timezone,
     })
     .from(users)
@@ -433,12 +436,14 @@ export async function findSaasUserAuditSnapshotById(
     return null;
   }
 
+  const [platform] = await db.select({ language: platformSettings.defaultLanguage })
+    .from(platformSettings).where(eq(platformSettings.settingKey, "default")).limit(1);
   return {
     email: user.email,
     phone: user.phone,
     displayName: resolveDisplayName(user),
     status: user.status,
-    language: user.language ?? "en",
+    language: resolveSaasInterfaceLanguage(user.language, user.metadata, platform?.language),
     timezone: user.timezone ?? "UTC",
   };
 }
@@ -802,6 +807,7 @@ export async function updateSaasUserRecord(
     updatedAt: Date;
     displayName?: string;
     language?: SaasUserLanguage;
+    metadata?: ReturnType<typeof sql>;
     timezone?: string;
   } = {
     updatedAt: now,
@@ -824,6 +830,7 @@ export async function updateSaasUserRecord(
 
   if (input.language !== undefined) {
     profileUpdates.language = input.language;
+    profileUpdates.metadata = sql`coalesce(${userProfiles.metadata}, '{}'::jsonb) || jsonb_build_object(${saasLanguagePreferenceKey}::text, ${input.language}::text)`;
     shouldUpdateProfile = true;
   }
 
@@ -905,6 +912,7 @@ export async function findSaasUsers(
       phone: users.phone,
       displayName: userProfiles.displayName,
       language: userProfiles.language,
+      metadata: userProfiles.metadata,
       status: users.status,
       lastLoginAt: users.lastLoginAt,
       createdAt: users.createdAt,
@@ -966,6 +974,8 @@ export async function findSaasUsers(
     rolesByUserId.set(roleRow.userId, userRoleCodes);
   }
 
+  const [platform] = await db.select({ language: platformSettings.defaultLanguage })
+    .from(platformSettings).where(eq(platformSettings.settingKey, "default")).limit(1);
   return rows.map((row) => ({
     id: row.id,
     tenantId: null,
@@ -975,7 +985,7 @@ export async function findSaasUsers(
     role: rolesByUserId.get(row.id)?.[0] ?? "unassigned",
     roles: rolesByUserId.get(row.id) ?? [],
     status: row.status,
-    language: row.language ?? "en",
+    language: resolveSaasInterfaceLanguage(row.language, row.metadata, platform?.language),
     lastLoginAt: toIsoString(row.lastLoginAt),
     createdAt: row.createdAt.toISOString(),
   }));
@@ -1036,6 +1046,7 @@ export async function findSaasUserDetailById(
       phone: users.phone,
       displayName: userProfiles.displayName,
       language: userProfiles.language,
+      metadata: userProfiles.metadata,
       avatarUrl: userProfiles.avatarUrl,
       timezone: userProfiles.timezone,
       status: users.status,
@@ -1084,6 +1095,8 @@ export async function findSaasUserDetailById(
 
   const userRolesList = roleRows.map((row) => row.roleCode);
 
+  const [platform] = await db.select({ language: platformSettings.defaultLanguage })
+    .from(platformSettings).where(eq(platformSettings.settingKey, "default")).limit(1);
   return {
     id: user.id,
     tenantId: null,
@@ -1093,7 +1106,7 @@ export async function findSaasUserDetailById(
     role: userRolesList[0] ?? "unassigned",
     roles: userRolesList,
     status: user.status,
-    language: user.language ?? "en",
+    language: resolveSaasInterfaceLanguage(user.language, user.metadata, platform?.language),
     avatarUrl: user.avatarUrl ?? null,
     timezone: user.timezone ?? "UTC",
     lastLoginAt: toIsoString(user.lastLoginAt),

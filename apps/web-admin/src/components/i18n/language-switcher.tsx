@@ -10,6 +10,7 @@ import {
   cn,
 } from "@cleanhub/ui";
 import { Languages } from "lucide-react";
+import { useState } from "react";
 
 import { useWebAdminLocale, type WebAdminLocale } from "@/i18n";
 
@@ -31,17 +32,36 @@ function getLocaleLabel(
 type LanguageSwitcherProps = {
   className?: string;
   iconOnly?: boolean;
+  onLocaleChange?: (locale: WebAdminLocale) => Promise<void>;
 };
 
 export function LanguageSwitcher({
   className,
   iconOnly = false,
+  onLocaleChange,
 }: LanguageSwitcherProps) {
   const { locale, setLocale, messages } = useWebAdminLocale();
+  const [saving, setSaving] = useState(false);
+
+  async function changeLocale(value: string) {
+    const next = value as WebAdminLocale;
+    if (next === locale || saving) return;
+    if (onLocaleChange) {
+      setSaving(true);
+      try {
+        await onLocaleChange(next);
+      } catch {
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+    }
+    setLocale(next);
+  }
 
   return (
     <Select
-      onValueChange={(value) => setLocale(value as WebAdminLocale)}
+      onValueChange={(value) => { void changeLocale(value); }}
       value={locale}
     >
       <SelectTrigger
@@ -53,6 +73,7 @@ export function LanguageSwitcher({
           className,
         )}
         title={messages.common.language}
+        disabled={saving}
       >
         <Icon icon={Languages} aria-hidden="true" />
         {iconOnly ? null : (

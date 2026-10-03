@@ -13,6 +13,8 @@
     "test:integration:tenant-orders": "tsx src/modules/tenant/orders/orders.integration.ts",
     "test:integration:tax": "tsx src/modules/tax/tax.integration.ts",
     "test:integration:tax-template": "tsx src/modules/tenant/tax-rates/tax-template.integration.ts",
+    "test:integration:tenant-edit": "tsx src/modules/saas/tenants/tenant-edit.integration.ts",
+    "test:integration:saas-language": "tsx src/modules/saas/platform-settings/saas-language.integration.ts",
     "check:tax-readiness": "tsx src/scripts/check-tax-readiness.ts",
     "smoke:auth-concurrency": "tsx src/modules/auth/auth.concurrency.repository.smoke.ts",
     "smoke:email-retry": "tsx src/modules/notifications/email-retry.smoke.ts",

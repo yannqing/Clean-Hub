@@ -6,6 +6,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  toast,
   cn,
 } from "@cleanhub/ui";
 import { ChevronDown, Settings, UserRound } from "lucide-react";
@@ -15,7 +16,9 @@ import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { webAdminRoutes } from "@/config/routes";
 import { LogoutButton } from "@/features/auth/components";
-import { useWebAdminLocale } from "@/i18n";
+import { dispatchSaasProfileUpdated } from "@/features/saas/profile";
+import { updateSaasProfileAction } from "@/features/saas/profile/actions";
+import { isWebAdminLocale, useWebAdminLocale, type WebAdminLocale } from "@/i18n";
 
 import type { SaasHeaderCopy } from "../types";
 
@@ -49,8 +52,25 @@ export function SaasHeaderAccountMenu({
   open,
   onOpenChange,
 }: SaasHeaderAccountMenuProps) {
-  const { messages } = useWebAdminLocale();
+  const { locale, messages } = useWebAdminLocale();
   const roleLabel = getRoleLabel(authContext, messages);
+
+  async function saveLanguage(next: WebAdminLocale) {
+    try {
+      const updated = await updateSaasProfileAction({ language: next });
+      dispatchSaasProfileUpdated({
+        displayName: updated.displayName,
+        language: isWebAdminLocale(updated.language) ? updated.language : next,
+      });
+    } catch (error) {
+      toast.error(locale === "zh-CN"
+        ? "语言保存失败，请重试。"
+        : locale === "fr"
+          ? "Impossible d'enregistrer la langue. Réessayez."
+          : "Could not save the language. Try again.");
+      throw error;
+    }
+  }
 
   return (
     <Popover onOpenChange={onOpenChange} open={open}>
@@ -138,7 +158,7 @@ export function SaasHeaderAccountMenu({
         </nav>
 
         <div className="flex items-center gap-2 border-t px-3 py-3">
-          <LanguageSwitcher className="min-w-0 flex-1" />
+          <LanguageSwitcher className="min-w-0 flex-1" onLocaleChange={saveLanguage} />
           <ThemeToggle />
         </div>
 
