@@ -14,6 +14,9 @@ import {
   getDb,
   orders,
   paymentTransactions,
+  platformTaxTemplates,
+  posChannelSettings,
+  posTerminalSettings,
   prices,
   productPrices,
   productSkus,
@@ -21,6 +24,7 @@ import {
   serviceCategories,
   services,
   tenantFeatureFlags,
+  tenantSettings,
   tenants,
   userProfiles,
   users,
@@ -63,6 +67,7 @@ function createFixtureIds() {
     tenantId: createId(),
     userId: createId(),
     branchId: createId(),
+    terminalId: createId(),
     secondBranchId: createId(),
     customerAccountId: createId(),
     customerId: createId(),
@@ -92,6 +97,10 @@ function createOwnerContext(ids: FixtureIds): AuthContext {
     displayName: "Tenant order integration owner",
     tenantId: ids.tenantId,
     branchIds: [],
+    terminalId: ids.terminalId,
+    terminalBranchId: ids.branchId,
+    terminalDeviceId: `orders-integration-${ids.terminalId}`,
+    terminalCredentialVersion: 1,
     role: "owner",
     roles: ["owner"],
     permissions: [],
@@ -107,6 +116,34 @@ async function insertFixtures(db: Database, ids: FixtureIds): Promise<void> {
     name: "Tenant order integration test",
     pressingCode: `INT-${uniqueSuffix}`,
     status: "active",
+    country: "ZZ",
+  });
+  await db.insert(platformTaxTemplates).values({
+    id: createId(),
+    countryCode: "ZZ",
+    name: "Order integration test country",
+    currencyCode: "CNY",
+    taxLabel: "TEST",
+    taxEnabled: true,
+    pricesIncludeTax: false,
+    rates: [{ key: "standard", name: "Standard", rate: "0.0000", isDefault: true }],
+  });
+  await db.insert(tenantSettings).values({
+    id: createId(),
+    tenantId: ids.tenantId,
+    defaultCurrency: "CNY",
+  });
+  await db.insert(posChannelSettings).values({
+    id: createId(),
+    tenantId: ids.tenantId,
+    cashTrackingEnabled: false,
+    taxEnabled: true,
+    defaultTaxRate: "0.0000",
+    pricesIncludeTax: false,
+    taxRegistrationNumber: "INTEGRATION-TEST",
+    taxLabel: "TEST",
+    taxTemplateCountryCode: "ZZ",
+    taxTemplateVersion: 1,
   });
   await db.insert(tenantFeatureFlags).values({
     id: createId(),
@@ -145,6 +182,17 @@ async function insertFixtures(db: Database, ids: FixtureIds): Promise<void> {
     name: "Integration second branch",
     defaultCurrency: "CNY",
     status: "active",
+    createdBy: ids.userId,
+  });
+  await db.insert(posTerminalSettings).values({
+    id: ids.terminalId,
+    tenantId: ids.tenantId,
+    branchId: ids.branchId,
+    deviceId: `orders-integration-${ids.terminalId}`,
+    status: "active",
+    credentialDigest: "integration-test-only",
+    credentialVersion: 1,
+    credentialIssuedAt: new Date(),
     createdBy: ids.userId,
   });
   await db.insert(customerAccounts).values({
@@ -428,7 +476,13 @@ async function runOrderLifecycleAssertions(
   await assert.rejects(
     createPosOrder(
       {
-        authContext,
+        authContext: {
+          ...authContext,
+          terminalId: undefined,
+          terminalBranchId: undefined,
+          terminalDeviceId: undefined,
+          terminalCredentialVersion: undefined,
+        },
         requestMeta,
         data: {
           id: ids.unavailableBranchOrderId,

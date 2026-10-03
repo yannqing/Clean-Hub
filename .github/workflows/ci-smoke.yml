@@ -245,6 +245,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Synchronize Android Capacitor plugins
+        run: pnpm --filter @cleanhub/pos-mobile cap:sync:android
+
       - name: Run Android unit tests
         working-directory: apps/pos-mobile/android
         # The POS duplicates server business rules in Kotlin -- ticket state
