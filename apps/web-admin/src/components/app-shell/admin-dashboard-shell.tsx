@@ -131,6 +131,22 @@ export function AdminDashboardShell({
     return children;
   }
 
+  if (settingsActive) {
+    return (
+      <div
+        className="min-h-screen bg-[#f1f1f1] text-foreground"
+        data-testid="saas-settings-shell"
+      >
+        <SaasGlobalHeader
+          authContext={authContext}
+          copy={messages.shell.saas.header}
+          displayName={displayName}
+        />
+        <main className="min-w-0">{children}</main>
+      </div>
+    );
+  }
+
   return (
     <div
       className="min-h-screen bg-muted/30 text-foreground"

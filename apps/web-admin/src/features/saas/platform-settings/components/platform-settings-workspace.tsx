@@ -64,12 +64,12 @@ export function PlatformSettingsWorkspace({
 
   return (
     <section
-      className="mx-auto w-full max-w-[1280px] pb-16"
+      className="min-h-[calc(100vh-4rem)] px-3 py-4 pb-16 sm:px-5 sm:py-5"
       data-testid="saas-settings-workspace"
     >
-      <div className="grid items-start gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="mx-auto grid w-full max-w-[1280px] items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside
-          className="overflow-hidden rounded-xl border bg-background shadow-sm lg:sticky lg:top-20"
+          className="overflow-hidden rounded-xl border bg-background shadow-sm lg:sticky lg:top-20 lg:flex lg:h-[calc(100vh-6rem)] lg:flex-col"
           data-testid="saas-settings-sidebar"
         >
           <div className="border-b px-4 py-4">
@@ -106,7 +106,10 @@ export function PlatformSettingsWorkspace({
               />
             </div>
           </div>
-          <nav aria-label={m.platformSettings.title} className="grid gap-1 p-3">
+          <nav
+            aria-label={m.platformSettings.title}
+            className="grid gap-1 p-3 lg:min-h-0 lg:flex-1 lg:content-start lg:overflow-y-auto"
+          >
             {visibleSections.map((section) => {
               const Icon = section.icon;
               const selected = section.key === active.key;
