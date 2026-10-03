@@ -24,6 +24,8 @@ function toErrorCode(error: unknown): TaxRateActionErrorCode {
       return "inUse";
     case "TAX_RATE_VERSION_CONFLICT":
       return "versionConflict";
+    case "TAX_RATE_TEMPLATE_MANAGED":
+      return "templateManaged";
     default:
       return "generic";
   }

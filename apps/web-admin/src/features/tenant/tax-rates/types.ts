@@ -22,6 +22,7 @@ export type TaxRateActionErrorCode =
   | "nameConflict"
   | "inUse"
   | "versionConflict"
+  | "templateManaged"
   | "generic";
 
 export type TaxRateActionResult<T> =

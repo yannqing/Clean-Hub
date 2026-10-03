@@ -184,7 +184,7 @@ function TenantSettingsForm({
   onUpdated: (settings: TenantSettings) => void;
   tenantId: string;
 }) {
-  const { m } = useSaasI18n();
+  const { locale, m } = useSaasI18n();
   const [values, setValues] = useState<TenantSettingsFormValues>(initialValues);
   const [errors, setErrors] = useState<
     Partial<Record<keyof TenantSettingsFormValues, string>>
@@ -289,14 +289,18 @@ function TenantSettingsForm({
               </Label>
               <Input
                 aria-invalid={Boolean(errors.defaultCurrency)}
-                disabled={disabled || submitting}
+                disabled
                 id="tenant-settings-currency"
                 maxLength={3}
-                onChange={(event) =>
-                  updateValue("defaultCurrency", event.target.value)
-                }
                 value={values.defaultCurrency}
               />
+              <p className="text-xs text-muted-foreground">
+                {locale === "zh-CN"
+                  ? "币种由租户国家的税务模板决定。要更换国家，请在租户详情页操作。"
+                  : locale === "fr"
+                    ? "La devise suit le modèle fiscal du pays. Changez le pays depuis la fiche du locataire."
+                    : "Currency follows the country's tax template. Change the country on the tenant detail page."}
+              </p>
               {errors.defaultCurrency ? (
                 <p className="text-xs text-destructive">
                   {errors.defaultCurrency}

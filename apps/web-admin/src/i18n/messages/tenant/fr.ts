@@ -2801,9 +2801,6 @@ export const tenantMessagesFr: TenantMessages = {
       defaultCurrencyTitle: "Devise par défaut",
       defaultCurrencyDescription:
         "Il s'agit de la devise par défaut pour tout le locataire. Les nouveaux prix du catalogue, remises fixes, transactions de succursale et de PDV, ainsi que les rapports utilisent cette valeur.",
-      defaultCurrencyHint:
-        "L'enregistrement met aussi à jour la devise par défaut de chaque succursale existante. Les commandes historiques et les prix existants conservent leur devise d'origine sans conversion.",
-      saveDefaultCurrency: "Enregistrer la devise",
       productsTitle: "Prix des produits",
       productsDescription:
         "Gérez le prix de vente, les variantes et la disponibilité des succursales dans le catalogue. La devise provient de ce paramètre du locataire.",
@@ -3231,7 +3228,8 @@ export const tenantMessagesFr: TenantMessages = {
     title: "Taux de taxe",
     description:
       "Des taux nommés à appliquer à certains services et produits, par exemple un taux réduit ou un article exonéré. Tout article sans taux propre utilise le taux de taxe par défaut ci-dessus.",
-    templateOverride: "Modifier un taux issu du modèle du pays arrête la synchronisation fiscale automatique pour ce locataire.",
+    templateOverride: "Ces classes fiscales suivent le modèle du pays. Demandez à un administrateur SaaS de modifier leurs taux ; les affectations aux articles restent modifiables.",
+    templateManaged: "Géré par le modèle du pays",
     empty: "Aucun taux pour l'instant. Tous les articles sont vendus au taux par défaut.",
     add: "Ajouter un taux",
     name: "Nom",
@@ -3265,6 +3263,7 @@ export const tenantMessagesFr: TenantMessages = {
       inUse:
         "Ce taux est encore attribué à des services ou produits. Réattribuez-les ou archivez le taux.",
       versionConflict: "Ce taux a été modifié par quelqu'un d'autre. Rechargez et réessayez.",
+      templateManaged: "Cette classe fiscale est gérée par le modèle du pays. Demandez à un administrateur SaaS de la modifier.",
       generic: "Le taux de taxe n'a pas pu être enregistré.",
     },
     field: {

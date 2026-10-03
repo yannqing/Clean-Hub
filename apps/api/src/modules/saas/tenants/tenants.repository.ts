@@ -20,7 +20,11 @@ import {
   platformSettings,
   platformTaxTemplates,
   posChannelSettings,
+  posCarts,
   posTerminalSettings,
+  orders,
+  prices,
+  productPrices,
   roles,
   taxRates,
   tenantFeatureFlags,
@@ -33,6 +37,7 @@ import {
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import { templateTaxRateKey } from "../../tax/tax.template-key.js";
+import { isReadyTaxTemplate } from "../../tax/tax-template-readiness.js";
 import {
   findPosCatalogProducts,
   findPosCatalogServices,
@@ -83,6 +88,49 @@ export async function findPlatformTaxTemplateForCountry(
     normalizedCountry(template.name.split(/\s[-–—]\s/, 1)[0] ?? "") === normalized ||
     (template.countryCode === "CI" && normalized === "ivorycoast")
   ) ?? null;
+}
+
+/** Existing amounts must never be silently reinterpreted in another currency. */
+export async function hasTenantMonetaryData(
+  db: Database,
+  tenantId: string,
+): Promise<boolean> {
+  const [order, cart, servicePrice, productPrice, terminal] = await Promise.all([
+    db.select({ id: orders.id }).from(orders).where(eq(orders.tenantId, tenantId)).limit(1),
+    db.select({ id: posCarts.id }).from(posCarts).where(eq(posCarts.tenantId, tenantId)).limit(1),
+    db.select({ id: prices.id }).from(prices).where(eq(prices.tenantId, tenantId)).limit(1),
+    db.select({ id: productPrices.id }).from(productPrices).where(eq(productPrices.tenantId, tenantId)).limit(1),
+    db.select({ id: posTerminalSettings.id }).from(posTerminalSettings)
+      .where(and(eq(posTerminalSettings.tenantId, tenantId), sql`${posTerminalSettings.credentialDigest} is not null`)).limit(1),
+  ]);
+  return Boolean(order[0] || cart[0] || servicePrice[0] || productPrice[0] || terminal[0]);
+}
+
+export async function hasTenantBranchCurrencyMismatch(
+  db: Database,
+  tenantId: string,
+  currency: string,
+): Promise<boolean> {
+  const [branch] = await db.select({ id: branches.id }).from(branches)
+    .where(and(eq(branches.tenantId, tenantId), ne(branches.defaultCurrency, currency), isNull(branches.deletedAt)))
+    .limit(1);
+  return Boolean(branch);
+}
+
+export async function alignTenantBranchCurrency(
+  db: Database,
+  input: { tenantId: string; currency: string; actorUserId: string },
+): Promise<void> {
+  await db.update(branches).set({
+    defaultCurrency: input.currency,
+    updatedAt: new Date(),
+    updatedBy: input.actorUserId,
+    version: sql`${branches.version} + 1`,
+  }).where(and(
+    eq(branches.tenantId, input.tenantId),
+    ne(branches.defaultCurrency, input.currency),
+    isNull(branches.deletedAt),
+  ));
 }
 
 export type UpdateSaasTenantRecordInput = {
@@ -449,8 +497,16 @@ export async function findSaasTenantDetailById(
     db.select({
       taxEnabled: posChannelSettings.taxEnabled,
       taxRegistrationNumber: posChannelSettings.taxRegistrationNumber,
+      taxTemplateCountryCode: posChannelSettings.taxTemplateCountryCode,
+      taxTemplateVersion: posChannelSettings.taxTemplateVersion,
     }).from(posChannelSettings).where(eq(posChannelSettings.tenantId, tenantId)).limit(1),
   ]);
+  const countryTemplate = tenant.country
+    ? await findPlatformTaxTemplateForCountry(db, tenant.country)
+    : null;
+  const taxTemplateApplied = Boolean(countryTemplate && isReadyTaxTemplate(countryTemplate) &&
+    taxRows[0]?.taxTemplateCountryCode === countryTemplate.countryCode &&
+    taxRows[0]?.taxTemplateVersion === countryTemplate.version);
   const enrolledBranchIds = new Set(terminalRows.map((row) => row.branchId));
   const candidateBranches = enrolledBranchIds.size
     ? branchRows.filter((branch) => enrolledBranchIds.has(branch.id))
@@ -481,6 +537,7 @@ export async function findSaasTenantDetailById(
       activeCatalogItemCount: hasSellableCatalogItem ? 1 : 0,
       enrolledTerminalCount: terminalRows.length,
       taxEnabled: taxRows[0]?.taxEnabled ?? false,
+      taxTemplateApplied,
       taxRegistrationNumberSet: Boolean(taxRows[0]?.taxRegistrationNumber?.trim()),
     },
     // The CHECK constraint keeps these three either all set or all null, so a

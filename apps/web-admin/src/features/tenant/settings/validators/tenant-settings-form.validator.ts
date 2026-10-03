@@ -1,5 +1,4 @@
 import type {
-  TenantDefaultCurrencyFormValues,
   TenantProfileFormValues,
   TenantSettingsFormValues,
   TenantSettingsLanguage,
@@ -15,17 +14,6 @@ export type TenantSettingsValidationResult =
   | {
       ok: false;
       errors: Partial<Record<keyof TenantSettingsFormValues, string>>;
-      message?: string;
-    };
-
-export type TenantDefaultCurrencyValidationResult =
-  | {
-      ok: true;
-      data: UpdateTenantSettingsRequest;
-    }
-  | {
-      ok: false;
-      errors: Partial<Record<keyof TenantDefaultCurrencyFormValues, string>>;
       message?: string;
     };
 
@@ -102,7 +90,6 @@ export function validateTenantProfileForm(
     ok: true,
     data: {
       tenantName,
-      country,
       city,
       contactName,
       contactPhone,
@@ -144,26 +131,5 @@ export function validateTenantSettingsForm(
       defaultLanguage: input.defaultLanguage,
       timezone,
     },
-  };
-}
-
-export function validateTenantDefaultCurrencyForm(
-  input: TenantDefaultCurrencyFormValues,
-): TenantDefaultCurrencyValidationResult {
-  const defaultCurrency = input.defaultCurrency.trim().toUpperCase();
-
-  if (!/^[A-Z]{3}$/.test(defaultCurrency)) {
-    return {
-      ok: false,
-      errors: {
-        defaultCurrency: "Currency must be a 3-letter code.",
-      },
-      message: "Currency must be a 3-letter code.",
-    };
-  }
-
-  return {
-    ok: true,
-    data: { defaultCurrency },
   };
 }

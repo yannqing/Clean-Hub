@@ -8,6 +8,7 @@ import {
   services,
   taxRates,
   tenantSettings,
+  tenants,
   type Database,
 } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
@@ -16,6 +17,7 @@ import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import { templateTaxRateKey } from "../../tax/tax.template-key.js";
 import { isReadyTaxTemplate } from "../../tax/tax-template-readiness.js";
+import { findPlatformTaxTemplateForCountry } from "../../saas/tenants/tenants.repository.js";
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 import {
   assertActiveTenant,
@@ -63,7 +65,7 @@ export async function listAvailableTaxTemplates(
 
 export class ApplyTaxTemplateError extends Error {
   constructor(
-    readonly code: "TAX_TEMPLATE_NOT_FOUND" | "TAX_TEMPLATE_VERSION_CONFLICT" | "TAX_SETTINGS_VERSION_CONFLICT" | "TAX_TEMPLATE_CURRENCY_MISMATCH" | "TAX_TEMPLATE_RATE_IN_USE" | "TAX_TEMPLATE_RATE_NAME_CONFLICT" | "TAX_TEMPLATE_UNMANAGED_RATE",
+    readonly code: "TAX_TEMPLATE_NOT_FOUND" | "TAX_TEMPLATE_VERSION_CONFLICT" | "TAX_SETTINGS_VERSION_CONFLICT" | "TAX_TEMPLATE_COUNTRY_MISMATCH" | "TAX_TEMPLATE_CURRENCY_MISMATCH" | "TAX_TEMPLATE_RATE_IN_USE" | "TAX_TEMPLATE_RATE_NAME_CONFLICT" | "TAX_TEMPLATE_UNMANAGED_RATE",
     message: string,
     readonly status: 404 | 409,
   ) {
@@ -87,7 +89,12 @@ export async function syncTaxTemplateForTenant(
     throw new ApplyTaxTemplateError("TAX_TEMPLATE_NOT_FOUND", "Country tax template is incomplete.", 404);
   }
   const [tenantCurrency] = await tx.select({ currency: tenantSettings.defaultCurrency })
-    .from(tenantSettings).where(eq(tenantSettings.tenantId, tenantId)).limit(1);
+    .from(tenantSettings).where(eq(tenantSettings.tenantId, tenantId))
+    .limit(1).for("update");
+  // Keep the lock order consistent with SaaS country edits: tenant settings,
+  // then POS settings, then tax classes. Manual tax edits lock POS settings.
+  await tx.select({ id: posChannelSettings.id }).from(posChannelSettings)
+    .where(eq(posChannelSettings.tenantId, tenantId)).limit(1).for("update");
   const branchCurrencies = await tx.select({ currency: branches.defaultCurrency })
     .from(branches).where(and(eq(branches.tenantId, tenantId), isNull(branches.deletedAt)));
   if (tenantCurrency?.currency !== template.currencyCode ||
@@ -255,6 +262,18 @@ export async function applyTenantTaxTemplate(input: {
     }
     if (template.version !== input.templateVersion) {
       throw new ApplyTaxTemplateError("TAX_TEMPLATE_VERSION_CONFLICT", "Country tax template changed. Refresh and retry.", 409);
+    }
+    const [tenant] = await tx.select({ country: tenants.country }).from(tenants)
+      .where(eq(tenants.id, tenantId)).limit(1);
+    const countryTemplate = tenant?.country
+      ? await findPlatformTaxTemplateForCountry(tx, tenant.country)
+      : null;
+    if (countryTemplate?.countryCode !== template.countryCode) {
+      throw new ApplyTaxTemplateError(
+        "TAX_TEMPLATE_COUNTRY_MISMATCH",
+        "The selected template does not match the tenant's country. Ask a SaaS administrator to change the country first.",
+        409,
+      );
     }
     const { current, updated } = await syncTaxTemplateForTenant(tx, {
       tenantId,

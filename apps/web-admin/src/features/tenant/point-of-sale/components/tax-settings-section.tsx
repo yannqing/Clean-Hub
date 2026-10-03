@@ -1,14 +1,11 @@
 "use client";
 
-import { Badge, Button, Checkbox, Input, Label, toast } from "@cleanhub/ui";
+import { Badge, Button, Input, Label, toast } from "@cleanhub/ui";
 import { Receipt } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import {
-  fractionToPercent,
-  percentToFraction,
-} from "@/features/tenant/tax-rates/percent";
+import { fractionToPercent } from "@/features/tenant/tax-rates/percent";
 import { useTenantI18n } from "@/i18n";
 
 import { updateTaxSettingsAction } from "../actions/update-tax-settings.action";
@@ -23,13 +20,14 @@ type Copy = {
   inclusiveHint: string;
   rate: string;
   rateHint: string;
-  rateInvalid: string;
   registration: string;
   registrationHint: string;
   save: string;
   saving: string;
   saved: string;
   readOnly: string;
+  on: string;
+  off: string;
   loadError: string;
 };
 
@@ -37,81 +35,71 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
   en: {
     title: "VAT and tax",
     description:
-      "The rate, inclusive setting and tax number are frozen onto each order when it is placed, so past orders never change with these settings.",
+      "The country template controls tax status, rate and inclusive pricing. The owner enters the receipt tax number here. Orders retain their tax snapshot.",
     enabled: "Enable VAT",
-    enabledHint: "POS price previews and checkout calculate and store VAT.",
+    enabledHint: "Set by the SaaS country tax template.",
     inclusive: "Prices include tax",
-    inclusiveHint:
-      "On, listed prices already contain tax. Off, tax is added on top of the subtotal.",
+    inclusiveHint: "Set by the SaaS country tax template.",
     rate: "Default VAT rate (%)",
-    rateHint:
-      "Used for every service and product without a tax rate of its own.",
-    rateInvalid: "Enter a rate between 0 and 100 with up to two decimals.",
+    rateHint: "Set by the SaaS country tax template; used when an item has no tax class.",
     registration: "Tax registration number",
     registrationHint: "Printed on receipts when VAT is enabled.",
     save: "Save changes",
     saving: "Saving…",
     saved: "Tax settings saved.",
     readOnly: "Read only",
+    on: "On",
+    off: "Off",
     loadError: "Tax settings could not be saved.",
   },
   fr: {
     title: "TVA et taxes",
     description:
-      "Le taux, le mode d'inclusion et le numéro fiscal sont figés sur chaque commande à sa création : les commandes passées ne changent jamais.",
+      "Le modèle du pays définit l'activation, le taux et les prix TTC. Le propriétaire saisit ici le numéro fiscal des reçus. Chaque commande conserve ses données fiscales.",
     enabled: "Activer la TVA",
-    enabledHint:
-      "Les aperçus de prix et l'encaissement calculent et enregistrent la TVA.",
+    enabledHint: "Défini par le modèle fiscal du pays dans SaaS.",
     inclusive: "Prix TTC",
-    inclusiveHint:
-      "Activé, les prix affichés incluent la taxe. Désactivé, la taxe s'ajoute au sous-total.",
+    inclusiveHint: "Défini par le modèle fiscal du pays dans SaaS.",
     rate: "Taux de TVA par défaut (%)",
-    rateHint:
-      "Utilisé pour tout service ou produit sans taux de taxe propre.",
-    rateInvalid:
-      "Saisissez un taux entre 0 et 100, avec deux décimales au plus.",
+    rateHint: "Défini par le modèle du pays et utilisé si l'article n'a pas de classe fiscale.",
     registration: "Numéro d'identification fiscale",
     registrationHint: "Imprimé sur les reçus lorsque la TVA est activée.",
     save: "Enregistrer",
     saving: "Enregistrement…",
     saved: "Paramètres fiscaux enregistrés.",
     readOnly: "Lecture seule",
+    on: "Activé",
+    off: "Désactivé",
     loadError: "Les paramètres fiscaux n'ont pas pu être enregistrés.",
   },
   "zh-CN": {
     title: "VAT / 税务设置",
     description:
-      "下单时会把税率、含税方式和税号固化到订单上，历史订单不会随这里的设置变化。",
+      "启用状态、税率和含税方式由国家税务模板管理；店主在这里填写小票税号。订单会保存当时的税务快照。",
     enabled: "启用 VAT",
-    enabledHint: "启用后，POS 价格预览和结账都会计算并保存 VAT。",
+    enabledHint: "由 SaaS 国家税务模板统一配置。",
     inclusive: "标价含税",
-    inclusiveHint: "开启表示商品标价已含税；关闭表示税额在小计之外增加。",
+    inclusiveHint: "由 SaaS 国家税务模板统一配置。",
     rate: "默认 VAT 税率（%）",
-    rateHint: "没有单独设置税率的服务和商品都按此税率计税。",
-    rateInvalid: "请输入 0 到 100 之间、最多两位小数的税率。",
+    rateHint: "由 SaaS 国家税务模板设置；未指定税类的项目使用此税率。",
     registration: "税务登记号",
     registrationHint: "启用 VAT 后会打印在小票上。",
     save: "保存修改",
     saving: "保存中…",
     saved: "税务设置已保存。",
     readOnly: "只读",
+    on: "开启",
+    off: "关闭",
     loadError: "税务设置保存失败。",
   },
 };
 
 type TaxForm = {
-  taxEnabled: boolean;
-  pricesIncludeTax: boolean;
-  /** Edited as a percent; stored and sent as a fraction. */
-  defaultTaxRatePercent: string;
   taxRegistrationNumber: string | null;
 };
 
 function toForm(settings: PointOfSaleSettings): TaxForm {
   return {
-    taxEnabled: settings.taxEnabled,
-    pricesIncludeTax: settings.pricesIncludeTax,
-    defaultTaxRatePercent: fractionToPercent(settings.defaultTaxRate),
     taxRegistrationNumber: settings.taxRegistrationNumber,
   };
 }
@@ -134,23 +122,13 @@ export function TaxSettingsSection({
   );
   const [saving, setSaving] = useState(false);
 
-  const disabled = !canManage || saving;
-
   async function save() {
     if (!settings || !form) return;
-    const defaultTaxRate = percentToFraction(form.defaultTaxRatePercent);
-    if (defaultTaxRate === null) {
-      toast.error(text.rateInvalid);
-      return;
-    }
     setSaving(true);
 
     try {
       const result = await updateTaxSettingsAction({
         version: settings.version,
-        taxEnabled: form.taxEnabled,
-        pricesIncludeTax: form.pricesIncludeTax,
-        defaultTaxRate,
         taxRegistrationNumber: form.taxRegistrationNumber,
       });
 
@@ -211,53 +189,29 @@ export function TaxSettingsSection({
         <div className="mt-4 grid max-w-3xl gap-4 sm:grid-cols-2">
           <div className="flex items-start justify-between gap-3 rounded-md border px-3 py-3">
             <div className="min-w-0">
-              <Label className="text-sm" htmlFor="pricing-tax-enabled">
-                {text.enabled}
-              </Label>
+              <span className="text-sm font-medium">{text.enabled}</span>
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 {text.enabledHint}
               </p>
             </div>
-            <Checkbox
-              checked={form.taxEnabled}
-              disabled={disabled}
-              id="pricing-tax-enabled"
-              onCheckedChange={(value) =>
-                setForm({ ...form, taxEnabled: value === true })
-              }
-            />
+            <Badge variant="outline">{settings?.taxEnabled ? text.on : text.off}</Badge>
           </div>
 
           <div className="flex items-start justify-between gap-3 rounded-md border px-3 py-3">
             <div className="min-w-0">
-              <Label className="text-sm" htmlFor="pricing-prices-include-tax">
-                {text.inclusive}
-              </Label>
+              <span className="text-sm font-medium">{text.inclusive}</span>
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 {text.inclusiveHint}
               </p>
             </div>
-            <Checkbox
-              checked={form.pricesIncludeTax}
-              disabled={disabled || !form.taxEnabled}
-              id="pricing-prices-include-tax"
-              onCheckedChange={(value) =>
-                setForm({ ...form, pricesIncludeTax: value === true })
-              }
-            />
+            <Badge variant="outline">{settings?.pricesIncludeTax ? text.on : text.off}</Badge>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="pricing-tax-rate">{text.rate}</Label>
-            <Input
-              disabled={disabled || !form.taxEnabled}
-              id="pricing-tax-rate"
-              inputMode="decimal"
-              onChange={(event) =>
-                setForm({ ...form, defaultTaxRatePercent: event.target.value })
-              }
-              value={form.defaultTaxRatePercent}
-            />
+            <span className="text-sm font-medium">{text.rate}</span>
+            <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm">
+              {fractionToPercent(settings?.defaultTaxRate ?? "0")} %
+            </div>
             <p className="text-xs leading-5 text-slate-500">{text.rateHint}</p>
           </div>
 
@@ -266,9 +220,9 @@ export function TaxSettingsSection({
               {text.registration}
             </Label>
             <Input
-              disabled={disabled || !form.taxEnabled}
+              disabled={!canManage || saving}
               id="pricing-tax-registration"
-              maxLength={120}
+              maxLength={200}
               onChange={(event) =>
                 setForm({
                   ...form,

@@ -18,15 +18,20 @@ import { useEffect, useState } from "react";
 import { useTenantI18n } from "@/i18n";
 import { webAdminApi } from "@/lib/api-client";
 
+function normalizeCountry(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z]/g, "");
+}
+
 const copy = {
   en: {
     title: "Country tax template",
-    description: "Select a SaaS-managed country template to update future POS taxes. Existing orders keep their saved tax amounts.",
+    description: "Apply the SaaS-managed template for this tenant's country to future POS sales. Existing orders keep their saved tax amounts.",
     choose: "Choose a country",
     apply: "Apply template",
     applying: "Applying…",
     applied: "Country tax template applied.",
-    empty: "No country templates are configured yet.",
+    empty: "No ready template matches this tenant's country. Ask a SaaS administrator to configure the country and its tax template.",
     readOnly: "Read only",
     currency: "Currency",
     label: "Local tax name",
@@ -40,12 +45,12 @@ const copy = {
   },
   fr: {
     title: "Modèle fiscal du pays",
-    description: "Choisissez un modèle géré par SaaS pour les futures ventes POS. Les anciennes commandes conservent leurs montants.",
+    description: "Appliquez le modèle SaaS du pays de ce locataire aux prochaines ventes POS. Les anciennes commandes conservent leurs montants.",
     choose: "Choisir un pays",
     apply: "Appliquer le modèle",
     applying: "Application…",
     applied: "Modèle fiscal appliqué.",
-    empty: "Aucun modèle fiscal configuré.",
+    empty: "Aucun modèle prêt ne correspond au pays du locataire. Demandez à l'administrateur SaaS de configurer le pays et sa fiscalité.",
     readOnly: "Lecture seule",
     currency: "Devise",
     label: "Nom local de la taxe",
@@ -59,12 +64,12 @@ const copy = {
   },
   "zh-CN": {
     title: "国家税务模板",
-    description: "选择 SaaS 管理员配置的国家模板，后续 POS 交易将采用新税率；历史订单税额保持原样。",
+    description: "应用与租户国家一致的 SaaS 税务模板，后续 POS 交易采用新税率；历史订单税额保持原样。",
     choose: "选择国家",
     apply: "应用模板",
     applying: "应用中…",
     applied: "国家税务模板已应用。",
-    empty: "SaaS 尚未配置国家税务模板。",
+    empty: "租户国家尚无可用税务模板，请联系 SaaS 管理员配置国家及其税务模板。",
     readOnly: "只读",
     currency: "货币",
     label: "当地税种名称",
@@ -80,6 +85,7 @@ const copy = {
 
 export function TenantTaxTemplateSection({
   canManage,
+  tenantCountry,
   settingsVersion,
   appliedCountryCode,
   appliedTemplateVersion,
@@ -87,6 +93,7 @@ export function TenantTaxTemplateSection({
   taxRegistrationNumber,
 }: {
   canManage: boolean;
+  tenantCountry: string | null;
   settingsVersion?: number;
   appliedCountryCode?: string | null;
   appliedTemplateVersion?: number | null;
@@ -113,7 +120,23 @@ export function TenantTaxTemplateSection({
     let active = true;
     webAdminApi.tenant.taxRates.listTemplates()
       .then(({ data }) => {
-        if (active) setTemplates(data);
+        if (active) {
+          const normalizedCountry = normalizeCountry(tenantCountry ?? "");
+          const available = data.filter((template) =>
+            normalizedCountry !== "" && (
+              normalizeCountry(template.countryCode) === normalizedCountry ||
+              normalizeCountry(template.name) === normalizedCountry ||
+              normalizeCountry(template.name.split(/\s[-–—]\s/, 1)[0] ?? "") === normalizedCountry ||
+              (template.countryCode === "CI" && normalizedCountry === "ivorycoast")
+            ),
+          );
+          setTemplates(available);
+          setCountryCode((current) =>
+            available.some((template) => template.countryCode === current)
+              ? current
+              : available[0]?.countryCode ?? "",
+          );
+        }
       })
       .catch((cause: unknown) => {
         if (active) setError(cause instanceof Error ? cause.message : text.loadError);
@@ -122,7 +145,7 @@ export function TenantTaxTemplateSection({
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [text.loadError]);
+  }, [tenantCountry, text.loadError]);
 
   async function apply() {
     if (!selected || currentVersion === undefined) return;

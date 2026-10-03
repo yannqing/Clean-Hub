@@ -9,50 +9,6 @@ export const tenantSettingsLanguageOptions = [
   value: TenantSettingsLanguage;
 }>;
 
-const preferredTenantSettingsCurrencyOptions = [
-  "XOF",
-  "XAF",
-  "CNY",
-  "USD",
-  "EUR",
-  "GBP",
-  "CAD",
-  "AUD",
-  "JPY",
-  "HKD",
-  "MOP",
-  "SGD",
-  "CHF",
-  "AED",
-  "SAR",
-  "INR",
-  "KRW",
-  "NZD",
-  "ZAR",
-  "NGN",
-  "GHS",
-  "KES",
-  "MAD",
-  "DZD",
-  "TND",
-  "EGP",
-  "BRL",
-  "MXN",
-] as const;
-
-const preferredTenantSettingsCurrencySet = new Set<string>(
-  preferredTenantSettingsCurrencyOptions,
-);
-
-export const tenantSettingsCurrencyOptions = [
-  ...preferredTenantSettingsCurrencyOptions,
-  ...Intl.supportedValuesOf("currency")
-    .filter(
-      (currency) => !preferredTenantSettingsCurrencySet.has(currency),
-    )
-    .sort((left, right) => left.localeCompare(right)),
-];
-
 const preferredTenantSettingsTimezoneOptions = [
   "UTC",
   "Africa/Abidjan",

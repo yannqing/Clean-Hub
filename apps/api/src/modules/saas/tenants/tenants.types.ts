@@ -181,6 +181,7 @@ export type SaasTenantDetail = SaasTenantListItem & {
     activeCatalogItemCount: number;
     enrolledTerminalCount: number;
     taxEnabled: boolean;
+    taxTemplateApplied: boolean;
     taxRegistrationNumberSet: boolean;
   };
   /** Null while the tenant is active. */

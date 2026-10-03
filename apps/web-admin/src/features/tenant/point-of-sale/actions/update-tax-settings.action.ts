@@ -11,9 +11,6 @@ import type { PointOfSaleSettings } from "../types";
 
 export type TaxSettingsInput = {
   version: number;
-  taxEnabled: boolean;
-  pricesIncludeTax: boolean;
-  defaultTaxRate: string;
   taxRegistrationNumber: string | null;
 };
 
@@ -34,13 +31,8 @@ export async function updateTaxSettingsAction(
     };
   }
 
-  const rate = Number(input.defaultTaxRate);
-  if (!Number.isFinite(rate) || rate < 0 || rate > 1) {
-    return { ok: false, message: "VAT rate must be between 0% and 100%." };
-  }
-
   const registrationNumber = input.taxRegistrationNumber?.trim() || null;
-  if (registrationNumber && registrationNumber.length > 120) {
+  if (registrationNumber && registrationNumber.length > 200) {
     return { ok: false, message: "Tax registration number is too long." };
   }
 
@@ -48,9 +40,6 @@ export async function updateTaxSettingsAction(
     const settings = await webAdminApi.tenant.posChannel.updateSettings(
       {
         version: input.version,
-        taxEnabled: input.taxEnabled,
-        pricesIncludeTax: input.pricesIncludeTax,
-        defaultTaxRate: input.defaultTaxRate,
         taxRegistrationNumber: registrationNumber,
       },
       requestOptions,

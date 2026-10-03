@@ -104,10 +104,10 @@ export function TenantDetailView({
   const isDialog = presentation === "dialog";
   const { locale, m, formatDate } = useSaasI18n();
   const readinessCopy = locale === "zh-CN"
-    ? { title: "开店就绪检查", owner: "店主账号", branch: "营业门店", catalog: "商品或服务", terminal: "已绑定终端", tax: "已启用税务", taxNumber: "税务登记号" }
+    ? { title: "开店就绪检查", owner: "店主账号", branch: "营业门店", catalog: "商品或服务", terminal: "已绑定终端", tax: "已启用税务", taxTemplate: "已应用当前国家税务模板", taxNumber: "税务登记号" }
     : locale === "fr"
-      ? { title: "Préparation du magasin", owner: "Compte propriétaire", branch: "Magasin actif", catalog: "Produit ou service", terminal: "Terminal inscrit", tax: "Taxe activée", taxNumber: "Numéro fiscal" }
-      : { title: "Store readiness", owner: "Owner account", branch: "Active branch", catalog: "Product or service", terminal: "Enrolled terminal", tax: "Tax enabled", taxNumber: "Tax registration number" };
+      ? { title: "Préparation du magasin", owner: "Compte propriétaire", branch: "Magasin actif", catalog: "Produit ou service", terminal: "Terminal inscrit", tax: "Taxe activée", taxTemplate: "Modèle fiscal national actuel appliqué", taxNumber: "Numéro fiscal" }
+      : { title: "Store readiness", owner: "Owner account", branch: "Active branch", catalog: "Product or service", terminal: "Enrolled terminal", tax: "Tax enabled", taxTemplate: "Current country tax template applied", taxNumber: "Tax registration number" };
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [tenant, setTenant] = useState<TenantDetail | null>(null);
@@ -462,7 +462,9 @@ export function TenantDetailView({
 
                 <TenantTaxSettingsCard
                   canEdit={authContext?.role === "super_admin"}
+                  key={`${tenant.id}-${tenant.updatedAt}`}
                   onSaved={() => { void getTenantDetailQuery(tenantId).then(setTenant); }}
+                  templateApplied={tenant.readiness.taxTemplateApplied}
                   tenantId={tenantId}
                 />
 
@@ -475,6 +477,7 @@ export function TenantDetailView({
                       [readinessCopy.catalog, tenant.readiness.activeCatalogItemCount > 0, null],
                       [readinessCopy.terminal, tenant.readiness.enrolledTerminalCount > 0, tenant.readiness.enrolledTerminalCount],
                       [readinessCopy.tax, tenant.readiness.taxEnabled, null],
+                      [readinessCopy.taxTemplate, tenant.readiness.taxTemplateApplied, null],
                       [readinessCopy.taxNumber, tenant.readiness.taxRegistrationNumberSet, null],
                     ] as const).map(([label, ready, count]) => (
                       <div className="flex items-center justify-between gap-3 text-sm" key={label}>

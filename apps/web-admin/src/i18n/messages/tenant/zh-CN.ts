@@ -2591,9 +2591,6 @@ export const tenantMessagesZhCN: TenantMessages = {
       defaultCurrencyTitle: "默认货币",
       defaultCurrencyDescription:
         "这是整个租户的统一默认货币。新增目录价格、固定金额折扣、门店与 POS 交易以及经营报表都从这里读取默认值。",
-      defaultCurrencyHint:
-        "保存后会同步所有现有门店的默认货币；历史订单与已有价格保留原币种，不进行金额换算。",
-      saveDefaultCurrency: "保存货币",
       productsTitle: "商品价格",
       productsDescription:
         "前往商品目录维护售价、规格以及发布门店；币种统一来自此租户设置。",
@@ -2992,7 +2989,8 @@ export const tenantMessagesZhCN: TenantMessages = {
     title: "税率",
     description:
       "可单独设置到服务和商品上的命名税率，例如优惠税率或免税项目。没有单独设置税率的项目使用上方的默认税率。",
-    templateOverride: "修改国家模板中的税类后，该租户将停止自动接收 SaaS 税务更新。",
+    templateOverride: "这些税类由国家税务模板管理；需要调整税率时请联系 SaaS 管理员。服务和商品的税类归属仍可编辑。",
+    templateManaged: "由国家税务模板管理",
     empty: "还没有税率，所有项目都按默认税率计税。",
     add: "新增税率",
     name: "名称",
@@ -3025,6 +3023,7 @@ export const tenantMessagesZhCN: TenantMessages = {
       nameConflict: "已有同名税率。",
       inUse: "该税率仍被服务或商品使用。请先改用其他税率，或将其归档。",
       versionConflict: "该税率已被他人修改，请刷新后重试。",
+      templateManaged: "该税类由国家税务模板管理，请联系 SaaS 管理员调整。",
       generic: "税率保存失败。",
     },
     field: {

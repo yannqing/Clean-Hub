@@ -18,6 +18,7 @@ import {
   updateSaasTenantStatusController,
 } from "./tenants.controller.js";
 import {
+  applySaasTenantTaxTemplateController,
   getSaasTenantTaxSettingsController,
   updateSaasTenantTaxSettingsController,
 } from "./tenant-tax-settings.controller.js";
@@ -43,6 +44,7 @@ export function createSaasTenantsRoutes() {
   routes.get("/:tenantId/settings", getSaasTenantSettingsController);
   routes.get("/:tenantId/tax-settings", getSaasTenantTaxSettingsController);
   routes.patch("/:tenantId/tax-settings", updateSaasTenantTaxSettingsController);
+  routes.post("/:tenantId/tax-template/apply", applySaasTenantTaxTemplateController);
   routes.patch("/:tenantId/settings", updateSaasTenantSettingsController);
   routes.patch("/:tenantId/status", updateSaasTenantStatusController);
   routes.get("/:tenantId/export", exportSaasTenantController);

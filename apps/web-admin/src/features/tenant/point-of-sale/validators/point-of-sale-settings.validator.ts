@@ -15,6 +15,10 @@ export type PointOfSaleSettingsFormValues = Omit<
   | "mobileMoneyProvidersEnabled"
   | "taxTemplateCountryCode"
   | "taxTemplateVersion"
+  | "taxEnabled"
+  | "defaultTaxRate"
+  | "pricesIncludeTax"
+  | "taxRegistrationNumber"
 >;
 
 export type PointOfSaleSettingsValidationResult =
@@ -38,13 +42,6 @@ function isWholeNumberInRange(
 export function validatePointOfSaleSettings(
   input: PointOfSaleSettingsFormValues,
 ): PointOfSaleSettingsValidationResult {
-  const taxRate = Number(input.defaultTaxRate);
-  if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 1) {
-    return {
-      ok: false,
-      message: "Tax rate must be between 0% and 100%.",
-    };
-  }
   if (!isWholeNumberInRange(input.syncIntervalSeconds, 5, 3600)) {
     return {
       ok: false,

@@ -87,7 +87,6 @@ function hasProfileChange(
 
   return (
     normalized.tenantName !== settings.tenantName ||
-    normalized.country !== (settings.country ?? "") ||
     normalized.city !== (settings.city ?? "") ||
     normalized.contactName !== (settings.contactName ?? "") ||
     normalized.contactPhone !== (settings.contactPhone ?? "") ||
@@ -146,7 +145,7 @@ function SettingsSection({
 }
 
 export function TenantSettingsView() {
-  const { m, formatDateTime } = useTenantI18n();
+  const { locale, m, formatDateTime } = useTenantI18n();
   const { authError, authLoaded, canUpdateSettings, settings, updateSettings } =
     useTenantSettingsWorkspace();
   const [form, setForm] = useState<TenantSettingsFormValues>(() =>
@@ -374,14 +373,18 @@ export function TenantSettingsView() {
                 </Label>
                 <Input
                   autoComplete="country-name"
-                  disabled={profileFormDisabled}
                   id="tenant-country"
                   maxLength={80}
-                  onChange={(event) =>
-                    updateProfileForm("country", event.target.value)
-                  }
+                  readOnly
                   value={profileForm.country}
                 />
+                <p className="text-xs text-muted-foreground">
+                  {locale === "zh-CN"
+                    ? "国家由 SaaS 管理员修改，以便同步税务模板和币种。"
+                    : locale === "fr"
+                      ? "Le pays est modifié par l'administrateur SaaS pour synchroniser le modèle fiscal et la devise."
+                      : "A SaaS administrator changes the country so the tax template and currency stay in sync."}
+                </p>
                 {profileErrors.country ? (
                   <p className="text-xs text-destructive">
                     {profileErrors.country}

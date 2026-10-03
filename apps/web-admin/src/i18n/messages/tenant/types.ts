@@ -2312,8 +2312,6 @@ export type TenantMessages = {
       description: string;
       defaultCurrencyTitle: string;
       defaultCurrencyDescription: string;
-      defaultCurrencyHint: string;
-      saveDefaultCurrency: string;
       productsTitle: string;
       productsDescription: string;
       servicesTitle: string;
@@ -2703,6 +2701,7 @@ export type TenantMessages = {
     title: string;
     description: string;
     templateOverride: string;
+    templateManaged: string;
     empty: string;
     add: string;
     name: string;
@@ -2735,6 +2734,7 @@ export type TenantMessages = {
       nameConflict: string;
       inUse: string;
       versionConflict: string;
+      templateManaged: string;
       generic: string;
     };
     field: {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, Button, toast } from "@cleanhub/ui";
+import { Button } from "@cleanhub/ui";
 import {
   ArrowRight,
   CircleDollarSign,
@@ -8,16 +8,13 @@ import {
   Package,
 } from "lucide-react";
 import Link from "next/link";
-import { type FormEvent, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
-import { updateTenantDefaultCurrencyAction } from "@/features/tenant/settings/actions";
 import { TaxSettingsSection } from "@/features/tenant/point-of-sale/components";
 import type { PointOfSaleSettings } from "@/features/tenant/point-of-sale/types";
 import { TaxRatesSection } from "@/features/tenant/tax-rates/components";
 import type { TaxRate } from "@/features/tenant/tax-rates/types";
 
-import { TenantDefaultCurrencyField } from "./tenant-default-currency-field";
 import { TenantSettingsSurface } from "./tenant-settings-surface";
 import { TenantTaxTemplateSection } from "./tenant-tax-template-section";
 import { useTenantSettingsWorkspace } from "./tenant-settings-workspace";
@@ -34,50 +31,9 @@ export function PricingSettingsView({
   taxRates: TaxRate[];
   taxRatesLoadFailed: boolean;
 }) {
-  const { m } = useTenantI18n();
-  const { authLoaded, canUpdateSettings, settings, updateSettings } =
+  const { locale, m } = useTenantI18n();
+  const { canUpdateSettings, settings } =
     useTenantSettingsWorkspace();
-  const [defaultCurrency, setDefaultCurrency] = useState(
-    settings.defaultCurrency,
-  );
-  const [currencyError, setCurrencyError] = useState<string>();
-  const [savingCurrency, setSavingCurrency] = useState(false);
-
-  async function handleCurrencySubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const normalizedCurrency = defaultCurrency.trim().toUpperCase();
-    setDefaultCurrency(normalizedCurrency);
-    setCurrencyError(undefined);
-
-    if (normalizedCurrency === settings.defaultCurrency) {
-      toast.success(m.settings.settingsUpToDate);
-      return;
-    }
-
-    setSavingCurrency(true);
-
-    try {
-      const result = await updateTenantDefaultCurrencyAction({
-        defaultCurrency: normalizedCurrency,
-      });
-
-      if (!result.ok) {
-        setCurrencyError(result.errors.defaultCurrency ?? result.message);
-        toast.error(result.message);
-        return;
-      }
-
-      updateSettings(result.data);
-      setDefaultCurrency(result.data.defaultCurrency);
-      toast.success(m.settings.settingsUpdated);
-    } catch {
-      setCurrencyError(m.settings.requestFailed);
-      toast.error(m.settings.requestFailed);
-    } finally {
-      setSavingCurrency(false);
-    }
-  }
 
   return (
     <TenantSettingsSurface>
@@ -104,46 +60,26 @@ export function PricingSettingsView({
                 {m.settings.pricingHub.defaultCurrencyDescription}
               </p>
 
-              <form
-                className="mt-4 grid max-w-xl gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
-                onSubmit={handleCurrencySubmit}
-              >
-                <TenantDefaultCurrencyField
-                  disabled={
-                    savingCurrency || !authLoaded || !canUpdateSettings
-                  }
-                  error={currencyError}
-                  id="pricing-default-currency"
-                  onChange={(value) => {
-                    setDefaultCurrency(value);
-                    setCurrencyError(undefined);
-                  }}
-                  value={defaultCurrency}
-                />
-                {canUpdateSettings ? (
-                  <Button
-                    disabled={savingCurrency || !authLoaded}
-                    size="sm"
-                    type="submit"
-                  >
-                    {savingCurrency
-                      ? m.common.saving
-                      : m.settings.pricingHub.saveDefaultCurrency}
-                  </Button>
-                ) : (
-                  <Badge className="w-fit" variant="outline">
-                    {authLoaded
-                      ? m.settings.readOnly
-                      : m.settings.checkingPermissions}
-                  </Badge>
-                )}
-              </form>
+              <div className="mt-4 grid max-w-xl gap-2">
+                <span className="text-xs font-medium">{m.settings.labels.defaultCurrency}</span>
+                <div className="rounded-md border border-input bg-slate-50 px-3 py-2 text-sm font-medium">
+                  {settings.defaultCurrency}
+                </div>
+                <p className="text-xs leading-5 text-slate-500">
+                  {locale === "zh-CN"
+                    ? "币种由国家税务模板决定。需要更换国家或币种时，请联系 SaaS 管理员统一调整。"
+                    : locale === "fr"
+                      ? "La devise suit le modèle fiscal du pays. Contactez l'administrateur SaaS pour changer de pays ou de devise."
+                      : "Currency follows the country tax template. Contact a SaaS administrator to change the country or currency."}
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
         <TenantTaxTemplateSection
           canManage={canUpdateSettings}
+          tenantCountry={settings.country}
           settingsVersion={taxSettings?.version}
           appliedCountryCode={taxSettings?.taxTemplateCountryCode}
           appliedTemplateVersion={taxSettings?.taxTemplateVersion}
@@ -160,7 +96,8 @@ export function PricingSettingsView({
         />
 
         <TaxRatesSection
-          canManage={canUpdateSettings}
+          canManage={canUpdateSettings && !taxSettings?.taxTemplateCountryCode}
+          templateManaged={Boolean(taxSettings?.taxTemplateCountryCode)}
           initialRates={taxRates}
           loadFailed={taxRatesLoadFailed}
           key={taxRates.map((rate) => `${rate.id}:${rate.version}`).join(",")}

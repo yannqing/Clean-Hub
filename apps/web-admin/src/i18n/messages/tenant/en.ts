@@ -2747,9 +2747,6 @@ export const tenantMessagesEn: TenantMessages = {
       defaultCurrencyTitle: "Default currency",
       defaultCurrencyDescription:
         "This is the tenant-wide default currency. New catalog prices, fixed discounts, branch and POS transactions, and reports read their default from here.",
-      defaultCurrencyHint:
-        "Saving also updates every existing branch default. Historical orders and existing prices keep their original currency and are not converted.",
-      saveDefaultCurrency: "Save currency",
       productsTitle: "Product prices",
       productsDescription:
         "Manage sale price, variants, and branch availability from the product catalog. Currency comes from this tenant setting.",
@@ -3164,7 +3161,8 @@ export const tenantMessagesEn: TenantMessages = {
     title: "Tax rates",
     description:
       "Named rates you can put on individual services and products, for example a reduced rate or an exempt item. Anything without its own rate uses the default tax rate above.",
-    templateOverride: "Editing a country-template rate stops automatic SaaS tax updates for this tenant.",
+    templateOverride: "These tax classes follow the country template. Ask a SaaS administrator to change their rates; item assignments remain editable.",
+    templateManaged: "Managed by the country template",
     empty: "No tax rates yet. Every item is sold at the default rate.",
     add: "Add tax rate",
     name: "Name",
@@ -3198,6 +3196,7 @@ export const tenantMessagesEn: TenantMessages = {
       inUse:
         "This rate is still assigned to services or products. Reassign them or archive the rate instead.",
       versionConflict: "Someone else changed this rate. Reload and try again.",
+      templateManaged: "This tax class is managed by the country template. Ask a SaaS administrator to change it.",
       generic: "The tax rate could not be saved.",
     },
     field: {

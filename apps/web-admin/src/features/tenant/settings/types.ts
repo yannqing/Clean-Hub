@@ -29,7 +29,3 @@ export type TenantProfileFormValues = {
   contactEmail: string;
   tenantVersion: number;
 };
-
-export type TenantDefaultCurrencyFormValues = {
-  defaultCurrency: string;
-};

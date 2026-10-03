@@ -1,5 +1,7 @@
-import { getDb, type Database } from "@cleanhub/db";
+import { getDb, posChannelSettings, type Database } from "@cleanhub/db";
+import { eq } from "drizzle-orm";
 import { isReadyTaxTemplate } from "../../tax/tax-template-readiness.js";
+import { ApplyTaxTemplateError, syncTaxTemplateForTenant } from "../../tenant/tax-rates/tax-template.service.js";
 
 import { AuthError } from "../../auth/auth.errors.js";
 import type { AuthContext } from "../../auth/auth.types.js";
@@ -30,7 +32,10 @@ import {
 import { SaasTenantsError } from "./tenants.errors.js";
 import {
   createSaasTenantRecord,
+  alignTenantBranchCurrency,
   findPlatformTaxTemplateForCountry,
+  hasTenantBranchCurrencyMismatch,
+  hasTenantMonetaryData,
   findSaasTenantFeatureFlagsByTenantId,
   findOtherTenantByPressingCode,
   findPlatformDefaultLanguage,
@@ -222,10 +227,10 @@ export async function createSaasTenant(
 
       const platformDefaults = await findPlatformSettings(tx);
       const taxTemplate = await findPlatformTaxTemplateForCountry(tx, input.data.country);
-      if (!taxTemplate || !isReadyTaxTemplate(taxTemplate)) {
+      if (!taxTemplate || !isReadyTaxTemplate(taxTemplate) || !taxTemplate.taxEnabled) {
         throw new SaasTenantsError(
           "SAAS_TENANT_TAX_TEMPLATE_REQUIRED",
-          "Configure the country's tax template before creating a tenant.",
+            "Configure and enable the country's tax template before creating a tenant.",
           422,
         );
       }
@@ -330,12 +335,77 @@ export async function updateSaasTenant(
         }
       }
 
+      let country = input.data.country;
+      if (country !== undefined && country !== before.country) {
+        const template = await findPlatformTaxTemplateForCountry(tx, country);
+        if (!template || !isReadyTaxTemplate(template) || !template.taxEnabled) {
+          throw new SaasTenantsError(
+            "SAAS_TENANT_TAX_TEMPLATE_REQUIRED",
+            "Configure and enable the country's tax template before changing the tenant country.",
+            422,
+          );
+        }
+        country = template.countryCode;
+        const previousTemplate = before.country
+          ? await findPlatformTaxTemplateForCountry(tx, before.country)
+          : null;
+        const settings = await findSaasTenantSettingsByTenantId(tx, input.tenantId);
+        if (!settings) {
+          throw new SaasTenantsError("SAAS_TENANT_SETTINGS_NOT_FOUND", "Tenant settings were not found.", 409);
+        }
+        const branchCurrencyMismatch = await hasTenantBranchCurrencyMismatch(
+          tx, input.tenantId, template.currencyCode!,
+        );
+        if (settings.defaultCurrency !== template.currencyCode || branchCurrencyMismatch) {
+          if (await hasTenantMonetaryData(tx, input.tenantId)) {
+            throw new SaasTenantsError(
+              "SAAS_TENANT_CURRENCY_IN_USE",
+              "This tenant has sales, saved carts, catalog prices, or enrolled terminals. A currency change requires a dedicated migration before changing country.",
+              409,
+            );
+          }
+          if (settings.defaultCurrency !== template.currencyCode) {
+            await updateSaasTenantSettingsRecord(tx, {
+              actorUserId: input.authContext.userId,
+              tenantId: input.tenantId,
+              data: { defaultCurrency: template.currencyCode! },
+              currentSettings: settings,
+            });
+          } else {
+            await alignTenantBranchCurrency(tx, {
+              actorUserId: input.authContext.userId,
+              tenantId: input.tenantId,
+              currency: template.currencyCode!,
+            });
+          }
+        }
+        try {
+          await syncTaxTemplateForTenant(tx, {
+            tenantId: input.tenantId,
+            actorUserId: input.authContext.userId,
+            template,
+          });
+        } catch (error) {
+          if (error instanceof ApplyTaxTemplateError) {
+            throw new SaasTenantsError("SAAS_TENANT_TAX_TEMPLATE_CONFLICT", error.message, error.status);
+          }
+          throw error;
+        }
+        if (previousTemplate?.countryCode !== template.countryCode) {
+          // The previous country's tax identity cannot be used on new receipts.
+          await tx.update(posChannelSettings)
+            .set({ taxRegistrationNumber: null })
+            .where(eq(posChannelSettings.tenantId, input.tenantId));
+        }
+      }
+
       const tenant = await updateSaasTenantRecord(tx, {
         actorUserId: input.authContext.userId,
         tenantId: input.tenantId,
         data: {
           ...input.data,
           pressingCode,
+          country,
         },
       });
 
@@ -419,6 +489,29 @@ export async function updateSaasTenantSettings(
         "SaaS tenant was not found.",
         404,
       );
+    }
+
+    if (input.data.defaultCurrency !== undefined &&
+        input.data.defaultCurrency !== before.defaultCurrency) {
+      const tenant = await findSaasTenantAuditSnapshotById(tx, input.tenantId);
+      const template = tenant?.country
+        ? await findPlatformTaxTemplateForCountry(tx, tenant.country)
+        : null;
+      if (!template || !isReadyTaxTemplate(template) ||
+          input.data.defaultCurrency !== template.currencyCode) {
+        throw new SaasTenantsError(
+          "SAAS_TENANT_CURRENCY_MISMATCH",
+          "Tenant currency must match the country's configured tax template. Change the country on the tenant detail page instead.",
+          422,
+        );
+      }
+      if (await hasTenantMonetaryData(tx, input.tenantId)) {
+        throw new SaasTenantsError(
+          "SAAS_TENANT_CURRENCY_IN_USE",
+          "This tenant has sales, saved carts, catalog prices, or enrolled terminals. A currency change requires a dedicated migration.",
+          409,
+        );
+      }
     }
 
     const settings = await updateSaasTenantSettingsRecord(tx, {

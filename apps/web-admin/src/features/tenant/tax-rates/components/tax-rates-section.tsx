@@ -41,10 +41,12 @@ function sortRates(rates: TaxRate[]): TaxRate[] {
 
 export function TaxRatesSection({
   canManage,
+  templateManaged,
   initialRates,
   loadFailed,
 }: {
   canManage: boolean;
+  templateManaged: boolean;
   initialRates: TaxRate[];
   loadFailed: boolean;
 }) {
@@ -148,9 +150,11 @@ export function TaxRatesSection({
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
               {text.description}
             </p>
-            <p className="mt-1 max-w-2xl text-xs leading-5 text-amber-700">
-              {text.templateOverride}
-            </p>
+            {templateManaged ? (
+              <p className="mt-1 max-w-2xl text-xs leading-5 text-amber-700">
+                {text.templateOverride}
+              </p>
+            ) : null}
           </div>
         </div>
         {canManage ? (
@@ -167,7 +171,7 @@ export function TaxRatesSection({
           </Button>
         ) : (
           <Badge className="w-fit shrink-0" variant="outline">
-            {text.readOnly}
+            {templateManaged ? text.templateManaged : text.readOnly}
           </Badge>
         )}
       </div>
@@ -294,7 +298,6 @@ export function TaxRatesSection({
                   setRatePercent(event.target.value);
                   setFieldError(undefined);
                 }}
-                placeholder="18"
                 value={ratePercent}
               />
             </div>

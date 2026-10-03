@@ -264,6 +264,11 @@ async function runAssertions(db: Database): Promise<void> {
     .where(eq(posChannelSettings.tenantId, ids.tenantId));
   const meta = { ipAddress: "127.0.0.1", userAgent: "tax-integration" };
 
+  // Legacy tax-class CRUD is allowed only before a country template is
+  // applied. This synthetic fixture exercises that cleanup path separately.
+  await db.update(posChannelSettings).set({ taxTemplateCountryCode: null, taxTemplateVersion: null })
+    .where(eq(posChannelSettings.tenantId, ids.tenantId));
+
   const standard = await createTenantTaxRate(
     { authContext: owner, data: { name: "TVA 18%", rate: "0.1800" }, requestMeta: meta },
     db,
@@ -328,9 +333,7 @@ async function runAssertions(db: Database): Promise<void> {
       error instanceof TenantServicesError && error.code === "SERVICE_TAX_RATE_NOT_FOUND",
   );
 
-  // The manual tax-class lifecycle deliberately detaches a real tenant from
-  // SaaS control. This transaction's synthetic fixture restores the marker so
-  // the legacy calculation assertions below can still exercise order pricing.
+  // Restore the synthetic template marker for the order-pricing assertions.
   await db.update(posChannelSettings).set({ taxTemplateCountryCode: "ZZ", taxTemplateVersion: 1 })
     .where(eq(posChannelSettings.tenantId, ids.tenantId));
 
@@ -435,6 +438,8 @@ async function runAssertions(db: Database): Promise<void> {
 
   // A rate still carried by a service cannot be deleted: that would silently
   // move the service to the default rate. It can be archived instead.
+  await db.update(posChannelSettings).set({ taxTemplateCountryCode: null, taxTemplateVersion: null })
+    .where(eq(posChannelSettings.tenantId, ids.tenantId));
   await expectRejectedInSavepoint(
     db,
     () =>

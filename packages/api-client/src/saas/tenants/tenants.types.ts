@@ -74,6 +74,7 @@ export type TenantDetail = TenantSummary & {
     activeCatalogItemCount: number;
     enrolledTerminalCount: number;
     taxEnabled: boolean;
+    taxTemplateApplied: boolean;
     taxRegistrationNumberSet: boolean;
   };
   /** Null while the tenant is active. */
@@ -153,8 +154,15 @@ export type SaasTenantTaxSettings = {
   defaultTaxRate: string;
   pricesIncludeTax: boolean;
   taxRegistrationNumber: string | null;
+  taxTemplateCountryCode: string | null;
+  taxTemplateVersion: number | null;
   version: number;
 };
+
+export type UpdateSaasTenantTaxSettingsRequest = Pick<
+  SaasTenantTaxSettings,
+  "taxRegistrationNumber" | "version"
+>;
 
 export type UpdateTenantSettingsRequest = {
   defaultLanguage?: TenantLanguage;

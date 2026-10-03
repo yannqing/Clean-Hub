@@ -19,7 +19,10 @@ import { createId } from "@cleanhub/id";
 
 import type { AuthContext } from "../../auth/auth.types.js";
 import { findPlatformTaxTemplateForCountry } from "../../saas/tenants/tenants.repository.js";
+import { TenantPosChannelError } from "../pos-channel/pos-channel.errors.js";
+import { updateTenantPosChannelSettings } from "../pos-channel/pos-channel.service.js";
 import { ApplyTaxTemplateError, applyTenantTaxTemplate, syncTaxTemplateForTenant } from "./tax-template.service.js";
+import { TenantTaxRateError } from "./tax-rates.errors.js";
 import { updateTenantTaxRate } from "./tax-rates.service.js";
 
 const rollback = new Error("TAX_TEMPLATE_INTEGRATION_ROLLBACK");
@@ -37,6 +40,7 @@ async function run(): Promise<void> {
             id: tenantId,
             name: "Template integration tenant",
             pressingCode: `TAX-${tenantId}`,
+            country: countryCode,
             status: "active",
           });
           await tx.insert(users).values({
@@ -99,6 +103,15 @@ async function run(): Promise<void> {
               },
             ],
           });
+          await tx.insert(platformTaxTemplates).values({
+            id: createId(),
+            countryCode: "ZX",
+            name: "Another test country",
+            currencyCode: "GHS",
+            taxLabel: "VAT",
+            taxEnabled: true,
+            rates: [{ key: "standard", name: "Standard", rate: "0.2000", isDefault: true }],
+          });
           assert.equal(
             (await findPlatformTaxTemplateForCountry(tx, "Testland"))
               ?.countryCode,
@@ -114,6 +127,15 @@ async function run(): Promise<void> {
             permissions: [],
             accessTokenExpiresAt: new Date(Date.now() + 60_000).toISOString(),
           };
+          await assert.rejects(() => applyTenantTaxTemplate(
+            {
+              authContext,
+              countryCode: "ZX",
+              templateVersion: 1,
+              settingsVersion: 1,
+            },
+            tx,
+          ), (error: unknown) => error instanceof ApplyTaxTemplateError && error.code === "TAX_TEMPLATE_COUNTRY_MISMATCH");
           await assert.rejects(() => applyTenantTaxTemplate(
             {
               authContext,
@@ -152,6 +174,16 @@ async function run(): Promise<void> {
             { name: "Part A", rate: "0.1500" },
             { name: "Part B", rate: "0.0500" },
           ]);
+          await assert.rejects(() => updateTenantPosChannelSettings({
+            authContext,
+            data: { version: settings!.version, defaultTaxRate: "0.2100" },
+          }, tx), (error: unknown) => error instanceof TenantPosChannelError && error.code === "POS_CHANNEL_SETTINGS_INVALID");
+          const registration = await updateTenantPosChannelSettings({
+            authContext,
+            data: { version: settings!.version, taxRegistrationNumber: "TEST-TAX-ID" },
+          }, tx);
+          assert.equal(registration.taxRegistrationNumber, "TEST-TAX-ID");
+          assert.equal(registration.taxTemplateCountryCode, countryCode);
           const [{ count }] = await tx
             .select({ count: sql<number>`count(*)::int` })
             .from(taxRates)
@@ -205,15 +237,15 @@ async function run(): Promise<void> {
           });
           const [swapped] = await tx.select().from(taxRates).where(eq(taxRates.id, rateId));
           assert.equal(swapped?.name, "Exempt", "swapping names must preserve stable tax class IDs");
-          await updateTenantTaxRate({
+          await assert.rejects(() => updateTenantTaxRate({
             authContext,
             taxRateId: rateId,
             data: { rate: "0.2100", expectedVersion: swapped!.version },
-          }, tx);
-          const [detached] = await tx.select().from(posChannelSettings)
+          }, tx), (error: unknown) => error instanceof TenantTaxRateError && error.code === "TAX_RATE_TEMPLATE_MANAGED");
+          const [stillLinked] = await tx.select().from(posChannelSettings)
             .where(eq(posChannelSettings.tenantId, tenantId));
-          assert.equal(detached?.taxTemplateCountryCode, null, "manual rate edits must detach SaaS auto-sync");
-          assert.equal(detached?.defaultTaxComponents, null, "manual rate edits must clear the component split");
+          assert.equal(stillLinked?.taxTemplateCountryCode, countryCode, "tenant edits must not break SaaS tax linkage");
+          assert.deepEqual(stillLinked?.defaultTaxComponents, currentTemplate.rates[0]?.components);
           throw rollback;
         });
       } catch (error) {

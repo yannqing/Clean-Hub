@@ -556,6 +556,17 @@ export async function updateTenantPosChannelSettings(
 
   return db.transaction(async (tx) => {
     const current = await findPosChannelSettingsRecord(tx, tenantId);
+    if (current.taxTemplateCountryCode && (
+      (input.data.taxEnabled !== undefined && input.data.taxEnabled !== current.taxEnabled) ||
+      (input.data.pricesIncludeTax !== undefined && input.data.pricesIncludeTax !== current.pricesIncludeTax) ||
+      (input.data.defaultTaxRate !== undefined && Number(input.data.defaultTaxRate) !== Number(current.defaultTaxRate))
+    )) {
+      throw new TenantPosChannelError(
+        "POS_CHANNEL_SETTINGS_INVALID",
+        "Tax rate, tax status and inclusive pricing are managed by the country template. Change the SaaS template instead.",
+        409,
+      );
+    }
     const mobileMoneyProvidersEnabled = await findEnabledTenantPaymentProviders(
       tx,
       tenantId,

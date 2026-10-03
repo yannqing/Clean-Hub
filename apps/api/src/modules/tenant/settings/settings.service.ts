@@ -82,6 +82,22 @@ export async function updateTenantSettings(
       );
     }
 
+    if (input.data.country !== undefined && input.data.country !== before.country) {
+      throw new TenantSettingsError(
+        "TENANT_COUNTRY_SAAS_MANAGED",
+        "Country changes must be made by a SaaS administrator so the tax template and currency stay in sync.",
+        422,
+      );
+    }
+    if (input.data.defaultCurrency !== undefined &&
+        input.data.defaultCurrency !== before.defaultCurrency) {
+      throw new TenantSettingsError(
+        "TENANT_CURRENCY_SAAS_MANAGED",
+        "Currency changes must be made by a SaaS administrator together with the country tax template.",
+        422,
+      );
+    }
+
     if (hasTenantProfileUpdate(input.data)) {
       const updated = await updateTenantProfileRecord(tx, {
         tenantId,

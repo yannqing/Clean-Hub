@@ -57,6 +57,11 @@ function getInitialValues(
   };
 }
 
+function normalizeCountry(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z]/g, "");
+}
+
 export function TenantForm({
   aside,
   disabled = false,
@@ -65,7 +70,7 @@ export function TenantForm({
   onSubmit,
   onSuccess,
 }: TenantFormProps) {
-  const { m } = useSaasI18n();
+  const { locale, m } = useSaasI18n();
   const [values, setValues] = useState<TenantFormValues>(() =>
     getInitialValues(initialValues),
   );
@@ -75,15 +80,25 @@ export function TenantForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [taxTemplates, setTaxTemplates] = useState<PlatformTaxTemplate[]>([]);
+  const [templateError, setTemplateError] = useState(false);
   const showDefaults = mode === "create";
   useEffect(() => {
-    if (mode !== "create") return;
     let active = true;
     webAdminApi.saas.platformSettings.listTaxTemplates()
-      .then(({ data }) => { if (active) setTaxTemplates(data.filter((entry) => entry.currencyCode && entry.taxLabel && entry.rates.some((rate) => rate.isDefault))); })
-      .catch(() => { /* Country can still be entered when templates are unavailable. */ });
+      .then(({ data }) => { if (active) setTaxTemplates(data.filter((entry) => entry.taxEnabled && entry.currencyCode && entry.taxLabel && entry.rates.some((rate) => rate.isDefault))); })
+      .catch(() => { if (active) setTemplateError(true); });
     return () => { active = false; };
-  }, [mode]);
+  }, []);
+  const selectedTemplate = taxTemplates.find((entry) =>
+    normalizeCountry(entry.countryCode) === normalizeCountry(values.country) ||
+    normalizeCountry(entry.name) === normalizeCountry(values.country),
+  );
+  const selectedCountry = selectedTemplate?.countryCode ?? values.country;
+  const countryCopy = locale === "zh-CN"
+    ? { unavailable: "无法加载国家税务模板，请稍后重试。", empty: "尚无可用的国家税务模板，请先在平台设置中配置。", change: "更换国家将同步税务模板及币种，并清除原税号；若已有交易、购物车、价格或绑定终端，跨币种更换需先完成专门迁移。" }
+    : locale === "fr"
+      ? { unavailable: "Impossible de charger les modèles fiscaux. Réessayez plus tard.", empty: "Aucun modèle fiscal disponible. Configurez-en un dans les paramètres de la plateforme.", change: "Changer de pays synchronise le modèle fiscal et la devise, puis efface l'ancien numéro fiscal. Si des ventes, paniers, prix ou terminaux inscrits existent, le changement de devise exige une migration dédiée." }
+      : { unavailable: "Could not load country tax templates. Try again later.", empty: "No country tax templates are ready. Configure one in platform settings first.", change: "Changing country synchronizes tax and currency and clears the old tax number. Existing sales, carts, prices, or enrolled terminals require a dedicated migration before a currency change." };
   const languageOptions = showDefaults
     ? tenantCreateLanguageOptions
     : tenantLanguageOptions;
@@ -214,20 +229,20 @@ export function TenantForm({
                   <Label htmlFor="tenant-country">
                     {m.tenants.form.fields.country}
                   </Label>
-                  {mode === "create" ? (
-                    <Select disabled={disabled || submitting} onValueChange={(countryCode) => {
+                  <Select disabled={disabled || submitting} onValueChange={(countryCode) => {
                       const template = taxTemplates.find((entry) => entry.countryCode === countryCode);
                       setValues((current) => ({ ...current, country: countryCode, defaultCurrency: template?.currencyCode ?? "" }));
                       setErrors((current) => ({ ...current, country: undefined, defaultCurrency: undefined }));
-                    }} value={values.country}>
+                    }} value={selectedCountry}>
                       <SelectTrigger aria-invalid={Boolean(errors.country)} id="tenant-country"><SelectValue placeholder={m.tenants.form.fields.country} /></SelectTrigger>
                       <SelectContent>
+                        {values.country && !selectedTemplate ? <SelectItem value={values.country}>{values.country}</SelectItem> : null}
                         {taxTemplates.map((template) => <SelectItem key={template.countryCode} value={template.countryCode}>{template.name} ({template.countryCode})</SelectItem>)}
                       </SelectContent>
                     </Select>
-                  ) : (
-                    <Input aria-invalid={Boolean(errors.country)} disabled={disabled || submitting} id="tenant-country" onChange={(event) => updateValue("country", event.target.value)} value={values.country} />
-                  )}
+                  {templateError ? <p className="text-xs text-destructive">{countryCopy.unavailable}</p> : null}
+                  {!templateError && taxTemplates.length === 0 ? <p className="text-xs text-muted-foreground">{countryCopy.empty}</p> : null}
+                  {mode === "edit" ? <p className="text-xs text-muted-foreground">{countryCopy.change}</p> : null}
                   {errors.country ? (
                     <p className="text-xs text-destructive">{errors.country}</p>
                   ) : null}
