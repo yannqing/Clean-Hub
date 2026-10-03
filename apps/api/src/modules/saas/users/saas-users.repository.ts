@@ -5,11 +5,13 @@ import {
   count,
   desc,
   eq,
+  gt,
   ilike,
   inArray,
   isNull,
   ne,
   or,
+  sql,
 } from "drizzle-orm";
 
 import {
@@ -585,6 +587,68 @@ export async function resetSaasUserPasswordRecord(
     );
 }
 
+export async function findSaasUserCredential(
+  db: Database,
+  userId: string,
+): Promise<{ passwordHash: string } | null> {
+  const rows = await db
+    .select({ passwordHash: users.passwordHash })
+    .from(users)
+    .where(
+      and(
+        eq(users.id, userId),
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        isNull(users.deletedAt),
+      ),
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateSaasSelfPasswordRecord(
+  db: Database,
+  input: { userId: string; expectedPasswordHash: string; passwordHash: string },
+): Promise<boolean> {
+  const rows = await db
+    .update(users)
+    .set({
+      passwordHash: input.passwordHash,
+      updatedAt: new Date(),
+      version: sql`${users.version} + 1`,
+    })
+    .where(
+      and(
+        eq(users.id, input.userId),
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        isNull(users.deletedAt),
+        eq(users.passwordHash, input.expectedPasswordHash),
+      ),
+    )
+    .returning({ id: users.id });
+  return Boolean(rows[0]);
+}
+
+export async function revokeSaasSelfRefreshTokens(
+  db: Database,
+  userId: string,
+): Promise<number> {
+  const rows = await db
+    .update(authRefreshTokens)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(authRefreshTokens.userId, userId),
+        isNull(authRefreshTokens.tenantId),
+        gt(authRefreshTokens.expiresAt, new Date()),
+        isNull(authRefreshTokens.revokedAt),
+      ),
+    )
+    .returning({ id: authRefreshTokens.id });
+  return rows.length;
+}
+
 export async function revokeSaasUserRefreshTokens(
   db: Database,
   userId: string,
@@ -922,26 +986,40 @@ export async function findSaasUserStats(
   q?: string,
 ): Promise<{ total: number; statusCounts: Record<SaasUserStatus, number> }> {
   const searchQuery = normalizeSearchQuery(q);
-  const rows = await db.select({
-    status: users.status,
-    value: count(),
-  }).from(users).leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-    .where(and(
-      eq(users.userType, "saas"),
-      isNull(users.tenantId),
-      isNull(users.deletedAt),
-      searchQuery ? or(
-        ilike(users.email, searchQuery),
-        ilike(users.phone, searchQuery),
-        ilike(userProfiles.displayName, searchQuery),
-      ) : undefined,
-    )).groupBy(users.status);
+  const rows = await db
+    .select({
+      status: users.status,
+      value: count(),
+    })
+    .from(users)
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(
+      and(
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        isNull(users.deletedAt),
+        searchQuery
+          ? or(
+              ilike(users.email, searchQuery),
+              ilike(users.phone, searchQuery),
+              ilike(userProfiles.displayName, searchQuery),
+            )
+          : undefined,
+      ),
+    )
+    .groupBy(users.status);
   const statusCounts: Record<SaasUserStatus, number> = {
-    active: 0, disabled: 0, invited: 0, suspended: 0,
+    active: 0,
+    disabled: 0,
+    invited: 0,
+    suspended: 0,
   };
   for (const row of rows) statusCounts[row.status] = row.value;
   return {
-    total: Object.values(statusCounts).reduce((total, value) => total + value, 0),
+    total: Object.values(statusCounts).reduce(
+      (total, value) => total + value,
+      0,
+    ),
     statusCounts,
   };
 }

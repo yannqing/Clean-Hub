@@ -7,7 +7,10 @@ import { assertPasswordMeetsPolicy } from "../../auth/password-policy.helper.js"
 import { hashPassword, hashPin } from "../../auth/password.service.js";
 import { resolveEffectiveSecurityPolicy } from "../security/security-policy.js";
 import { randomUUID } from "node:crypto";
-import { requireSaasRole, type SaasRole } from "../../auth/permission.helper.js";
+import {
+  requireSaasRole,
+  type SaasRole,
+} from "../../auth/permission.helper.js";
 import { SaasUsersError } from "./saas-users.errors.js";
 import {
   countActiveSaasSuperAdmins,
@@ -72,9 +75,7 @@ function normalizeUpdatePhone(
   return normalizePhone(phone);
 }
 
-function normalizeRoleCodes(
-  roleCodes: SaasUserRoleCode[],
-): SaasUserRoleCode[] {
+function normalizeRoleCodes(roleCodes: SaasUserRoleCode[]): SaasUserRoleCode[] {
   return [...new Set(roleCodes)].sort();
 }
 
@@ -164,10 +165,7 @@ export async function createSaasUser(
   ]);
 
   return db.transaction(async (tx) => {
-    const existingUser = await findUserByNormalizedEmail(
-      tx,
-      normalizedEmail,
-    );
+    const existingUser = await findUserByNormalizedEmail(tx, normalizedEmail);
 
     if (existingUser) {
       throw new SaasUsersError(
@@ -228,6 +226,24 @@ export async function updateSaasUser(
 ): Promise<SaasUserDetail> {
   requireSaasUsersAccess(input.authContext, ["super_admin"]);
 
+  return updateSaasUserInternal(input, db);
+}
+
+export async function updateSaasSelfProfile(
+  input: Omit<UpdateSaasUserInput, "userId">,
+  db: Database = getDb(),
+): Promise<SaasUserDetail> {
+  requireSaasUsersAccess(input.authContext, ["super_admin", "support"]);
+  return updateSaasUserInternal(
+    { ...input, userId: input.authContext.userId },
+    db,
+  );
+}
+
+async function updateSaasUserInternal(
+  input: UpdateSaasUserInput,
+  db: Database,
+): Promise<SaasUserDetail> {
   if (!Object.values(input.data).some((value) => value !== undefined)) {
     throw new SaasUsersError(
       "SAAS_USER_UPDATE_EMPTY",
@@ -356,10 +372,7 @@ export async function updateSaasUserStatus(
 
     const roleCodes = await findActiveSaasUserRoleCodes(tx, input.userId);
 
-    if (
-      input.data.status === "disabled" &&
-      roleCodes.includes("super_admin")
-    ) {
+    if (input.data.status === "disabled" && roleCodes.includes("super_admin")) {
       const activeSuperAdminCount = await countActiveSaasSuperAdmins(tx);
 
       if (before.status === "active" && activeSuperAdminCount <= 1) {

@@ -42,6 +42,7 @@ import { createSaasSecurityRoutes } from "./modules/saas/security/security.route
 import { createSaasTenantsRoutes } from "./modules/saas/tenants/tenants.routes.js";
 import { createSaasRolesRoutes } from "./modules/saas/users/saas-roles.routes.js";
 import { createSaasUsersRoutes } from "./modules/saas/users/saas-users.routes.js";
+import { createSaasProfileRoutes } from "./modules/saas/profile/profile.routes.js";
 import { createTenantAuditRoutes } from "./modules/tenant/audit/audit.routes.js";
 import { createTenantBackupRoutes } from "./modules/tenant/backups/backups.routes.js";
 import { createTenantCustomerRoutes } from "./modules/tenant/customers/customers.routes.js";
@@ -269,6 +270,7 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   // SaaS 平台 - 用户与权限
   app.route("/saas/roles", createSaasRolesRoutes());
   app.route("/saas/users", createSaasUsersRoutes());
+  app.route("/saas/profile", createSaasProfileRoutes());
 
   // SaaS 平台 - 运营管理
   app.route("/saas/feedback-tickets", createSaasFeedbackTicketRoutes());

@@ -3,12 +3,10 @@ import type { ApiClient } from "../types";
 // sibling resource's folder because they share types (e.g. restore-requests
 // belongs under backups/ since backups.ts imports RestoreRequest).
 import { createSaasAuditLogsApi, createSaasOperationLogsApi } from "./audit";
-import {
-  createSaasBackupsApi,
-  createSaasRestoreRequestsApi,
-} from "./backups";
+import { createSaasBackupsApi, createSaasRestoreRequestsApi } from "./backups";
 import { createSaasFeedbackTicketsApi } from "./feedback-tickets";
 import { createSaasOverviewApi } from "./overview";
+import { createSaasProfileApi } from "./profile";
 import { createSaasPlatformSettingsApi } from "./platform-settings";
 import { createSaasRolesApi, createSaasUsersApi } from "./identity";
 import {
@@ -21,6 +19,7 @@ export * from "./audit";
 export * from "./backups";
 export * from "./feedback-tickets";
 export * from "./overview";
+export * from "./profile";
 export * from "./platform-settings";
 export * from "./identity";
 export * from "./security";
@@ -48,6 +47,7 @@ export function createSaasApi(client: ApiClient) {
     backups,
     feedbackTickets,
     overview,
+    profile: createSaasProfileApi(client),
     operationLogs,
     platformSettings,
     restoreRequests,

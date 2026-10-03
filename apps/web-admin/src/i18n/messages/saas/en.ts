@@ -200,7 +200,8 @@ export const saasMessagesEn: SaasMessages = {
       offboardSucceeded:
         "Tenant offboarded. {tables} table(s) were exported beforehand.",
       offboardFailed: "Tenant offboarding failed.",
-      offboardedBanner: "This tenant was offboarded on {date}. Reason: {reason}",
+      offboardedBanner:
+        "This tenant was offboarded on {date}. Reason: {reason}",
       purgeAfterLabel: "Data is kept until {date}",
       restoreAction: "Cancel offboarding",
       restoreSucceeded: "Offboarding cancelled. The tenant is now suspended.",
@@ -474,17 +475,20 @@ export const saasMessagesEn: SaasMessages = {
     selectBackupHint:
       "Select a backup task before submitting a restore request for manual review.",
     manualBackup: "Manual Backup",
-    backupPhysicalScopeHint: "The artifact is always a full database backup. Tenant scope only associates the request with a tenant for manual recovery review.",
+    backupPhysicalScopeHint:
+      "The artifact is always a full database backup. Tenant scope only associates the request with a tenant for manual recovery review.",
     scope: "Scope",
     reason: "Reason",
     backupReasonPlaceholder: "Optional note for the backup task record",
     createBackupTask: "Create backup task",
-    backupCreated: "Backup queued. A restore can be requested after verification.",
+    backupCreated:
+      "Backup queued. A restore can be requested after verification.",
     restoreReason: "Restore reason",
     restoreReasonPlaceholder: "Explain why this restore needs manual review",
     submitRestore: "Submit restore request",
     restoreSubmitted: "Restore request submitted.",
-    restoreRequiresSuccess: "A restore can only be requested from a verified, successful backup.",
+    restoreRequiresSuccess:
+      "A restore can only be requested from a verified, successful backup.",
     columns: {
       created: "Created",
       requestedBy: "Requested by",
@@ -506,7 +510,8 @@ export const saasMessagesEn: SaasMessages = {
       complete: "Confirm manual restore completed",
       cancel: "Cancel request",
       reviewNote: "Review note",
-      reviewNotePlaceholder: "Required to confirm a manual restore; optional otherwise",
+      reviewNotePlaceholder:
+        "Required to confirm a manual restore; optional otherwise",
       applyNote: "Apply",
     },
     reviewToasts: {
@@ -673,6 +678,48 @@ export const saasMessagesEn: SaasMessages = {
       created: "Created",
       updated: "Updated",
     },
+  },
+  profile: {
+    intro: "Manage your platform account and sign-in security.",
+    identityTitle: "Personal details",
+    identityDescription:
+      "Your name and contact details are visible to platform operators.",
+    preferencesTitle: "Preferences",
+    preferencesDescription:
+      "Choose the language and time zone used in your account.",
+    securityTitle: "Change password",
+    securityDescription: "Enter your current password to set a new one.",
+    displayName: "Display name",
+    email: "Email",
+    phone: "Phone",
+    language: "Language",
+    timezone: "Time zone",
+    timezoneHint: "Use an IANA time zone, such as Africa/Dakar.",
+    currentPassword: "Current password",
+    newPassword: "New password",
+    confirmPassword: "Confirm new password",
+    passwordHint: "At least {count} characters{number}{symbol}.",
+    numberRequirement: ", including a number",
+    symbolRequirement: " and a symbol",
+    passwordReauth:
+      "This device signs out immediately. Other devices will need to sign in again when their current access expires.",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
+    changePassword: "Change password",
+    discard: "Discard changes",
+    saved: "Profile saved.",
+    passwordChanged: "Password changed. Please sign in again.",
+    saveFailed: "Could not save your profile.",
+    passwordFailed: "Could not change your password.",
+    required: "This field is required.",
+    invalidEmail: "Enter a valid email address.",
+    invalidPhone: "Enter a valid phone number.",
+    invalidTimezone: "Choose a valid time zone.",
+    passwordMismatch: "New passwords do not match.",
+    passwordSame: "Choose a different password.",
+    currentPasswordIncorrect: "Current password is incorrect.",
+    emailConflict: "This email is already in use.",
+    phoneConflict: "This phone number is already in use.",
   },
   placeholders: {
     profile: {

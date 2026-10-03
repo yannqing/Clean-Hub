@@ -639,6 +639,45 @@ export type SaasMessages = {
       updated: string;
     };
   };
+  profile: {
+    intro: string;
+    identityTitle: string;
+    identityDescription: string;
+    preferencesTitle: string;
+    preferencesDescription: string;
+    securityTitle: string;
+    securityDescription: string;
+    displayName: string;
+    email: string;
+    phone: string;
+    language: string;
+    timezone: string;
+    timezoneHint: string;
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+    passwordHint: string;
+    numberRequirement: string;
+    symbolRequirement: string;
+    passwordReauth: string;
+    showPassword: string;
+    hidePassword: string;
+    changePassword: string;
+    discard: string;
+    saved: string;
+    passwordChanged: string;
+    saveFailed: string;
+    passwordFailed: string;
+    required: string;
+    invalidEmail: string;
+    invalidPhone: string;
+    invalidTimezone: string;
+    passwordMismatch: string;
+    passwordSame: string;
+    currentPasswordIncorrect: string;
+    emailConflict: string;
+    phoneConflict: string;
+  };
   placeholders: {
     profile: {
       title: string;
