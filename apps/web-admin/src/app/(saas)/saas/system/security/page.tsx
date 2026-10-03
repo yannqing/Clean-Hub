@@ -1,5 +1,7 @@
-import { SecurityPageView } from "@/features/saas/security/components";
+import { redirect } from "next/navigation";
+
+import { webAdminRoutes } from "@/config/routes";
 
 export default function SaasSystemSecurityPage() {
-  return <SecurityPageView />;
+  redirect(webAdminRoutes.saas.auditSecurity);
 }

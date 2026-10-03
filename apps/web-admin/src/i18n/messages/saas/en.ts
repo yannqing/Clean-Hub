@@ -412,6 +412,9 @@ export const saasMessagesEn: SaasMessages = {
   auditLogs: {
     badge: "SaaS audit",
     title: "Audit Logs",
+    centerTitle: "Audit & Security",
+    activityDescription: "Review all recorded platform and tenant actions, including sign-in attempts and configuration changes.",
+    securityDescription: "Investigate security events by severity. Failed sign-ins also appear in the audit log.",
     loadError: "Failed to load audit logs.",
     emptyTitle: "No audit logs found",
     category: "Category",

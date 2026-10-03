@@ -59,16 +59,12 @@ export const enMessages: WebAdminMessages = {
               description: "Open outstanding platform work in one place.",
             },
             auditLogs: {
-              label: "Audit logs",
-              description: "Trace important platform and account changes.",
+              label: "Audit & security",
+              description: "Review activity records and security events.",
             },
             operationLogs: {
               label: "Operation logs",
               description: "Inspect application and service activity.",
-            },
-            security: {
-              label: "Security",
-              description: "Review security policy and recent events.",
             },
             settings: {
               label: "Platform settings",
@@ -225,13 +221,9 @@ export const enMessages: WebAdminMessages = {
       {
         title: "System Settings",
         items: [
-          { label: "Audit Logs", href: webAdminRoutes.saas.auditLogs },
+          { label: "Audit & Security", href: webAdminRoutes.saas.auditLogs },
           { label: "Operation Logs", href: webAdminRoutes.saas.system.logs },
           { label: "Data Backups", href: webAdminRoutes.saas.system.backups },
-          {
-            label: "Security Settings",
-            href: webAdminRoutes.saas.system.security,
-          },
         ],
       },
     ],

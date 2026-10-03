@@ -5,7 +5,7 @@ export const webAdminNavigation = {
     { label: "Overview", href: webAdminRoutes.saas.home },
     { label: "Tenants", href: webAdminRoutes.saas.tenants },
     { label: "Users", href: webAdminRoutes.saas.users },
-    { label: "Audit Logs", href: webAdminRoutes.saas.auditLogs },
+    { label: "Audit & Security", href: webAdminRoutes.saas.auditLogs },
     { label: "Feedback Tickets", href: webAdminRoutes.saas.feedbackTickets },
   ],
   tenant: [
@@ -66,12 +66,8 @@ export const webAdminSidebarNavigation = {
     {
       title: "System Settings",
       items: [
-        { label: "Audit Logs", href: webAdminRoutes.saas.auditLogs },
+        { label: "Audit & Security", href: webAdminRoutes.saas.auditLogs },
         { label: "Operation Logs", href: webAdminRoutes.saas.system.logs },
-        {
-          label: "Security Settings",
-          href: webAdminRoutes.saas.system.security,
-        },
       ],
     },
   ],

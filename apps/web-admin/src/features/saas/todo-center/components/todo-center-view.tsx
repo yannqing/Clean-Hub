@@ -195,7 +195,7 @@ export function TodoCenterView() {
             />
             <TodoQueueCard
               emptyText={copy.securityQueue.empty}
-              href={webAdminRoutes.saas.system.security}
+              href={webAdminRoutes.saas.auditSecurity}
               icon={AlertTriangle}
               items={result?.securityEvents.items ?? []}
               renderTitle={(item) => {

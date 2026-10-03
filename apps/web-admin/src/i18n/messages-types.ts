@@ -182,10 +182,6 @@ type SaasShellCopy = ShellCopy & {
           label: string;
           description: string;
         };
-        security: {
-          label: string;
-          description: string;
-        };
         settings: {
           label: string;
           description: string;

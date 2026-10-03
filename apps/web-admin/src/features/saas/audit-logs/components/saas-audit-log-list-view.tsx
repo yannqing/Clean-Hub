@@ -17,18 +17,14 @@ import {
   TableRow,
 } from "@cleanhub/ui";
 import { DataTable } from "@cleanhub/ui/data-table";
-import { RefreshCw, ScrollText, Search } from "lucide-react";
+import { RefreshCw, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Pagination } from "@/components/pagination";
 import { webAdminRoutes } from "@/config/routes";
-import {
-  SaasPageHeader,
-  SaasTableSurface,
-  saasCompactTableClassName,
-} from "@/features/saas/shared";
+import { SaasTableSurface, saasCompactTableClassName } from "@/features/saas/shared";
 import { useSaasI18n, useWebAdminLocale } from "@/i18n";
 import {
   getAuditEventDescription,
@@ -151,23 +147,20 @@ export function SaasAuditLogListView() {
 
   return (
     <section className="space-y-7 pb-8" data-testid="saas-audit-log-list-view">
-      <SaasPageHeader
-        actions={
-          <Button
-            className="h-8 gap-1.5 px-2.5 text-xs"
-            disabled={loading}
-            onClick={loadLogs}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            <Icon aria-hidden icon={RefreshCw} size={14} />
-            <span>{m.common.refresh}</span>
-          </Button>
-        }
-        icon={ScrollText}
-        title={m.auditLogs.title}
-      />
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold">{m.auditLogs.title}</h2>
+        <Button
+          className="h-8 gap-1.5 px-2.5 text-xs"
+          disabled={loading}
+          onClick={loadLogs}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          <Icon aria-hidden icon={RefreshCw} size={14} />
+          <span>{m.common.refresh}</span>
+        </Button>
+      </div>
 
       <SaasTableSurface>
         <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2.5">

@@ -210,7 +210,7 @@ export function SaasOverviewView() {
     },
     {
       copy: m.overview.quickEntries.security,
-      href: webAdminRoutes.saas.system.security,
+      href: webAdminRoutes.saas.auditSecurity,
       icon: ShieldCheck,
     },
   ] as const;

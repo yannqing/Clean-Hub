@@ -1,7 +1,6 @@
-import { isUlid } from "@cleanhub/id";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 
-import { SecurityEventDetailView } from "@/features/saas/security";
+import { webAdminRoutes } from "@/config/routes";
 
 type SecurityEventDetailPageProps = {
   params: Promise<{
@@ -14,9 +13,5 @@ export default async function SecurityEventDetailPage({
 }: SecurityEventDetailPageProps) {
   const { eventId } = await params;
 
-  if (!isUlid(eventId)) {
-    notFound();
-  }
-
-  return <SecurityEventDetailView eventId={eventId} />;
+  redirect(webAdminRoutes.saas.auditSecurityEvent(eventId));
 }

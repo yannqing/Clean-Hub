@@ -378,6 +378,9 @@ export type SaasMessages = {
   auditLogs: {
     badge: string;
     title: string;
+    centerTitle: string;
+    activityDescription: string;
+    securityDescription: string;
     loadError: string;
     emptyTitle: string;
     category: string;

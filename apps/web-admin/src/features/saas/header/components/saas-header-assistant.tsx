@@ -21,7 +21,6 @@ import {
   ScrollText,
   Search,
   Settings,
-  ShieldCheck,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -100,12 +99,6 @@ function createActions(copy: SaasHeaderCopy["assistant"]): AssistantAction[] {
       href: webAdminRoutes.saas.system.logs,
       icon: ScrollText,
       ...copy.actions.operationLogs,
-    },
-    {
-      id: "security",
-      href: webAdminRoutes.saas.system.security,
-      icon: ShieldCheck,
-      ...copy.actions.security,
     },
     {
       id: "settings",

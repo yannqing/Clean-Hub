@@ -400,6 +400,9 @@ export const saasMessagesZhCN: SaasMessages = {
   auditLogs: {
     badge: "SaaS 审计",
     title: "审计日志",
+    centerTitle: "审计与安全",
+    activityDescription: "查看平台及租户的完整操作记录，包括登录尝试和配置变更。",
+    securityDescription: "按严重程度排查安全事件。登录失败也会记录在审计日志中。",
     loadError: "加载审计日志失败。",
     emptyTitle: "未找到审计日志",
     category: "分类",

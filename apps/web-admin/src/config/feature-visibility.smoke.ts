@@ -5,6 +5,7 @@ import {
   filterSidebarSections,
   isNavFeatureVisible,
 } from "./feature-visibility";
+import { webAdminSidebarNavigation } from "./navigation";
 import { webAdminRoutes } from "./routes";
 
 const sections = [
@@ -24,7 +25,6 @@ const sections = [
       { href: webAdminRoutes.saas.auditLogs },
       { href: webAdminRoutes.saas.system.logs },
       { href: webAdminRoutes.saas.system.backups },
-      { href: webAdminRoutes.saas.system.security },
       { href: webAdminRoutes.saas.config.platformSettings },
     ],
   },
@@ -62,7 +62,6 @@ for (const href of [
   webAdminRoutes.saas.todos,
   webAdminRoutes.saas.auditLogs,
   webAdminRoutes.saas.system.logs,
-  webAdminRoutes.saas.system.security,
 ]) {
   assert.equal(
     canSaasRoleAccessHref("support", href),
@@ -70,6 +69,20 @@ for (const href of [
     `support must keep access to ${href}`,
   );
 }
+
+const saasSidebarLinks = webAdminSidebarNavigation.saas.flatMap((section) =>
+  section.items.map((item) => item.href as string),
+);
+assert.equal(
+  saasSidebarLinks.filter((href) => href === webAdminRoutes.saas.auditLogs).length,
+  1,
+  "the SaaS sidebar must expose one combined audit and security entry",
+);
+assert.equal(
+  saasSidebarLinks.some((href) => href === webAdminRoutes.saas.system.security),
+  false,
+  "the old security page must not remain as a second log entry",
+);
 
 const supportHrefs = hrefsFor("support");
 assert.ok(

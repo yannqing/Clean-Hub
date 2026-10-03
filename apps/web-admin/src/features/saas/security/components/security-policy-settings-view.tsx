@@ -69,7 +69,7 @@ export function SecurityPolicySettingsView() {
     <section className="space-y-4">
       <div className="flex justify-between gap-3">
         <Button asChild size="sm" variant="outline">
-          <Link href={webAdminRoutes.saas.system.security}>
+          <Link href={webAdminRoutes.saas.auditSecurity}>
             {m.platformSettings.workspace.securityEvents}
           </Link>
         </Button>

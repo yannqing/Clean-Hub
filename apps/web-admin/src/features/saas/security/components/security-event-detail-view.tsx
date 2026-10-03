@@ -90,7 +90,7 @@ export function SecurityEventDetailView({ eventId }: { eventId: string }) {
       <SaasBreadcrumbs
         ariaLabel={m.security.events.detailTitle}
         items={[{ label: breadcrumbLabel }]}
-        rootHref={webAdminRoutes.saas.system.security}
+        rootHref={webAdminRoutes.saas.auditSecurity}
         rootIcon={ShieldCheck}
         rootLabel={m.security.events.title}
       />

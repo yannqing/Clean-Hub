@@ -17,6 +17,9 @@ export const webAdminRoutes = {
     editUser: (userId: string) =>
       `/saas/users/${encodeURIComponent(userId)}/edit`,
     auditLogs: "/saas/audit-logs",
+    auditSecurity: "/saas/audit-logs?view=security",
+    auditSecurityEvent: (eventId: string) =>
+      `/saas/audit-logs/security/${encodeURIComponent(eventId)}`,
     auditLog: (logId: string) =>
       `/saas/audit-logs/${encodeURIComponent(logId)}`,
     feedbackTickets: "/saas/feedback-tickets",

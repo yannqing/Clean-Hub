@@ -323,7 +323,7 @@ export function SecurityEventListView() {
               </TableHeader>
               <TableBody>
                 {events.map((event) => {
-                  const detailHref = webAdminRoutes.saas.system.securityEvent(
+                  const detailHref = webAdminRoutes.saas.auditSecurityEvent(
                     event.id,
                   );
 

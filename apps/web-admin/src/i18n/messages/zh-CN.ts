@@ -55,16 +55,12 @@ export const zhCNMessages: WebAdminMessages = {
               description: "集中查看尚待处理的平台工作。",
             },
             auditLogs: {
-              label: "审计日志",
-              description: "追溯重要的平台与账号变更。",
+              label: "审计与安全",
+              description: "查看操作记录和安全事件。",
             },
             operationLogs: {
               label: "操作日志",
               description: "查看应用与服务的运行记录。",
-            },
-            security: {
-              label: "安全设置",
-              description: "查看安全策略与近期安全事件。",
             },
             settings: {
               label: "平台设置",
@@ -208,10 +204,9 @@ export const zhCNMessages: WebAdminMessages = {
       {
         title: "系统设置",
         items: [
-          { label: "审计日志", href: webAdminRoutes.saas.auditLogs },
+          { label: "审计与安全", href: webAdminRoutes.saas.auditLogs },
           { label: "操作日志", href: webAdminRoutes.saas.system.logs },
           { label: "数据备份", href: webAdminRoutes.saas.system.backups },
-          { label: "安全设置", href: webAdminRoutes.saas.system.security },
         ],
       },
     ],
