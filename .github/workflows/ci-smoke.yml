@@ -139,7 +139,9 @@ jobs:
       - name: Start API and verify /health
         run: |
           set -euo pipefail
-          pnpm --filter @cleanhub/api start > /tmp/cleanhub-api.log 2>&1 &
+          # The production API is bundled by release:build. The plain tsc
+          # output still resolves workspace packages to TypeScript sources.
+          pnpm --filter @cleanhub/api exec tsx src/index.ts > /tmp/cleanhub-api.log 2>&1 &
           echo $! > /tmp/cleanhub-api.pid
 
           for attempt in $(seq 1 30); do
