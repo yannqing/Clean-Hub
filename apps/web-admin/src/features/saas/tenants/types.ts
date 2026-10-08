@@ -32,6 +32,7 @@ export type TenantFormValues = {
   initialOwnerDisplayName: string;
   initialOwnerEmail: string;
   initialOwnerPhone: string;
+  featureFlags: TenantFeatureFlagsFormValues;
 };
 
 export type TenantSettingsFormValues = {

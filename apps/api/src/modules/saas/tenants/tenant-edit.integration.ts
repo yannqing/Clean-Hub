@@ -79,6 +79,15 @@ async function run(): Promise<void> {
             data: {
               name: "Automatically coded tenant",
               country: "QX",
+              featureFlags: {
+                laundryEnabled: false,
+                carWashEnabled: true,
+                retailProductsEnabled: true,
+                deliveryEnabled: true,
+                notificationsEnabled: false,
+                emailEnabled: true,
+                customerOtpEnabled: true,
+              },
               initialOwner: { displayName: "Initial owner", email: `owner-${tenantId}@example.test` },
             },
           }, tx);
@@ -86,6 +95,25 @@ async function run(): Promise<void> {
           const [createdRecord] = await tx.select({ pressingCode: tenants.pressingCode })
             .from(tenants).where(eq(tenants.id, createdTenant.id));
           assert.equal(createdRecord?.pressingCode, createdTenant.pressingCode);
+          const [createdFlags] = await tx.select().from(tenantFeatureFlags)
+            .where(eq(tenantFeatureFlags.tenantId, createdTenant.id));
+          assert.equal(createdFlags?.laundryEnabled, false);
+          assert.equal(createdFlags?.carWashEnabled, true);
+          assert.equal(createdFlags?.retailProductsEnabled, true);
+          assert.equal(createdFlags?.deliveryEnabled, true);
+          assert.equal(createdFlags?.notificationsEnabled, false);
+          assert.equal(createdFlags?.emailEnabled, true);
+          assert.equal(createdFlags?.customerOtpEnabled, true);
+          const defaultTenant = await createSaasTenant({
+            authContext: saasAuth,
+            data: { name: "Default flag tenant", country: "QX" },
+          }, tx);
+          const [defaultFlags] = await tx.select().from(tenantFeatureFlags)
+            .where(eq(tenantFeatureFlags.tenantId, defaultTenant.id));
+          assert.equal(defaultFlags?.laundryEnabled, true);
+          assert.equal(defaultFlags?.carWashEnabled, false);
+          assert.equal(defaultFlags?.notificationsEnabled, true);
+          assert.equal(defaultFlags?.emailEnabled, false);
           assert.ok(createdTenant.initialOwnerUserId);
           const createdUsers = await listSaasTenantUsers({
             authContext: saasAuth,

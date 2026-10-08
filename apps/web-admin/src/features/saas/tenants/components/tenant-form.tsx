@@ -28,8 +28,9 @@ import {
   tenantDefaultValues,
   tenantLanguageOptions,
 } from "../constants";
-import type { TenantDetail, TenantFormValues } from "../types";
+import type { TenantDetail, TenantFeatureFlagsFormValues, TenantFormValues } from "../types";
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
+import { TenantFeatureFlagFields } from "./tenant-feature-flag-fields";
 
 type TenantFormResult =
   | {
@@ -57,6 +58,10 @@ function getInitialValues(
   return {
     ...tenantDefaultValues,
     ...values,
+    featureFlags: {
+      ...tenantDefaultValues.featureFlags,
+      ...values?.featureFlags,
+    },
   };
 }
 
@@ -125,7 +130,7 @@ export function TenantForm({
     return m.common.languageLabels.zhCN;
   };
 
-  function updateValue(key: keyof TenantFormValues, value: string): void {
+  function updateValue(key: Exclude<keyof TenantFormValues, "featureFlags">, value: string): void {
     setValues((current) => ({
       ...current,
       [key]: value,
@@ -134,6 +139,15 @@ export function TenantForm({
       ...current,
       [key]: undefined,
     }));
+    setFormError(null);
+  }
+
+  function updateFeatureFlag(key: keyof TenantFeatureFlagsFormValues, enabled: boolean): void {
+    setValues((current) => ({
+      ...current,
+      featureFlags: { ...current.featureFlags, [key]: enabled },
+    }));
+    setErrors((current) => ({ ...current, featureFlags: undefined }));
     setFormError(null);
   }
 
@@ -380,6 +394,24 @@ export function TenantForm({
                     <p className="mt-2 text-xs text-muted-foreground">{m.tenants.form.initialCredentialHint}</p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {showDefaults ? (
+            <Card className="gap-0 rounded-lg py-0 shadow-none">
+              <CardContent className="grid gap-4 py-5">
+                <h2 className="text-sm font-semibold text-foreground">
+                  {m.tenants.settings.featureFlagsSection}
+                </h2>
+                <TenantFeatureFlagFields
+                  disabled={disabled || submitting}
+                  onChange={updateFeatureFlag}
+                  values={values.featureFlags}
+                />
+                {errors.featureFlags ? (
+                  <p className="text-xs text-destructive">{errors.featureFlags}</p>
+                ) : null}
               </CardContent>
             </Card>
           ) : null}

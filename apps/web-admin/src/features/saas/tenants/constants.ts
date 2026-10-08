@@ -33,6 +33,15 @@ export const tenantDefaultValues = {
   country: "",
   defaultCurrency: "",
   defaultLanguage: "platform-default",
+  featureFlags: {
+    laundryEnabled: true,
+    carWashEnabled: false,
+    retailProductsEnabled: false,
+    deliveryEnabled: false,
+    notificationsEnabled: true,
+    emailEnabled: false,
+    customerOtpEnabled: false,
+  },
   initialOwnerDisplayName: "",
   initialOwnerEmail: "",
   initialOwnerPhone: "",
@@ -41,41 +50,11 @@ export const tenantDefaultValues = {
 } as const;
 
 export const tenantFeatureFlagOptions = [
-  {
-    key: "laundryEnabled",
-    label: "Laundry and dry cleaning",
-    description: "Core laundry, pressing, and dry cleaning workflows.",
-  },
-  {
-    key: "carWashEnabled",
-    label: "Car wash",
-    description: "Car wash services, pricing, and operations entry points.",
-  },
-  {
-    key: "retailProductsEnabled",
-    label: "Retail products",
-    description: "Laundry liquid, care products, consumables, and retail sales.",
-  },
-  {
-    key: "deliveryEnabled",
-    label: "Pickup and delivery",
-    description: "Doorstep pickup, delivery states, and delivery staff flows.",
-  },
-  {
-    key: "notificationsEnabled",
-    label: "Notifications",
-    description: "WhatsApp, SMS, email settings, and send records.",
-  },
-  {
-    key: "emailEnabled",
-    label: "Email sending",
-    description:
-      "Emailed receipts and notifications. Needs platform SMTP; without it the option stays hidden at the till even when this is on.",
-  },
-  {
-    key: "customerOtpEnabled",
-    label: "Customer one-time-code login",
-    description:
-      "Allows customer OTP sign-in. Keep this off until an SMS or email delivery provider is configured.",
-  },
+  { key: "laundryEnabled" },
+  { key: "carWashEnabled" },
+  { key: "retailProductsEnabled" },
+  { key: "deliveryEnabled" },
+  { key: "notificationsEnabled" },
+  { key: "emailEnabled" },
+  { key: "customerOtpEnabled" },
 ] as const;

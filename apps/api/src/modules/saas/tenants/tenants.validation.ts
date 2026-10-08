@@ -35,6 +35,16 @@ const initialOwnerSchema = z.object({
   phone: optionalStringSchema(32),
 });
 
+const tenantFeatureFlagsSchema = z.object({
+  laundryEnabled: z.boolean().optional(),
+  carWashEnabled: z.boolean().optional(),
+  retailProductsEnabled: z.boolean().optional(),
+  deliveryEnabled: z.boolean().optional(),
+  notificationsEnabled: z.boolean().optional(),
+  emailEnabled: z.boolean().optional(),
+  customerOtpEnabled: z.boolean().optional(),
+}).strict();
+
 export const listSaasTenantsQuerySchema = z.object({
   q: z.string().trim().min(1).optional(),
   status: saasTenantStatusSchema.optional(),
@@ -78,6 +88,7 @@ export const createSaasTenantBodySchema = z.object({
       z.string().trim().email().max(320).optional(),
     ),
   status: saasTenantStatusSchema.default("active"),
+  featureFlags: tenantFeatureFlagsSchema.optional(),
   initialOwner: initialOwnerSchema.optional(),
 });
 
@@ -134,16 +145,7 @@ export const updateSaasTenantSettingsBodySchema = z
     "At least one tenant setting must be provided.",
   );
 
-export const updateSaasTenantFeatureFlagsBodySchema = z
-  .object({
-    laundryEnabled: z.boolean().optional(),
-    carWashEnabled: z.boolean().optional(),
-    retailProductsEnabled: z.boolean().optional(),
-    deliveryEnabled: z.boolean().optional(),
-    notificationsEnabled: z.boolean().optional(),
-    emailEnabled: z.boolean().optional(),
-    customerOtpEnabled: z.boolean().optional(),
-  })
+export const updateSaasTenantFeatureFlagsBodySchema = tenantFeatureFlagsSchema
   .refine(
     (data) => Object.values(data).some((value) => value !== undefined),
     "At least one tenant feature flag must be provided.",

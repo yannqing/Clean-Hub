@@ -241,6 +241,15 @@ export type SaasMessages = {
       notFoundDescription: string;
       defaultsSection: string;
       featureFlagsSection: string;
+      featureFlagOptions: {
+        laundryEnabled: { label: string; description: string };
+        carWashEnabled: { label: string; description: string };
+        retailProductsEnabled: { label: string; description: string };
+        deliveryEnabled: { label: string; description: string };
+        notificationsEnabled: { label: string; description: string };
+        emailEnabled: { label: string; description: string };
+        customerOtpEnabled: { label: string; description: string };
+      };
       pilotSection: string;
       saveDefaults: string;
       saveFeatureFlags: string;

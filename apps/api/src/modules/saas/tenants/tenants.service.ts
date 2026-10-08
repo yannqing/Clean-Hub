@@ -273,10 +273,15 @@ export async function createSaasTenant(
         const tenantWithUsers = initialOwner
           ? await findSaasTenantDetailById(tx, tenant.id)
           : tenant;
+        const featureFlags = await findSaasTenantFeatureFlagsByTenantId(tx, tenant.id);
+        if (!featureFlags) {
+          throw new Error("Failed to load created tenant feature flags.");
+        }
 
         await writeSaasTenantCreatedAuditLog(tx, {
           actorUserId: input.authContext.userId,
           tenant: tenantWithUsers ?? tenant,
+          featureFlags,
           ipAddress: input.requestMeta?.ipAddress,
           userAgent: input.requestMeta?.userAgent,
         });

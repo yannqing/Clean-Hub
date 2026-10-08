@@ -39,6 +39,7 @@ export type CreateSaasTenantRequest = {
   contactPhone?: string;
   contactEmail?: string;
   status?: SaasTenantStatus;
+  featureFlags?: UpdateSaasTenantFeatureFlagsRequest;
   initialOwner?: {
     displayName: string;
     email: string;

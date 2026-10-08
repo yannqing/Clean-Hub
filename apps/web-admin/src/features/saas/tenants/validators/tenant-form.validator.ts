@@ -217,10 +217,12 @@ export function validateTenantForm(
   const basics = validateTenantBasics(input, false);
   const settings = validateCreateDefaults(input);
   const owner = validateInitialOwner(input);
+  const flags = validateTenantFeatureFlagsForm(input.featureFlags);
   const errors = {
     ...basics.errors,
     ...settings.errors,
     ...owner.errors,
+    ...(!flags.ok ? { featureFlags: flags.error } : {}),
   };
 
   if (Object.keys(errors).length > 0) {
@@ -242,6 +244,7 @@ export function validateTenantForm(
       contactPhone: normalizeOptional(input.contactPhone),
       contactEmail: basics.contactEmail,
       initialOwner: owner.initialOwner,
+      featureFlags: flags.ok ? flags.data : undefined,
     },
   };
 }

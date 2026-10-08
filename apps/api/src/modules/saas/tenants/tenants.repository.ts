@@ -425,6 +425,7 @@ export async function createSaasTenantRecord(
   await db.insert(tenantFeatureFlags).values({
     id: featureFlagsId,
     tenantId,
+    ...input.featureFlags,
     updatedBy: input.actorUserId,
   });
 
@@ -834,6 +835,7 @@ export async function writeSaasTenantCreatedAuditLog(
   input: {
     actorUserId: string;
     tenant: SaasTenantDetail;
+    featureFlags: SaasTenantFeatureFlags;
     ipAddress?: string;
     userAgent?: string;
   },
@@ -848,7 +850,7 @@ export async function writeSaasTenantCreatedAuditLog(
     success: true,
     ipAddress: input.ipAddress,
     userAgent: input.userAgent,
-    after: input.tenant,
+    after: { ...input.tenant, featureFlags: input.featureFlags },
   });
 }
 

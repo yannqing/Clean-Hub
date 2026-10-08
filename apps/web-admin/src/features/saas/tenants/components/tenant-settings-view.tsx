@@ -6,7 +6,6 @@ import {
   Button,
   Card,
   CardContent,
-  Checkbox,
   DialogDescription,
   DialogHeader,
   DialogTitle,
@@ -49,6 +48,7 @@ import type {
   TenantSettingsFormValues,
   TenantStatus,
 } from "../types";
+import { TenantFeatureFlagFields } from "./tenant-feature-flag-fields";
 
 export type TenantSettingsPresentation = "page" | "dialog";
 
@@ -383,30 +383,11 @@ function TenantFeatureFlagsForm({
             {m.tenants.settings.featureFlagsSection}
           </h2>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            {tenantFeatureFlagOptions.map((option) => (
-              <label
-                className="flex min-h-24 items-start gap-3 rounded-lg bg-muted/45 px-3 py-3 text-sm transition-colors hover:bg-muted/70"
-                key={option.key}
-              >
-                <Checkbox
-                  checked={values[option.key]}
-                  disabled={disabled || submitting}
-                  onCheckedChange={(checked) =>
-                    updateValue(option.key, checked === true)
-                  }
-                />
-                <span className="grid gap-1">
-                  <span className="font-medium leading-none">
-                    {option.label}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {option.description}
-                  </span>
-                </span>
-              </label>
-            ))}
-          </div>
+          <TenantFeatureFlagFields
+            disabled={disabled || submitting}
+            onChange={updateValue}
+            values={values}
+          />
 
           <div className="flex justify-end">
             <Button disabled={disabled || submitting} type="submit">

@@ -112,6 +112,7 @@ export type CreateTenantRequest = {
   contactPhone?: string;
   contactEmail?: string;
   status?: TenantStatus;
+  featureFlags?: UpdateTenantFeatureFlagsRequest;
   initialOwner?: {
     displayName: string;
     email: string;
