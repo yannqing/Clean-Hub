@@ -47,7 +47,7 @@ export const enMessages: WebAdminMessages = {
               description: "Manage tenant accounts and platform access.",
             },
             users: {
-              label: "Platform users",
+              label: "User management",
               description: "Manage SaaS operators and their roles.",
             },
             feedbackTickets: {
@@ -193,7 +193,7 @@ export const enMessages: WebAdminMessages = {
             label: "Tenant Management",
             href: webAdminRoutes.saas.config.tenants,
           },
-          { label: "Platform users", href: webAdminRoutes.saas.users },
+          { label: "User management", href: webAdminRoutes.saas.users },
           {
             label: "Feedback Tickets",
             href: webAdminRoutes.saas.feedbackTickets,

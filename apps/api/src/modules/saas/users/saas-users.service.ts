@@ -22,6 +22,7 @@ import {
   findOtherUserByNormalizedEmail,
   findOtherSaasUserByPhone,
   findSaasRoles,
+  findSaasTenantAdmins,
   findSaasUserAuditSnapshotById,
   findSaasUserDetailById,
   findSaasUserStats,
@@ -47,6 +48,7 @@ import type {
   ResetSaasUserPasswordInput,
   ResetSaasUserPasswordResult,
   SaasRoleListItem,
+  SaasTenantAdminListItem,
   SaasUserDetail,
   SaasUserListItem,
   SaasUserRoleCode,
@@ -108,6 +110,14 @@ export async function listSaasUsers(
   requireSaasUsersAccess(input.authContext, ["super_admin", "support"]);
 
   return findSaasUsers(db, input.query);
+}
+
+export async function listSaasTenantAdmins(
+  input: ListSaasUsersInput,
+  db: Database = getDb(),
+): Promise<SaasTenantAdminListItem[]> {
+  requireSaasUsersAccess(input.authContext, ["super_admin", "support"]);
+  return findSaasTenantAdmins(db, input.query);
 }
 
 export async function getSaasUserStats(

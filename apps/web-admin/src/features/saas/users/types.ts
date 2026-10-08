@@ -13,6 +13,7 @@ export type {
   SaasUserStatus,
   SaasUserSummary,
   SaasUserStats,
+  SaasTenantAdminSummary,
 } from "@cleanhub/api-client";
 
 export type ListSaasUsersQuery = QueryParams;

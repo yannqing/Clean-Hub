@@ -43,8 +43,8 @@ export const zhCNMessages: WebAdminMessages = {
               description: "管理租户账号及其平台访问状态。",
             },
             users: {
-              label: "平台用户",
-              description: "管理 SaaS 运营人员及其角色。",
+              label: "用户管理",
+              description: "查看 SaaS 运营人员和租户管理员。",
             },
             feedbackTickets: {
               label: "反馈工单",
@@ -185,7 +185,7 @@ export const zhCNMessages: WebAdminMessages = {
         items: [
           { label: "主页", href: webAdminRoutes.saas.home },
           { label: "租户管理", href: webAdminRoutes.saas.config.tenants },
-          { label: "平台用户", href: webAdminRoutes.saas.users },
+          { label: "用户管理", href: webAdminRoutes.saas.users },
           { label: "反馈工单", href: webAdminRoutes.saas.feedbackTickets },
           { label: "我的待办", href: webAdminRoutes.saas.todos },
         ],

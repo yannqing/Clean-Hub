@@ -115,6 +115,20 @@ export type SaasUserListItem = {
   createdAt: string;
 };
 
+export type SaasTenantAdminListItem = {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  tenantCode: string;
+  email: string | null;
+  phone: string | null;
+  displayName: string;
+  roles: string[];
+  status: SaasUserStatus;
+  lastLoginAt: string | null;
+  createdAt: string;
+};
+
 export type SaasUserDetail = SaasUserListItem & {
   avatarUrl: string | null;
   timezone: string;

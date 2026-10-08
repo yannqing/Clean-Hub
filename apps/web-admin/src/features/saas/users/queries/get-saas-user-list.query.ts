@@ -4,6 +4,7 @@ import type {
   ListSaasUsersQuery,
   SaasUserStats,
   SaasUserSummary,
+  SaasTenantAdminSummary,
 } from "../types";
 
 export async function getSaasUserListQuery(
@@ -14,4 +15,10 @@ export async function getSaasUserListQuery(
 
 export async function getSaasUserStatsQuery(q?: string): Promise<SaasUserStats> {
   return webAdminApi.saas.users.stats({ q });
+}
+
+export async function getSaasTenantAdminListQuery(
+  query?: ListSaasUsersQuery,
+): Promise<SaasTenantAdminSummary[]> {
+  return webAdminApi.saas.users.listTenantAdmins(query);
 }

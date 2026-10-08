@@ -119,8 +119,8 @@ export const saasMessagesEn: SaasMessages = {
         description: "Review tenant profiles, status, and platform settings.",
       },
       users: {
-        title: "Platform users",
-        description: "Manage operators, roles, and account status.",
+        title: "User management",
+        description: "View platform members and tenant administrators.",
       },
       feedback: {
         title: "Feedback tickets",
@@ -212,7 +212,7 @@ export const saasMessagesEn: SaasMessages = {
       exportSucceeded: "Export downloaded.",
       exportFailed: "Tenant data export failed.",
       tenantUsersTitle: "Tenant users",
-      tenantUsersHint: "The initial owner is a tenant user. Platform members are listed separately.",
+      tenantUsersHint: "The initial owner belongs to this tenant and also appears under Tenant administrators in User management.",
       tenantUsersEmpty: "No tenant users have been created.",
       tenantUsersLoading: "Loading tenant users...",
       tenantUsersLoadError: "Tenant users could not be loaded.",
@@ -330,6 +330,17 @@ export const saasMessagesEn: SaasMessages = {
   users: {
     badge: "SaaS platform",
     title: "Platform Members",
+    directoryLabel: "User scope",
+    platformTab: "Platform members",
+    tenantAdminsTab: "Tenant administrators",
+    tenantAdminsTitle: "Tenant administrators",
+    tenantAdminsHint: "View owners and managers across tenants. Open the tenant to manage its accounts; tenant accounts do not gain SaaS access here.",
+    tenantAdminsSearchPlaceholder: "Name, email, phone, tenant name or code",
+    tenantAdminsLoadError: "Failed to load tenant administrators.",
+    tenantAdminsEmpty: "No tenant administrators found",
+    tenantColumn: "Tenant",
+    ownerRole: "Owner",
+    managerRole: "Manager",
     inviteMember: "Invite member",
     readOnlyHint:
       "Support users can view platform members and roles. Member edits, role changes, and disable actions require Super Admin.",

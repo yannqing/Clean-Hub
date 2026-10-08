@@ -54,6 +54,20 @@ export type SaasUserSummary = {
   createdAt: string;
 };
 
+export type SaasTenantAdminSummary = {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  tenantCode: string;
+  email: string | null;
+  phone: string | null;
+  displayName: string;
+  roles: string[];
+  status: SaasUserStatus;
+  lastLoginAt: string | null;
+  createdAt: string;
+};
+
 export type SaasUserDetail = SaasUserSummary & {
   avatarUrl: string | null;
   timezone: string;

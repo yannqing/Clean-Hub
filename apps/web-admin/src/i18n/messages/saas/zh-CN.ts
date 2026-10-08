@@ -118,8 +118,8 @@ export const saasMessagesZhCN: SaasMessages = {
         description: "查看租户资料、运行状态与平台配置。",
       },
       users: {
-        title: "平台用户",
-        description: "管理运营成员、角色与账户状态。",
+        title: "用户管理",
+        description: "查看平台成员和各租户管理员。",
       },
       feedback: {
         title: "反馈工单",
@@ -208,7 +208,7 @@ export const saasMessagesZhCN: SaasMessages = {
       exportSucceeded: "导出已下载。",
       exportFailed: "租户数据导出失败。",
       tenantUsersTitle: "租户用户",
-      tenantUsersHint: "初始所有者属于该租户，不会出现在 SaaS 平台用户列表。",
+      tenantUsersHint: "初始所有者属于该租户，也可在用户管理的租户管理员标签页查看。",
       tenantUsersEmpty: "该租户尚无用户。",
       tenantUsersLoading: "正在加载租户用户...",
       tenantUsersLoadError: "加载租户用户失败。",
@@ -323,6 +323,17 @@ export const saasMessagesZhCN: SaasMessages = {
   users: {
     badge: "SaaS 平台",
     title: "平台成员",
+    directoryLabel: "用户范围",
+    platformTab: "平台成员",
+    tenantAdminsTab: "租户管理员",
+    tenantAdminsTitle: "租户管理员",
+    tenantAdminsHint: "跨租户查看店主和经理账号。账号管理请进入对应租户；此处不会赋予租户账号 SaaS 权限。",
+    tenantAdminsSearchPlaceholder: "姓名、邮箱、电话、租户名称或编码",
+    tenantAdminsLoadError: "加载租户管理员失败。",
+    tenantAdminsEmpty: "未找到租户管理员",
+    tenantColumn: "所属租户",
+    ownerRole: "店主",
+    managerRole: "经理",
     inviteMember: "邀请成员",
     readOnlyHint:
       "支持人员可查看平台成员与角色。成员编辑、角色变更与禁用操作需要超级管理员权限。",

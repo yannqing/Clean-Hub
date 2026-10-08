@@ -303,6 +303,17 @@ export type SaasMessages = {
   users: {
     badge: string;
     title: string;
+    directoryLabel: string;
+    platformTab: string;
+    tenantAdminsTab: string;
+    tenantAdminsTitle: string;
+    tenantAdminsHint: string;
+    tenantAdminsSearchPlaceholder: string;
+    tenantAdminsLoadError: string;
+    tenantAdminsEmpty: string;
+    tenantColumn: string;
+    ownerRole: string;
+    managerRole: string;
     inviteMember: string;
     readOnlyHint: string;
     sessionReadOnlyHint: string;

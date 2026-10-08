@@ -5,6 +5,7 @@ import {
   createSaasUserController,
   getSaasUserController,
   listSaasUsersController,
+  listSaasTenantAdminsController,
   getSaasUserStatsController,
   resetSaasUserPasswordController,
   updateSaasUserController,
@@ -17,6 +18,7 @@ export function createSaasUsersRoutes() {
 
   routes.get("/", listSaasUsersController);
   routes.get("/stats", getSaasUserStatsController);
+  routes.get("/tenant-admins", listSaasTenantAdminsController);
   routes.post("/", createSaasUserController);
   routes.get("/:userId", getSaasUserController);
   routes.patch("/:userId/roles", updateSaasUserRolesController);
