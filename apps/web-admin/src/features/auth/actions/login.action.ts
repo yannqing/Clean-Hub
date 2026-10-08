@@ -4,7 +4,12 @@ import type { AuthContext } from "@cleanhub/api-client";
 import { cookies, headers } from "next/headers";
 
 import { getWebAdminHomePath } from "@/config/auth-routing";
-import { isWebAdminLocale, webAdminLocaleCookieName } from "@/i18n";
+import {
+  isWebAdminLocale,
+  shouldApplyWebAdminDefaultLocale,
+  webAdminLocaleCookieName,
+  webAdminLocalePreferenceCookieName,
+} from "@/i18n";
 import { webAdminApi } from "@/lib/api-client";
 
 import {
@@ -115,10 +120,18 @@ export async function loginAction(
       );
     }
 
-    // The API resolves an explicit account preference or the current platform
-    // default. Use that value on the first authenticated server render too.
-    if (result.authContext.language && isWebAdminLocale(result.authContext.language)) {
-      (await cookies()).set(webAdminLocaleCookieName, result.authContext.language, {
+    // Preserve the language chosen on the login page. Account or tenant
+    // defaults apply only when this browser has no explicit choice.
+    const cookieStore = await cookies();
+    if (
+      result.authContext.language &&
+      isWebAdminLocale(result.authContext.language) &&
+      shouldApplyWebAdminDefaultLocale(
+        cookieStore.get(webAdminLocaleCookieName)?.value,
+        cookieStore.get(webAdminLocalePreferenceCookieName)?.value,
+      )
+    ) {
+      cookieStore.set(webAdminLocaleCookieName, result.authContext.language, {
         path: "/",
         maxAge: 60 * 60 * 24 * 365,
         sameSite: "lax",

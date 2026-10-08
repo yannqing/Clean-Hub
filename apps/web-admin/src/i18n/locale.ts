@@ -9,6 +9,7 @@ export const webAdminLocales = [
 ] as const satisfies readonly WebAdminLocale[];
 
 export const webAdminLocaleCookieName = "cleanhub_web_admin_locale";
+export const webAdminLocalePreferenceCookieName = "cleanhub_web_admin_locale_preference";
 
 export const webAdminDefaultLocale: WebAdminLocale = "en";
 
@@ -32,4 +33,12 @@ export function parseWebAdminLocale(
 
 export function getWebAdminHtmlLang(locale: WebAdminLocale): string {
   return locale;
+}
+
+/** An explicit browser choice takes priority over account and tenant defaults. */
+export function shouldApplyWebAdminDefaultLocale(
+  localeCookie: string | null | undefined,
+  preferenceCookie: string | null | undefined,
+): boolean {
+  return preferenceCookie !== "1" || !isWebAdminLocale(localeCookie ?? "");
 }

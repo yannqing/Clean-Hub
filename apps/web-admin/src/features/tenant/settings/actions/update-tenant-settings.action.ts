@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
 import { getAuthSessionQuery } from "@/features/auth/queries";
-import { webAdminLocaleCookieName } from "@/i18n";
+import {
+  shouldApplyWebAdminDefaultLocale,
+  webAdminLocaleCookieName,
+  webAdminLocalePreferenceCookieName,
+} from "@/i18n";
 import { webAdminApi } from "@/lib/api-client";
 
 import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
@@ -122,11 +126,17 @@ export async function updateTenantSettingsAction(
       requestOptions,
     );
 
-    (await cookies()).set(webAdminLocaleCookieName, settings.defaultLanguage, {
-      maxAge: 60 * 60 * 24 * 365,
-      path: "/",
-      sameSite: "lax",
-    });
+    const cookieStore = await cookies();
+    if (shouldApplyWebAdminDefaultLocale(
+      cookieStore.get(webAdminLocaleCookieName)?.value,
+      cookieStore.get(webAdminLocalePreferenceCookieName)?.value,
+    )) {
+      cookieStore.set(webAdminLocaleCookieName, settings.defaultLanguage, {
+        maxAge: 60 * 60 * 24 * 365,
+        path: "/",
+        sameSite: "lax",
+      });
+    }
 
     revalidatePath("/tenant/system/settings");
     revalidatePath("/tenant/system/preferences");

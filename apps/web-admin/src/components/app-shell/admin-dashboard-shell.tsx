@@ -53,7 +53,7 @@ export function AdminDashboardShell({
 }: AdminDashboardShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { messages, setLocale } = useWebAdminLocale();
+  const { messages, setLocale, setDefaultLocale } = useWebAdminLocale();
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const platformSettingsHref = webAdminRoutes.saas.config.platformSettings;
   // The backend already refuses privileged writes from support staff; hiding
@@ -83,7 +83,7 @@ export function AdminDashboardShell({
 
       if (session) {
         setAuthContext(session);
-        if (session.language) setLocale(session.language);
+        if (session.language) setDefaultLocale(session.language);
       } else {
         router.replace(webAdminRoutes.login);
       }
@@ -94,7 +94,7 @@ export function AdminDashboardShell({
     return () => {
       active = false;
     };
-  }, [router, setLocale]);
+  }, [router, setDefaultLocale]);
 
   useEffect(() => {
     function handleProfileUpdated(event: Event) {

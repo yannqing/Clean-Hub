@@ -15,14 +15,17 @@ import type { WebAdminMessages } from "./messages-types";
 import {
   getWebAdminHtmlLang,
   parseWebAdminLocale,
+  shouldApplyWebAdminDefaultLocale,
   webAdminDefaultLocale,
   webAdminLocaleCookieName,
+  webAdminLocalePreferenceCookieName,
   type WebAdminLocale,
 } from "./locale";
 
 type WebAdminLocaleContextValue = {
   locale: WebAdminLocale;
   setLocale: (locale: WebAdminLocale) => void;
+  setDefaultLocale: (locale: WebAdminLocale) => void;
   messages: WebAdminMessages;
   /** True while a non-default locale's message bundle is being loaded. */
   loading: boolean;
@@ -32,21 +35,28 @@ const WebAdminLocaleContext = createContext<WebAdminLocaleContextValue | null>(
   null,
 );
 
-function readLocaleFromCookie(): WebAdminLocale {
+function readCookie(name: string): string | null {
   if (typeof document === "undefined") {
-    return webAdminDefaultLocale;
+    return null;
   }
 
   const match = document.cookie.match(
-    new RegExp(`(?:^|; )${webAdminLocaleCookieName}=([^;]*)`),
+    new RegExp(`(?:^|; )${name}=([^;]*)`),
   );
 
-  return parseWebAdminLocale(match?.[1] ? decodeURIComponent(match[1]) : null);
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
-function writeLocaleCookie(locale: WebAdminLocale): void {
+function readLocaleFromCookie(): WebAdminLocale {
+  return parseWebAdminLocale(readCookie(webAdminLocaleCookieName));
+}
+
+function writeLocaleCookie(locale: WebAdminLocale, explicit: boolean): void {
   const maxAgeSeconds = 60 * 60 * 24 * 365;
   document.cookie = `${webAdminLocaleCookieName}=${encodeURIComponent(locale)}; path=/; max-age=${maxAgeSeconds}; samesite=lax`;
+  if (explicit) {
+    document.cookie = `${webAdminLocalePreferenceCookieName}=1; path=/; max-age=${maxAgeSeconds}; samesite=lax`;
+  }
 }
 
 function resolveInitialLocale(initialLocale?: WebAdminLocale): WebAdminLocale {
@@ -131,9 +141,15 @@ export function WebAdminLocaleProvider({
     };
   }, [initialMessages, locale]);
 
-  const setLocale = useCallback((nextLocale: WebAdminLocale) => {
+  const applyLocale = useCallback((nextLocale: WebAdminLocale, explicit: boolean) => {
+    if (!explicit && !shouldApplyWebAdminDefaultLocale(
+      readCookie(webAdminLocaleCookieName),
+      readCookie(webAdminLocalePreferenceCookieName),
+    )) {
+      return;
+    }
     setLocaleState(nextLocale);
-    writeLocaleCookie(nextLocale);
+    writeLocaleCookie(nextLocale, explicit);
 
     // No need to load anything when switching to the default locale — its
     // bundle is always present (it's the SSR/first-paint fallback).
@@ -169,14 +185,23 @@ export function WebAdminLocaleProvider({
       });
   }, []);
 
+  const setLocale = useCallback((nextLocale: WebAdminLocale) => {
+    applyLocale(nextLocale, true);
+  }, [applyLocale]);
+
+  const setDefaultLocale = useCallback((nextLocale: WebAdminLocale) => {
+    applyLocale(nextLocale, false);
+  }, [applyLocale]);
+
   const value = useMemo<WebAdminLocaleContextValue>(
     () => ({
       locale,
       setLocale,
+      setDefaultLocale,
       messages,
       loading,
     }),
-    [locale, setLocale, messages, loading],
+    [locale, setLocale, setDefaultLocale, messages, loading],
   );
 
   return (

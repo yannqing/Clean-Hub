@@ -58,7 +58,7 @@ export function TenantDashboardShell({
 }: TenantDashboardShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { locale, messages, setLocale } = useWebAdminLocale();
+  const { locale, messages, setDefaultLocale } = useWebAdminLocale();
   const [authContext, setAuthContext] = useState<AuthContext | null>(
     initialAuthContext,
   );
@@ -201,9 +201,9 @@ export function TenantDashboardShell({
 
   useEffect(() => {
     if (authContext?.language && authContext.language !== locale) {
-      setLocale(authContext.language);
+      setDefaultLocale(authContext.language);
     }
-  }, [authContext?.language, locale, setLocale]);
+  }, [authContext?.language, locale, setDefaultLocale]);
 
   useEffect(() => {
     function handleSettingsUpdated(event: Event) {
@@ -215,7 +215,7 @@ export function TenantDashboardShell({
       }
 
       if (detail.defaultLanguage !== locale) {
-        setLocale(detail.defaultLanguage);
+        setDefaultLocale(detail.defaultLanguage);
       }
 
       setTenantName(detail.tenantName);
@@ -242,7 +242,7 @@ export function TenantDashboardShell({
         handleSettingsUpdated,
       );
     };
-  }, [locale, setLocale]);
+  }, [locale, setDefaultLocale]);
 
   if (isSettingsWorkspace) {
     return (
