@@ -35,6 +35,38 @@ internal class NativePosCopy(
     /** Keys every language must define; the test reads this. */
     internal fun keys(): Set<String> = values.keys
 
+    val authBrandName: String get() = get("authBrandName")
+    val authBrandSuffix: String get() = get("authBrandSuffix")
+    val authWelcomeTitle: String get() = get("authWelcomeTitle")
+    val authIdentityStep: String get() = get("authIdentityStep")
+    val authTerminalStep: String get() = get("authTerminalStep")
+    val authReadyStep: String get() = get("authReadyStep")
+    val authAccountHint: String get() = get("authAccountHint")
+    val authEmailPlaceholder: String get() = get("authEmailPlaceholder")
+    val authPasswordPlaceholder: String get() = get("authPasswordPlaceholder")
+    val authShowPassword: String get() = get("authShowPassword")
+    val authHidePassword: String get() = get("authHidePassword")
+    val authLanguageLabel: String get() = get("authLanguageLabel")
+    val authVerifying: String get() = get("authVerifying")
+    val authBinding: String get() = get("authBinding")
+    val authStoreHint: String get() = get("authStoreHint")
+    val authTerminalHint: String get() = get("authTerminalHint")
+    val authTerminalPlaceholder: String get() = get("authTerminalPlaceholder")
+    val authSetupFooter: String get() = get("authSetupFooter")
+    val authStepProgress: String get() = get("authStepProgress")
+    val authPinTitle: String get() = get("authPinTitle")
+    val authWelcomeBack: String get() = get("authWelcomeBack")
+    val authPinOnlineHint: String get() = get("authPinOnlineHint")
+    val authPinOfflineHint: String get() = get("authPinOfflineHint")
+    val authPinAutoLogin: String get() = get("authPinAutoLogin")
+    val authPinOfflineAvailable: String get() = get("authPinOfflineAvailable")
+    val authPinOnlineRequired: String get() = get("authPinOnlineRequired")
+    val authPinFooter: String get() = get("authPinFooter")
+    val authPinClear: String get() = get("authPinClear")
+    val authPinDelete: String get() = get("authPinDelete")
+    val authPinLabel: String get() = get("authPinLabel")
+    val authPinProgress: String get() = get("authPinProgress")
+
     val online: String get() = get("online")
     val offline: String get() = get("offline")
     val offlineMode: String get() = get("offlineMode")
@@ -803,6 +835,37 @@ internal class NativePosCopy(
 }
 
 private val COPY_ZH_VALUES: Map<String, String> = mapOf(
+    "authBrandName" to "CleanHub",
+    "authBrandSuffix" to "门店收银工作台",
+    "authWelcomeTitle" to "欢迎使用 CleanHub",
+    "authIdentityStep" to "验证身份",
+    "authTerminalStep" to "绑定终端",
+    "authReadyStep" to "开始收银",
+    "authAccountHint" to "使用租户管理端的店主或经理账号。",
+    "authEmailPlaceholder" to "输入账号邮箱",
+    "authPasswordPlaceholder" to "输入密码",
+    "authShowPassword" to "显示密码",
+    "authHidePassword" to "隐藏密码",
+    "authLanguageLabel" to "选择语言",
+    "authVerifying" to "正在验证身份…",
+    "authBinding" to "正在绑定终端…",
+    "authStoreHint" to "选择此设备所属的门店。仅展示你有权访问的门店。",
+    "authTerminalHint" to "为设备起一个便于识别的名称。",
+    "authTerminalPlaceholder" to "例如：前台收银机",
+    "authSetupFooter" to "由店主或经理完成设置，员工使用 PIN 登录收银。",
+    "authStepProgress" to "步骤 %d / %d",
+    "authPinTitle" to "员工登录",
+    "authWelcomeBack" to "欢迎回来",
+    "authPinOnlineHint" to "输入员工 6 位 PIN，即可进入收银工作台。",
+    "authPinOfflineHint" to "输入 6 位 PIN，解锁本机收银。",
+    "authPinAutoLogin" to "输入完成后自动登录",
+    "authPinOfflineAvailable" to "当前可使用本机离线验证",
+    "authPinOnlineRequired" to "首次登录需要联网",
+    "authPinFooter" to "使用个人员工 PIN 进入收银",
+    "authPinClear" to "清除",
+    "authPinDelete" to "删除一位",
+    "authPinLabel" to "员工 PIN",
+    "authPinProgress" to "已输入 %d / %d 位 PIN",
     "builtInThermalPrinterOf" to "%s 内置热敏打印机",
     "builtInScannerOf" to "%s 内置扫码器",
     "printCopiesRangeTen" to "打印份数应为 1–10。",
@@ -898,7 +961,7 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
     "openNotification" to "查看通知",
     "loadingLocalData" to "正在加载本地 POS 数据…",
     "initialiseTerminal" to "初始化此 POS 终端",
-    "initialiseIntro" to "首次需联网，由店主或经理绑定门店。完成后，收银界面、商品、现金订单和同步队列都运行在此 APK 的本地数据库中。",
+    "initialiseIntro" to "将此设备与门店关联，即可开始收银。首次设置需联网，并由店主或经理完成。",
     "noApiUrl" to "此安装包没有 POS API 地址，无法完成初始化。",
     "startInitialisation" to "开始初始化",
     "managerLogin" to "店主或经理登录",
@@ -1569,6 +1632,37 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_EN_VALUES: Map<String, String> = mapOf(
+    "authBrandName" to "CleanHub",
+    "authBrandSuffix" to "IN-STORE POS",
+    "authWelcomeTitle" to "Welcome to CleanHub",
+    "authIdentityStep" to "Verify account",
+    "authTerminalStep" to "Enrol terminal",
+    "authReadyStep" to "Ready to sell",
+    "authAccountHint" to "Use your owner or manager account from the tenant back office.",
+    "authEmailPlaceholder" to "Enter your account email",
+    "authPasswordPlaceholder" to "Enter your password",
+    "authShowPassword" to "Show password",
+    "authHidePassword" to "Hide password",
+    "authLanguageLabel" to "Choose language",
+    "authVerifying" to "Verifying account…",
+    "authBinding" to "Enrolling terminal…",
+    "authStoreHint" to "Choose the store for this device. Only stores you can access are shown.",
+    "authTerminalHint" to "Give this device a name your team can recognise.",
+    "authTerminalPlaceholder" to "For example: Front counter",
+    "authSetupFooter" to "An owner or manager sets up the device. Staff sign in with their PIN.",
+    "authStepProgress" to "Step %d of %d",
+    "authPinTitle" to "Staff sign in",
+    "authWelcomeBack" to "Welcome back",
+    "authPinOnlineHint" to "Enter your 6-digit staff PIN to open the register.",
+    "authPinOfflineHint" to "Enter your 6-digit PIN to unlock this register.",
+    "authPinAutoLogin" to "Sign in automatically after the final digit",
+    "authPinOfflineAvailable" to "Local verification is available while offline",
+    "authPinOnlineRequired" to "An internet connection is required for the first sign-in",
+    "authPinFooter" to "Use your personal staff PIN to sign in",
+    "authPinClear" to "Clear",
+    "authPinDelete" to "Delete last digit",
+    "authPinLabel" to "Staff PIN",
+    "authPinProgress" to "%d of %d PIN digits entered",
     "builtInThermalPrinterOf" to "%s built-in thermal printer",
     "builtInScannerOf" to "%s built-in scanner",
     "printCopiesRangeTen" to "Copies must be between 1 and 10.",
@@ -1664,7 +1758,7 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
     "openNotification" to "Open",
     "loadingLocalData" to "Loading this terminal's POS data…",
     "initialiseTerminal" to "Set up this POS terminal",
-    "initialiseIntro" to "The first setup needs a connection, and an owner or manager to bind a store. After that the till, products, cash orders and sync queue all run in this APK's local database.",
+    "initialiseIntro" to "Connect this device to your store to start taking payments. The first setup requires an internet connection and an owner or manager.",
     "noApiUrl" to "This build has no POS API address, so it cannot be set up.",
     "startInitialisation" to "Start setup",
     "managerLogin" to "Owner or manager sign-in",
@@ -2335,6 +2429,37 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_FR_VALUES: Map<String, String> = mapOf(
+    "authBrandName" to "CleanHub",
+    "authBrandSuffix" to "CAISSE MAGASIN",
+    "authWelcomeTitle" to "Bienvenue sur CleanHub",
+    "authIdentityStep" to "Vérifier le compte",
+    "authTerminalStep" to "Associer la caisse",
+    "authReadyStep" to "Prêt à encaisser",
+    "authAccountHint" to "Utilisez votre compte propriétaire ou responsable du portail de gestion.",
+    "authEmailPlaceholder" to "Saisissez votre adresse e-mail",
+    "authPasswordPlaceholder" to "Saisissez votre mot de passe",
+    "authShowPassword" to "Afficher le mot de passe",
+    "authHidePassword" to "Masquer le mot de passe",
+    "authLanguageLabel" to "Choisir la langue",
+    "authVerifying" to "Vérification du compte…",
+    "authBinding" to "Association de la caisse…",
+    "authStoreHint" to "Choisissez le magasin de cet appareil. Seuls les magasins autorisés sont affichés.",
+    "authTerminalHint" to "Donnez à cet appareil un nom facile à reconnaître.",
+    "authTerminalPlaceholder" to "Par exemple : Caisse accueil",
+    "authSetupFooter" to "Le propriétaire ou responsable configure l’appareil. Les employés se connectent avec leur PIN.",
+    "authStepProgress" to "Étape %d sur %d",
+    "authPinTitle" to "Connexion employé",
+    "authWelcomeBack" to "Bon retour",
+    "authPinOnlineHint" to "Saisissez votre PIN employé à 6 chiffres pour accéder à la caisse.",
+    "authPinOfflineHint" to "Saisissez votre PIN à 6 chiffres pour déverrouiller la caisse.",
+    "authPinAutoLogin" to "Connexion automatique après le dernier chiffre",
+    "authPinOfflineAvailable" to "La vérification locale est disponible hors ligne",
+    "authPinOnlineRequired" to "Une connexion Internet est nécessaire pour la première connexion",
+    "authPinFooter" to "Connectez-vous avec votre PIN employé personnel",
+    "authPinClear" to "Effacer",
+    "authPinDelete" to "Supprimer le dernier chiffre",
+    "authPinLabel" to "PIN employé",
+    "authPinProgress" to "%d chiffres du PIN saisis sur %d",
     "builtInThermalPrinterOf" to "Imprimante thermique intégrée %s",
     "builtInScannerOf" to "Scanner intégré %s",
     "printCopiesRangeTen" to "Le nombre de copies doit être entre 1 et 10.",
@@ -2430,7 +2555,7 @@ private val COPY_FR_VALUES: Map<String, String> = mapOf(
     "openNotification" to "Ouvrir",
     "loadingLocalData" to "Chargement des données POS de cette caisse…",
     "initialiseTerminal" to "Initialiser cette caisse",
-    "initialiseIntro" to "La première configuration demande une connexion et un propriétaire ou responsable pour lier un magasin. Ensuite, la caisse, les produits, les commandes et la file de synchro fonctionnent dans la base locale de cet APK.",
+    "initialiseIntro" to "Associez cet appareil à votre magasin pour commencer à encaisser. La première configuration nécessite une connexion Internet et un propriétaire ou responsable.",
     "noApiUrl" to "Cette version n'a pas d'adresse d'API POS ; l'initialisation est impossible.",
     "startInitialisation" to "Démarrer l'initialisation",
     "managerLogin" to "Connexion propriétaire ou responsable",

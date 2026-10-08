@@ -38,8 +38,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -67,7 +65,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -90,7 +87,7 @@ import java.util.concurrent.atomic.AtomicLong
 import org.json.JSONArray
 import org.json.JSONObject
 
-private data class NativeSetupBranch(val id: String, val name: String)
+internal data class NativeSetupBranch(val id: String, val name: String)
 private data class NativeAdministrator(val branches: List<NativeSetupBranch>, val requiresReenrollment: Boolean = false)
 private data class NativePosBootstrapIdentity(val tenantName: String, val branchName: String?)
 private data class NativeOfflinePinResult(val verified: Boolean, val lockedForSeconds: Long? = null)
@@ -313,7 +310,7 @@ private fun nativePosScreenClass(): NativePosScreenClass {
     }
 }
 
-private enum class NativePinLanguage(val code: String, val label: String) {
+internal enum class NativePinLanguage(val code: String, val label: String) {
     Chinese("zh-CN", "中文"),
     English("en", "English"),
     French("fr", "Français");
@@ -323,60 +320,7 @@ private enum class NativePinLanguage(val code: String, val label: String) {
     }
 }
 
-private data class NativePinLoginCopy(
-    val fallbackTenantName: String,
-    val online: String,
-    val offline: String,
-    val welcomeBack: String,
-    val staffLogin: String,
-    val offlineSubtitle: String,
-    val onlineSubtitle: String,
-    val verifying: String,
-    val offlineVerificationAvailable: String,
-    val autoLogin: String,
-    val onlineRequired: String,
-    val footer: String,
-    val clear: String,
-)
-
-private fun NativePinLanguage.pinLoginCopy(): NativePinLoginCopy = when (this) {
-    NativePinLanguage.Chinese -> NativePinLoginCopy(
-        fallbackTenantName = "门店收银", online = "已联网", offline = "离线",
-        welcomeBack = "欢迎回来", staffLogin = "员工登录",
-        offlineSubtitle = "输入 6 位 PIN 解锁本机收银。",
-        onlineSubtitle = "输入员工 6 位 PIN，首次登录会同步本地收银数据。",
-        verifying = "正在验证…", offlineVerificationAvailable = "可在断网时使用本机验证",
-        autoLogin = "输入完成后将自动登录", onlineRequired = "需要联网完成首次登录",
-        footer = "使用员工 PIN 进入收银", clear = "清除",
-    )
-    NativePinLanguage.English -> NativePinLoginCopy(
-        fallbackTenantName = "Store POS", online = "Online", offline = "Offline",
-        welcomeBack = "Welcome back", staffLogin = "Staff sign in",
-        offlineSubtitle = "Enter your 6-digit PIN to unlock this register.",
-        onlineSubtitle = "Enter your 6-digit staff PIN. Your local POS data will sync after your first sign-in.",
-        verifying = "Verifying…", offlineVerificationAvailable = "Available with local verification while offline",
-        autoLogin = "You will sign in automatically after the final digit", onlineRequired = "An internet connection is required for the first sign-in",
-        footer = "Use your staff PIN to enter the register", clear = "Clear",
-    )
-    NativePinLanguage.French -> NativePinLoginCopy(
-        fallbackTenantName = "Caisse magasin", online = "En ligne", offline = "Hors ligne",
-        welcomeBack = "Bon retour", staffLogin = "Connexion employé",
-        offlineSubtitle = "Saisissez votre code PIN à 6 chiffres pour déverrouiller la caisse.",
-        onlineSubtitle = "Saisissez le PIN employé à 6 chiffres. Les données locales seront synchronisées après la première connexion.",
-        verifying = "Vérification…", offlineVerificationAvailable = "La vérification locale est disponible hors ligne",
-        autoLogin = "Connexion automatique après le dernier chiffre", onlineRequired = "Une connexion Internet est nécessaire pour la première connexion",
-        footer = "Utilisez votre PIN employé pour accéder à la caisse", clear = "Effacer",
-    )
-}
-
-private const val PIN_LENGTH = 6
 private const val BLUETOOTH_PERMISSION_REQUEST_CODE = 3_208
-private val PIN_PAGE_BACKGROUND = Color(0xFFF7F7F6)
-private val PIN_PAGE_PRIMARY = Color(0xFF18181B)
-private val PIN_PAGE_INK = Color(0xFF18181B)
-private val PIN_PAGE_MUTED = Color(0xFF71717A)
-private val PIN_PAGE_EMPTY_DOT = Color(0xFFA1A1AA)
-private val PIN_PAGE_KEY = Color(0xFFE9E9E7)
 private val POS_PAGE_BACKGROUND = Color(0xFFF8F7FB)
 private val POS_PANEL_BACKGROUND = Color(0xFFFFFFFF)
 private val POS_ACCENT = Color(0xFF6546A3)
@@ -2158,6 +2102,8 @@ fun NativePosApp(applicationContext: Context) {
     Column(
         Modifier
             .fillMaxSize()
+            .background(if (current == null || current.terminal == null || !session.hasTerminalCredential() || !unlocked)
+                NATIVE_ENTRY_BACKGROUND else MaterialTheme.colorScheme.surface)
             .systemBarsPadding(),
     ) {
         when {
@@ -5520,359 +5466,6 @@ private fun NativeBottomNavigation(copy: NativePosCopy, activeTab: NativePosTab,
 }
 
 @Composable private fun LoadingView(copy: NativePosCopy) = Text(copy.loadingLocalData, Modifier.padding(24.dp))
-
-@Composable
-private fun FirstLaunchView(
-    copy: NativePosCopy,
-    language: NativePinLanguage,
-    onLanguageSelected: (NativePinLanguage) -> Unit,
-    apiConfigured: Boolean,
-    busy: Boolean,
-    message: String?,
-    onStart: () -> Unit,
-) {
-    FormColumn(copy.initialiseTerminal, language, onLanguageSelected) {
-        Text(copy.initialiseIntro)
-        if (!apiConfigured) Text(copy.noApiUrl, color = MaterialTheme.colorScheme.error)
-        Button(onClick = onStart, enabled = apiConfigured && !busy) { Text(copy.startInitialisation) }
-        ErrorText(message)
-    }
-}
-
-@Composable
-private fun AdministratorLoginView(
-    copy: NativePosCopy,
-    language: NativePinLanguage,
-    onLanguageSelected: (NativePinLanguage) -> Unit,
-    internetAvailable: Boolean,
-    busy: Boolean,
-    message: String?,
-    onSubmit: (String, String) -> Unit,
-) {
-    var identifier by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    FormColumn(copy.managerLogin, language, onLanguageSelected) {
-        Text(copy.managerLoginIntro)
-        NetworkStatusIndicator(copy, internetAvailable)
-        TextField(identifier, { identifier = it }, label = { Text(copy.emailLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        TextField(password, { password = it }, label = { Text(copy.passwordLabel) }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
-        Button(onClick = { onSubmit(identifier, password) }, enabled = identifier.isNotBlank() && password.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.verifyAndSelectStore) }
-        ErrorText(message)
-    }
-}
-
-@Composable
-private fun TerminalEnrollmentView(
-    copy: NativePosCopy,
-    language: NativePinLanguage,
-    onLanguageSelected: (NativePinLanguage) -> Unit,
-    branches: List<NativeSetupBranch>,
-    requiresReenrollment: Boolean,
-    busy: Boolean,
-    message: String?,
-    onEnroll: (String, String) -> Unit,
-) {
-    var branchId by remember { mutableStateOf(branches.first().id) }
-    var label by remember { mutableStateOf("${branches.first().name} POS") }
-    FormColumn(if (requiresReenrollment) copy.rebindTerminal else copy.bindTerminal, language, onLanguageSelected) {
-        if (requiresReenrollment) {
-            Text(
-                copy.rebindWarning,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-        Text(copy.selectStore)
-        branches.forEach { branch ->
-            OutlinedButton(onClick = { branchId = branch.id; if (label.isBlank()) label = "${branch.name} POS" }, modifier = Modifier.fillMaxWidth()) {
-                Text(if (branch.id == branchId) "✓ ${branch.name}" else branch.name)
-            }
-        }
-        TextField(label, { label = it }, label = { Text(copy.terminalName) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        Button(onClick = { onEnroll(branchId, label) }, enabled = label.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth()) {
-            Text(if (requiresReenrollment) copy.revokeAndRebind else copy.bindAndContinue)
-        }
-        ErrorText(message)
-    }
-}
-
-@Composable
-private fun TerminalCredentialRecoveryView(
-    copy: NativePosCopy,
-    language: NativePinLanguage,
-    onLanguageSelected: (NativePinLanguage) -> Unit,
-    internetAvailable: Boolean,
-    busy: Boolean,
-    message: String?,
-    onRecover: (String, String) -> Unit,
-) {
-    var identifier by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    FormColumn(copy.recoverCredential, language, onLanguageSelected) {
-        Text(copy.recoverIntro)
-        NetworkStatusIndicator(copy, internetAvailable)
-        TextField(identifier, { identifier = it }, label = { Text(copy.emailLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        TextField(password, { password = it }, label = { Text(copy.passwordLabel) }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
-        Button(onClick = { onRecover(identifier, password) }, enabled = identifier.isNotBlank() && password.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.reissueCredential) }
-        ErrorText(message)
-    }
-}
-
-@Composable
-private fun StaffPinGate(
-    language: NativePinLanguage,
-    onLanguageSelected: (NativePinLanguage) -> Unit,
-    tenantName: String?,
-    branchName: String?,
-    offlineAvailable: Boolean,
-    internetAvailable: Boolean,
-    busy: Boolean,
-    message: String?,
-    onPinEdited: () -> Unit,
-    onUnlockOffline: (String) -> Unit,
-    onOnlineLogin: (String) -> Unit,
-) {
-    var pin by remember { mutableStateOf("") }
-    val copy = language.pinLoginCopy()
-    val displayedTenantName = tenantName?.trim()?.takeIf { it.isNotEmpty() } ?: copy.fallbackTenantName
-    val displayedBranchName = branchName?.trim()?.takeIf { it.isNotEmpty() }
-    val unlockingOffline = !internetAvailable && offlineAvailable
-
-    LaunchedEffect(message, busy) {
-        if (message != null && !busy && pin.length == PIN_LENGTH) pin = ""
-    }
-
-    fun updatePin(next: String) {
-        if (busy) return
-        val normalized = next.filter(Char::isDigit).take(PIN_LENGTH)
-        pin = normalized
-        onPinEdited()
-        if (normalized.length == PIN_LENGTH) {
-            when {
-                internetAvailable -> onOnlineLogin(normalized)
-                offlineAvailable -> onUnlockOffline(normalized)
-            }
-        }
-    }
-
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(PIN_PAGE_BACKGROUND)
-            .padding(horizontal = 24.dp, vertical = 20.dp),
-    ) {
-        Column(Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        displayedTenantName,
-                        color = PIN_PAGE_INK,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    displayedBranchName?.let {
-                        Text(
-                            it,
-                            color = PIN_PAGE_MUTED,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    PinLanguageMenu(language, onLanguageSelected)
-                    PinNetworkStatus(internetAvailable, copy)
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
-                ) {
-                    Text(
-                        if (unlockingOffline) copy.welcomeBack else copy.staffLogin,
-                        color = PIN_PAGE_INK,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        if (unlockingOffline) copy.offlineSubtitle else copy.onlineSubtitle,
-                        color = PIN_PAGE_MUTED,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    PinDots(filled = pin.length, isError = message != null)
-                    Text(
-                        when {
-                            busy -> copy.verifying
-                            message != null -> message
-                            unlockingOffline -> copy.offlineVerificationAvailable
-                            internetAvailable -> copy.autoLogin
-                            else -> copy.onlineRequired
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = if (message != null) MaterialTheme.colorScheme.error else PIN_PAGE_MUTED,
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    PinKeypad(
-                        enabled = !busy,
-                        canDelete = pin.isNotEmpty(),
-                        onDigit = { digit -> updatePin(pin + digit) },
-                        clearLabel = copy.clear,
-                        onClear = { updatePin("") },
-                        onDelete = { updatePin(pin.dropLast(1)) },
-                    )
-                }
-            }
-
-            Text(
-                copy.footer,
-                modifier = Modifier.fillMaxWidth(),
-                color = PIN_PAGE_MUTED,
-                style = MaterialTheme.typography.labelSmall,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
-}
-
-@Composable
-private fun PinLanguageMenu(language: NativePinLanguage, onLanguageSelected: (NativePinLanguage) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        OutlinedButton(
-            onClick = { expanded = true },
-            modifier = Modifier.height(36.dp),
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-            shape = RoundedCornerShape(10.dp),
-        ) {
-            Text("${language.label} ▾", style = MaterialTheme.typography.labelMedium)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            NativePinLanguage.entries.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option.label) },
-                    onClick = {
-                        onLanguageSelected(option)
-                        expanded = false
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PinNetworkStatus(internetAvailable: Boolean, copy: NativePinLoginCopy) {
-    val color = if (internetAvailable) Color(0xFF16803A) else MaterialTheme.colorScheme.error
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
-        Text(
-            if (internetAvailable) copy.online else copy.offline,
-            color = color,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
-@Composable
-private fun PinDots(filled: Int, isError: Boolean) {
-    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        repeat(PIN_LENGTH) { index ->
-            val dotColor = when {
-                index < filled -> PIN_PAGE_PRIMARY
-                isError -> MaterialTheme.colorScheme.error
-                else -> PIN_PAGE_EMPTY_DOT
-            }
-            Box(
-                Modifier
-                    .size(14.dp)
-                    .clip(CircleShape)
-                    .background(if (index < filled) dotColor else Color.Transparent)
-                    .border(1.dp, dotColor, CircleShape),
-            )
-        }
-    }
-}
-
-@Composable
-private fun PinKeypad(
-    enabled: Boolean,
-    canDelete: Boolean,
-    clearLabel: String,
-    onDigit: (String) -> Unit,
-    onClear: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    val rows = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"))
-    Column(
-        modifier = Modifier.width(264.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        rows.forEach { row ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                row.forEach { digit -> PinKey(digit, enabled, onClick = { onDigit(digit) }) }
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            PinKey(clearLabel, enabled && canDelete, control = true, onClick = onClear)
-            PinKey("0", enabled, onClick = { onDigit("0") })
-            PinKey("⌫", enabled && canDelete, control = true, onClick = onDelete)
-        }
-    }
-}
-
-@Composable
-private fun PinKey(label: String, enabled: Boolean, control: Boolean = false, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.size(64.dp),
-        shape = CircleShape,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (control) Color.Transparent else PIN_PAGE_KEY,
-            contentColor = if (control) PIN_PAGE_MUTED else PIN_PAGE_INK,
-            disabledContainerColor = if (control) Color.Transparent else PIN_PAGE_KEY,
-            disabledContentColor = PIN_PAGE_MUTED.copy(alpha = 0.35f),
-        ),
-        contentPadding = PaddingValues(0.dp),
-    ) {
-        Text(
-            label,
-            style = if (control) MaterialTheme.typography.labelLarge else MaterialTheme.typography.headlineSmall,
-            fontWeight = if (control) FontWeight.SemiBold else FontWeight.Medium,
-        )
-    }
-}
 
 @Composable
 private fun CachedDataExpiredView(copy: NativePosCopy, busy: Boolean, message: String?, onSynchronize: () -> Unit) {
