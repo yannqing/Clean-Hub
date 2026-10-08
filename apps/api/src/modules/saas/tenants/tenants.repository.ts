@@ -62,7 +62,7 @@ export type TenantPressingCodeRecord = {
   id: string;
 };
 
-export type CreateSaasTenantRecordInput = Omit<CreateSaasTenantRequest, "defaultCurrency"> & {
+export type CreateSaasTenantRecordInput = Omit<CreateSaasTenantRequest, "defaultCurrency" | "pressingCode"> & {
   actorUserId: string;
   pressingCode: string;
   defaultLanguage: SaasTenantLanguage;

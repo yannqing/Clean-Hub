@@ -9,6 +9,7 @@ export {
   type SupportedLocale,
 } from "./locales";
 export { messages, type Messages } from "./messages/index";
+export { getLocalizedCountryName, isoCountryCodes } from "./countries";
 export {
   createTranslator,
   hasMessage,

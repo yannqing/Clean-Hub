@@ -10,6 +10,7 @@ import { writeAuditLog } from "../../audit/audit.helper.js";
 import { requireSaasRole, requireSuperAdmin } from "../../auth/permission.helper.js";
 import { taxRateFractionSchema } from "../../tax/tax.validation.js";
 import { templateTaxRateKey } from "../../tax/tax.template-key.js";
+import { isReadyTaxTemplate } from "../../tax/tax-template-readiness.js";
 import { ApplyTaxTemplateError, syncTaxTemplateForTenant } from "../../tenant/tax-rates/tax-template.service.js";
 
 const rateSchema = z.object({
@@ -70,6 +71,7 @@ function toResponse(row: typeof platformTaxTemplates.$inferSelect) {
     taxLabel: row.taxLabel,
     exemptionNotes: row.exemptionNotes,
     taxEnabled: row.taxEnabled,
+    ready: isReadyTaxTemplate(row),
     pricesIncludeTax: row.pricesIncludeTax,
     rates: row.rates.map((rate, index) => ({ ...rate, key: templateTaxRateKey(rate, index) })),
     version: row.version,

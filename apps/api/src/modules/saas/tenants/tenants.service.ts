@@ -29,6 +29,7 @@ import {
   createTenantOwnerUser,
   TenantOwnerUserHelperError,
 } from "./tenant-owner-user.helper.js";
+import { generateTenantCode } from "./tenant-code.helper.js";
 import { SaasTenantsError } from "./tenants.errors.js";
 import {
   createSaasTenantRecord,
@@ -215,81 +216,104 @@ export async function createSaasTenant(
 ): Promise<CreateSaasTenantResult> {
   requireSaasTenantsAccess(input.authContext, ["super_admin"]);
 
-  const pressingCode = normalizePressingCode(input.data.pressingCode);
+  const manualCode = input.data.pressingCode === undefined
+    ? undefined
+    : normalizePressingCode(input.data.pressingCode);
+  const maxAttempts = manualCode === undefined ? 5 : 1;
 
-  try {
-    return await db.transaction(async (tx) => {
-      const existingTenant = await findTenantByPressingCode(tx, pressingCode);
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const pressingCode = manualCode ?? generateTenantCode();
 
-      if (existingTenant) {
-        throw createPressingCodeConflictError();
-      }
+    try {
+      return await db.transaction(async (tx) => {
+        const existingTenant = await findTenantByPressingCode(tx, pressingCode);
 
-      const platformDefaults = await findPlatformSettings(tx);
-      const taxTemplate = await findPlatformTaxTemplateForCountry(tx, input.data.country);
-      if (!taxTemplate || !isReadyTaxTemplate(taxTemplate) || !taxTemplate.taxEnabled) {
-        throw new SaasTenantsError(
-          "SAAS_TENANT_TAX_TEMPLATE_REQUIRED",
+        if (existingTenant) {
+          throw createPressingCodeConflictError();
+        }
+
+        const platformDefaults = await findPlatformSettings(tx);
+        const taxTemplate = await findPlatformTaxTemplateForCountry(tx, input.data.country);
+        if (!taxTemplate || !isReadyTaxTemplate(taxTemplate) || !taxTemplate.taxEnabled) {
+          throw new SaasTenantsError(
+            "SAAS_TENANT_TAX_TEMPLATE_REQUIRED",
             "Configure and enable the country's tax template before creating a tenant.",
-          422,
+            422,
+          );
+        }
+        if (input.data.defaultCurrency && input.data.defaultCurrency !== taxTemplate.currencyCode) {
+          throw new SaasTenantsError(
+            "SAAS_TENANT_CURRENCY_MISMATCH",
+            "Tenant currency must match the selected country's tax template.",
+            422,
+          );
+        }
+        const defaultLanguage = await resolveDefaultLanguage(
+          tx,
+          input.data.defaultLanguage,
         );
-      }
-      if (input.data.defaultCurrency && input.data.defaultCurrency !== taxTemplate.currencyCode) {
-        throw new SaasTenantsError(
-          "SAAS_TENANT_CURRENCY_MISMATCH",
-          "Tenant currency must match the selected country's tax template.",
-          422,
-        );
-      }
-      const defaultLanguage = await resolveDefaultLanguage(
-        tx,
-        input.data.defaultLanguage,
-      );
-      const tenant = await createSaasTenantRecord(tx, {
-        ...input.data,
-        actorUserId: input.authContext.userId,
-        pressingCode,
-        defaultLanguage,
-        defaultCurrency: taxTemplate.currencyCode!,
-        timezone: platformDefaults?.timezone ?? "UTC",
-        taxTemplate,
+        const tenant = await createSaasTenantRecord(tx, {
+          ...input.data,
+          actorUserId: input.authContext.userId,
+          pressingCode,
+          defaultLanguage,
+          defaultCurrency: taxTemplate.currencyCode!,
+          timezone: platformDefaults?.timezone ?? "UTC",
+          taxTemplate,
+        });
+        const initialOwner = input.data.initialOwner
+          ? await createTenantOwnerUser(tx, {
+              ...input.data.initialOwner,
+              tenantId: tenant.id,
+              actorUserId: input.authContext.userId,
+              ipAddress: input.requestMeta?.ipAddress,
+              userAgent: input.requestMeta?.userAgent,
+            })
+          : undefined;
+        const tenantWithUsers = initialOwner
+          ? await findSaasTenantDetailById(tx, tenant.id)
+          : tenant;
+
+        await writeSaasTenantCreatedAuditLog(tx, {
+          actorUserId: input.authContext.userId,
+          tenant: tenantWithUsers ?? tenant,
+          ipAddress: input.requestMeta?.ipAddress,
+          userAgent: input.requestMeta?.userAgent,
+        });
+
+        return {
+          ...(tenantWithUsers ?? tenant),
+          initialOwnerUserId: initialOwner?.id,
+        };
       });
-      const initialOwner = input.data.initialOwner
-        ? await createTenantOwnerUser(tx, {
-            ...input.data.initialOwner,
-            tenantId: tenant.id,
-            actorUserId: input.authContext.userId,
-            ipAddress: input.requestMeta?.ipAddress,
-            userAgent: input.requestMeta?.userAgent,
-          })
-        : undefined;
-      const tenantWithUsers = initialOwner
-        ? await findSaasTenantDetailById(tx, tenant.id)
-        : tenant;
+    } catch (error) {
+      if (
+        isPressingCodeUniqueViolation(error) ||
+        (error instanceof SaasTenantsError &&
+          error.code === "SAAS_TENANT_PRESSING_CODE_CONFLICT")
+      ) {
+        if (manualCode === undefined && attempt < maxAttempts - 1) {
+          continue;
+        }
+        if (manualCode !== undefined) {
+          throw createPressingCodeConflictError();
+        }
+        break;
+      }
 
-      await writeSaasTenantCreatedAuditLog(tx, {
-        actorUserId: input.authContext.userId,
-        tenant: tenantWithUsers ?? tenant,
-        ipAddress: input.requestMeta?.ipAddress,
-        userAgent: input.requestMeta?.userAgent,
-      });
+      if (error instanceof TenantOwnerUserHelperError) {
+        throw new SaasTenantsError(error.code, error.message, error.status);
+      }
 
-      return {
-        ...(tenantWithUsers ?? tenant),
-        initialOwnerUserId: initialOwner?.id,
-      };
-    });
-  } catch (error) {
-    if (isPressingCodeUniqueViolation(error)) {
-      throw createPressingCodeConflictError();
+      throw error;
     }
-
-    if (error instanceof TenantOwnerUserHelperError) {
-      throw new SaasTenantsError(error.code, error.message, error.status);
-    }
-
-    throw error;
   }
+
+  throw new SaasTenantsError(
+    "SAAS_TENANT_CODE_GENERATION_FAILED",
+    "Could not assign a unique tenant code. Please try again.",
+    409,
+  );
 }
 
 export async function updateSaasTenant(

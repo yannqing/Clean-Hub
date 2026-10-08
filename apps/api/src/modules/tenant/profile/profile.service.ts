@@ -2,7 +2,7 @@ import { getDb, type Database } from "@cleanhub/db";
 
 import { resolveAllowedBranchIds } from "../../auth/branch-scope.helper.js";
 import { validatePasswordAgainstPolicy } from "../../auth/password-policy.helper.js";
-import { hashPassword, verifyPassword } from "../../auth/password.service.js";
+import { hashPassword, hashPin, verifyPassword } from "../../auth/password.service.js";
 import { isNormalizedEmailUniqueViolation } from "../../auth/email-identity.helper.js";
 import {
   assertActiveTenant,
@@ -11,7 +11,9 @@ import {
 import { resolveEffectiveSecurityPolicy } from "../../saas/security/security-policy.js";
 import { hashOpaqueToken } from "../../auth/token.service.js";
 import { TenantProfileError } from "./profile.errors.js";
+import { lockTenantPinAssignments } from "../users/tenant-users.repository.js";
 import {
+  findOtherTenantPinHashes,
   findTenantLoginSessionFamilyIdByTokenHash,
   findTenantLoginSessionRecord,
   findTenantSelfProfile,
@@ -20,12 +22,16 @@ import {
   revokeTenantLoginDeviceSessions,
   revokeTenantUserRefreshTokens,
   updateTenantSelfProfileRecord,
+  updateTenantSelfPinRecord,
   updateTenantUserPasswordRecord,
   writeTenantLoginSessionRevokedAuditLog,
   writeTenantPasswordChangedAuditLog,
+  writeTenantPinChangedAuditLog,
   writeTenantProfileUpdatedAuditLog,
 } from "./profile.repository.js";
 import type {
+  ChangeTenantProfilePinRequest,
+  ChangeTenantProfilePinResult,
   ChangeTenantProfilePasswordRequest,
   ChangeTenantProfilePasswordResult,
   RevokeTenantLoginSessionResult,
@@ -36,6 +42,61 @@ import type {
   TenantProfileRequestInput,
   UpdateTenantProfileRequest,
 } from "./profile.types.js";
+
+export async function changeTenantSelfPin(
+  input: TenantProfileRequestInput<ChangeTenantProfilePinRequest>,
+  db: Database = getDb(),
+): Promise<ChangeTenantProfilePinResult> {
+  const tenantId = requireTenantId(input.authContext);
+  await assertActiveTenant(input.authContext, db);
+  const credential = await findTenantUserCredential(db, {
+    tenantId,
+    userId: input.authContext.userId,
+  });
+  if (!credential) {
+    throw new TenantProfileError("TENANT_PROFILE_NOT_FOUND", "The current tenant user profile was not found.", 404);
+  }
+  if (!(await verifyPassword(input.data.currentPin, credential.pinHash))) {
+    throw new TenantProfileError("CURRENT_PIN_INCORRECT", "Current PIN is incorrect.", 422);
+  }
+  if (input.data.newPin === input.data.currentPin) {
+    throw new TenantProfileError("NEW_PIN_UNCHANGED", "New PIN must differ from the current PIN.", 422);
+  }
+
+  return db.transaction(async (tx) => {
+    await lockTenantPinAssignments(tx, tenantId);
+    const otherHashes = await findOtherTenantPinHashes(tx, {
+      tenantId,
+      userId: input.authContext.userId,
+    });
+    for (const hash of otherHashes) {
+      if (await verifyPassword(input.data.newPin, hash)) {
+        throw new TenantProfileError("NEW_PIN_CONFLICT", "This PIN is already used by another tenant user.", 409);
+      }
+    }
+    const updated = await updateTenantSelfPinRecord(tx, {
+      tenantId,
+      userId: input.authContext.userId,
+      expectedPinHash: credential.pinHash,
+      pinHash: await hashPin(input.data.newPin),
+    });
+    if (!updated) {
+      throw new TenantProfileError("TENANT_PROFILE_CONFLICT", "The account changed while the PIN was being updated. Try again.", 409);
+    }
+    const sessionsRevoked = await revokeTenantUserRefreshTokens(tx, {
+      tenantId,
+      userId: input.authContext.userId,
+    });
+    await writeTenantPinChangedAuditLog(tx, {
+      tenantId,
+      actorUserId: input.authContext.userId,
+      sessionsRevoked,
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+    return { pinChanged: true, sessionsRevoked };
+  });
+}
 
 function toIsoString(value: Date): string {
   return new Date(value).toISOString();

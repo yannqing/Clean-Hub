@@ -525,9 +525,18 @@ export async function lockTenantBranchPinAssignments(
   db: Database,
   input: { tenantId: string; branchId: string },
 ): Promise<void> {
+  await lockTenantPinAssignments(db, input.tenantId);
   await db.execute(
     sql`select pg_advisory_xact_lock(
       hashtextextended(${`tenant-user-pin:${input.tenantId}:${input.branchId}`}, 0)
+    )`,
+  );
+}
+
+export async function lockTenantPinAssignments(db: Database, tenantId: string): Promise<void> {
+  await db.execute(
+    sql`select pg_advisory_xact_lock(
+      hashtextextended(${`tenant-user-pin-all:${tenantId}`}, 0)
     )`,
   );
 }

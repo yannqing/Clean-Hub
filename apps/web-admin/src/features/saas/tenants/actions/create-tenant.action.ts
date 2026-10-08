@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 
 import { getAuthSessionQuery } from "@/features/auth/queries";
-import { getSecuritySettingsQuery } from "@/features/saas/security/queries";
 import { getSaasServerApiRequestOptions } from "@/features/saas/server/api-request-options";
 import { webAdminApi } from "@/lib/api-client";
 import { canCreateTenant } from "@/lib/permissions";
@@ -39,8 +38,7 @@ export async function createTenantAction(
     };
   }
 
-  const passwordPolicy = await getSecuritySettingsQuery(requestOptions);
-  const validation = validateTenantForm(input, passwordPolicy);
+  const validation = validateTenantForm(input);
 
   if (!validation.ok) {
     return {

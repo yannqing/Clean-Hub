@@ -23,9 +23,11 @@ import type { AuthContext } from "../../auth/auth.types.js";
 import { resolvePosTaxReadiness } from "../../tax/pos-tax-readiness.js";
 import { getTenantSettings, updateTenantSettings } from "../../tenant/settings/settings.service.js";
 import { TenantSettingsError } from "../../tenant/settings/settings.errors.js";
+import { verifyPassword } from "../../auth/password.service.js";
+import { changeTenantSelfPin } from "../../tenant/profile/profile.service.js";
 import { updatePosChannelSettingsRecord, findPosChannelSettingsRecord } from "../../tenant/pos-channel/pos-channel.repository.js";
 import { SaasTenantsError } from "./tenants.errors.js";
-import { updateSaasTenant, updateSaasTenantFeatureFlags, updateSaasTenantSettings } from "./tenants.service.js";
+import { createSaasTenant, listSaasTenantUsers, updateSaasTenant, updateSaasTenantFeatureFlags, updateSaasTenantSettings } from "./tenants.service.js";
 
 const rollback = new Error("TENANT_EDIT_INTEGRATION_ROLLBACK");
 
@@ -71,6 +73,42 @@ async function run(): Promise<void> {
           };
           const saasAuth: AuthContext = { ...authBase, userId: saasUserId, tenantId: null, role: "super_admin" };
           const ownerAuth: AuthContext = { ...authBase, userId: ownerId, tenantId, role: "owner" };
+
+          const createdTenant = await createSaasTenant({
+            authContext: saasAuth,
+            data: {
+              name: "Automatically coded tenant",
+              country: "QX",
+              initialOwner: { displayName: "Initial owner", email: `owner-${tenantId}@example.test` },
+            },
+          }, tx);
+          assert.match(createdTenant.pressingCode, /^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/);
+          const [createdRecord] = await tx.select({ pressingCode: tenants.pressingCode })
+            .from(tenants).where(eq(tenants.id, createdTenant.id));
+          assert.equal(createdRecord?.pressingCode, createdTenant.pressingCode);
+          assert.ok(createdTenant.initialOwnerUserId);
+          const createdUsers = await listSaasTenantUsers({
+            authContext: saasAuth,
+            tenantId: createdTenant.id,
+          }, tx);
+          assert.equal(createdUsers.length, 1);
+          assert.equal(createdUsers[0]?.id, createdTenant.initialOwnerUserId);
+          assert.deepEqual(createdUsers[0]?.roleCodes, ["owner"]);
+          const [ownerCredentials] = await tx.select({ passwordHash: users.passwordHash, pinHash: users.pinHash })
+            .from(users).where(eq(users.id, createdTenant.initialOwnerUserId));
+          assert.equal(await verifyPassword("123456", ownerCredentials.passwordHash), true);
+          assert.equal(await verifyPassword("666666", ownerCredentials.pinHash), true);
+          const createdOwnerAuth: AuthContext = {
+            ...authBase, userId: createdTenant.initialOwnerUserId,
+            tenantId: createdTenant.id, role: "owner",
+          };
+          await changeTenantSelfPin({
+            authContext: createdOwnerAuth,
+            data: { currentPin: "666666", newPin: "654321" },
+          }, tx);
+          const [changedPin] = await tx.select({ pinHash: users.pinHash })
+            .from(users).where(eq(users.id, createdTenant.initialOwnerUserId));
+          assert.equal(await verifyPassword("654321", changedPin.pinHash), true);
 
           await updateSaasTenant({
             authContext: saasAuth, tenantId,

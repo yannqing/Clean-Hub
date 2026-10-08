@@ -6,6 +6,7 @@ import type { AppBindings } from "../../../http/types.js";
 import { REFRESH_COOKIE_NAME } from "../../auth/cookie.service.js";
 import { TenantProfileError } from "./profile.errors.js";
 import {
+  changeTenantSelfPin,
   changeTenantSelfPassword,
   getTenantLoginSessions,
   getTenantSelfProfile,
@@ -13,10 +14,26 @@ import {
   updateTenantSelfProfile,
 } from "./profile.service.js";
 import {
+  changeTenantProfilePinBodySchema,
   changeTenantProfilePasswordBodySchema,
   tenantLoginSessionParamsSchema,
   updateTenantProfileBodySchema,
 } from "./profile.validation.js";
+
+export async function changeTenantSelfPinController(c: Context<AppBindings>) {
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = changeTenantProfilePinBodySchema.parse(rawBody);
+  try {
+    return c.json(await changeTenantSelfPin({
+      authContext: c.get("authContext"),
+      requestMeta: getRequestMeta(c),
+      data,
+    }));
+  } catch (error) {
+    if (error instanceof TenantProfileError) return createErrorResponse(c, error);
+    throw error;
+  }
+}
 
 function createErrorResponse(
   c: Context<AppBindings>,

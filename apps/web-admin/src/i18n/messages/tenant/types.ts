@@ -2566,6 +2566,20 @@ export type TenantMessages = {
       signOutNotice: string;
       changePassword: string;
       changingPassword: string;
+      pinTitle: string;
+      pinDescription: string;
+      currentPin: string;
+      newPin: string;
+      confirmPin: string;
+      changePin: string;
+      changingPin: string;
+      pinFormatError: string;
+      pinConfirmationError: string;
+      pinCurrentIncorrect: string;
+      pinUnchanged: string;
+      pinConflict: string;
+      pinChanged: string;
+      pinChangeFailed: string;
     };
     devices: {
       title: string;

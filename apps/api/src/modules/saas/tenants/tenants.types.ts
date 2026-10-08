@@ -30,7 +30,7 @@ export type GetSaasTenantDetailInput = {
 
 export type CreateSaasTenantRequest = {
   name: string;
-  pressingCode: string;
+  pressingCode?: string;
   country: string;
   city?: string;
   defaultLanguage?: SaasTenantLanguage;
@@ -43,8 +43,6 @@ export type CreateSaasTenantRequest = {
     displayName: string;
     email: string;
     phone?: string;
-    password: string;
-    pin: string;
   };
 };
 

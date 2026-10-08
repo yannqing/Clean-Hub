@@ -26,6 +26,7 @@ export type PlatformTaxTemplate = {
   taxLabel: string | null;
   exemptionNotes: string | null;
   taxEnabled: boolean;
+  ready: boolean;
   pricesIncludeTax: boolean;
   rates: Array<{
     key?: string;
@@ -38,4 +39,4 @@ export type PlatformTaxTemplate = {
   updatedAt: string;
 };
 
-export type UpsertPlatformTaxTemplateRequest = Omit<PlatformTaxTemplate, "id" | "version" | "updatedAt">;
+export type UpsertPlatformTaxTemplateRequest = Omit<PlatformTaxTemplate, "id" | "version" | "updatedAt" | "ready">;

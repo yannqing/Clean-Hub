@@ -220,9 +220,9 @@ export async function updateTenantSelfProfileRecord(
 export async function findTenantUserCredential(
   db: Database,
   input: { tenantId: string; userId: string },
-): Promise<{ passwordHash: string } | null> {
+): Promise<{ passwordHash: string; pinHash: string } | null> {
   const rows = await db
-    .select({ passwordHash: users.passwordHash })
+    .select({ passwordHash: users.passwordHash, pinHash: users.pinHash })
     .from(users)
     .where(
       and(
@@ -235,6 +235,39 @@ export async function findTenantUserCredential(
     .limit(1);
 
   return rows[0] ?? null;
+}
+
+export async function findOtherTenantPinHashes(
+  db: Database,
+  input: { tenantId: string; userId: string },
+): Promise<string[]> {
+  const rows = await db.select({ pinHash: users.pinHash }).from(users).where(
+    and(
+      eq(users.tenantId, input.tenantId),
+      eq(users.userType, "tenant"),
+      ne(users.id, input.userId),
+      isNull(users.deletedAt),
+    ),
+  );
+  return rows.map((row) => row.pinHash);
+}
+
+export async function updateTenantSelfPinRecord(
+  db: Database,
+  input: { tenantId: string; userId: string; expectedPinHash: string; pinHash: string },
+): Promise<boolean> {
+  const rows = await db.update(users).set({
+    pinHash: input.pinHash,
+    updatedAt: new Date(),
+    version: sql`${users.version} + 1`,
+  }).where(and(
+    eq(users.id, input.userId),
+    eq(users.tenantId, input.tenantId),
+    eq(users.userType, "tenant"),
+    eq(users.pinHash, input.expectedPinHash),
+    isNull(users.deletedAt),
+  )).returning({ id: users.id });
+  return Boolean(rows[0]);
 }
 
 export async function updateTenantUserPasswordRecord(
@@ -481,5 +514,22 @@ export async function writeTenantPasswordChangedAuditLog(
     metadata: {
       sessionsRevoked: input.sessionsRevoked,
     },
+  });
+}
+
+export async function writeTenantPinChangedAuditLog(
+  db: Database,
+  input: { tenantId: string; actorUserId: string; sessionsRevoked: number; ipAddress?: string; userAgent?: string },
+): Promise<void> {
+  await writeAuditLog(db, {
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+    eventCategory: "security",
+    eventType: "tenant_profile.pin_changed",
+    entityType: "user",
+    entityId: input.actorUserId,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    metadata: { sessionsRevoked: input.sessionsRevoked },
   });
 }

@@ -1,5 +1,7 @@
 import type { ApiClient, ApiRequestOptions } from "../../types";
 import type {
+  ChangeTenantProfilePinRequest,
+  ChangeTenantProfilePinResult,
   ChangeTenantProfilePasswordRequest,
   ChangeTenantProfilePasswordResult,
   RevokeTenantLoginSessionResult,
@@ -34,6 +36,12 @@ export function createTenantProfileApi(client: ApiClient) {
     ) =>
       client.patch<ChangeTenantProfilePasswordResult>(
         `${TENANT_PROFILE_BASE}/password`,
+        input,
+        options,
+      ),
+    changePin: (input: ChangeTenantProfilePinRequest, options?: RequestOptions) =>
+      client.patch<ChangeTenantProfilePinResult>(
+        `${TENANT_PROFILE_BASE}/pin`,
         input,
         options,
       ),

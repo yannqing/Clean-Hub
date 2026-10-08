@@ -24,8 +24,6 @@ export const tenantFormFieldNames = [
   "initialOwnerDisplayName",
   "initialOwnerEmail",
   "initialOwnerPhone",
-  "initialOwnerPassword",
-  "initialOwnerPin",
 ] as const satisfies ReadonlyArray<keyof TenantFormValues>;
 
 export const tenantSettingsFieldNames = [
@@ -214,9 +212,9 @@ export function getTenantFormActionErrorResult(
     return {
       ok: false,
       errors: {
-        pressingCode: "A tenant with this pressing code already exists.",
+        pressingCode: "A tenant with this code already exists.",
       },
-      message: "A tenant with this pressing code already exists.",
+      message: "A tenant with this code already exists.",
     };
   }
 

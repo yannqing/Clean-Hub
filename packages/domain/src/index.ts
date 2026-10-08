@@ -9,6 +9,7 @@ export const orderStatuses = [
 export type OrderStatus = (typeof orderStatuses)[number];
 
 export * from "./currency";
+export * from "./initial-owner-credentials";
 export * from "./order-codes";
 export * from "./payment-methods";
 export * from "./permissions";

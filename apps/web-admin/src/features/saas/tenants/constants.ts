@@ -35,9 +35,7 @@ export const tenantDefaultValues = {
   defaultLanguage: "platform-default",
   initialOwnerDisplayName: "",
   initialOwnerEmail: "",
-  initialOwnerPassword: "",
   initialOwnerPhone: "",
-  initialOwnerPin: "",
   name: "",
   pressingCode: "",
 } as const;

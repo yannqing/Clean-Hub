@@ -185,7 +185,7 @@ export const zhCNMessages: WebAdminMessages = {
         items: [
           { label: "主页", href: webAdminRoutes.saas.home },
           { label: "租户管理", href: webAdminRoutes.saas.config.tenants },
-          { label: "用户管理", href: webAdminRoutes.saas.users },
+          { label: "平台用户", href: webAdminRoutes.saas.users },
           { label: "反馈工单", href: webAdminRoutes.saas.feedbackTickets },
           { label: "我的待办", href: webAdminRoutes.saas.todos },
         ],

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 import type { AppBindings } from "../../../http/types.js";
 import {
+  changeTenantSelfPinController,
   changeTenantSelfPasswordController,
   getTenantLoginSessionsController,
   getTenantSelfProfileController,
@@ -16,6 +17,7 @@ export function createTenantProfileRoutes() {
   routes.get("/sessions", getTenantLoginSessionsController);
   routes.patch("/", updateTenantSelfProfileController);
   routes.patch("/password", changeTenantSelfPasswordController);
+  routes.patch("/pin", changeTenantSelfPinController);
   routes.delete("/sessions/:sessionId", revokeTenantLoginSessionController);
 
   return routes;

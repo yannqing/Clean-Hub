@@ -42,6 +42,7 @@ import { logoutAction } from "@/features/auth/actions";
 import { useTenantI18n } from "@/i18n";
 
 import {
+  changeTenantProfilePinAction,
   changeTenantProfilePasswordAction,
   revokeTenantLoginSessionAction,
   updateTenantProfileAction,
@@ -214,6 +215,8 @@ export function TenantProfileView({
     useState<TenantPasswordFormErrors>({});
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [pinForm, setPinForm] = useState({ currentPin: "", newPin: "", confirmPin: "" });
+  const [savingPin, setSavingPin] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -423,6 +426,50 @@ export function TenantProfileView({
       toast.error(copy.feedback.requestFailed);
     } finally {
       setSavingPassword(false);
+    }
+  }
+
+  async function handlePinSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!/^\d{6}$/.test(pinForm.currentPin) || !/^\d{6}$/.test(pinForm.newPin)) {
+      toast.error(copy.security.pinFormatError);
+      return;
+    }
+    if (pinForm.newPin !== pinForm.confirmPin) {
+      toast.error(copy.security.pinConfirmationError);
+      return;
+    }
+    if (pinForm.newPin === pinForm.currentPin) {
+      toast.error(copy.security.pinUnchanged);
+      return;
+    }
+
+    setSavingPin(true);
+    try {
+      const result = await changeTenantProfilePinAction({
+        currentPin: pinForm.currentPin,
+        newPin: pinForm.newPin,
+      });
+      if (!result.ok) {
+        const message = result.code === "CURRENT_PIN_INCORRECT"
+          ? copy.security.pinCurrentIncorrect
+          : result.code === "NEW_PIN_UNCHANGED"
+            ? copy.security.pinUnchanged
+            : result.code === "NEW_PIN_CONFLICT"
+              ? copy.security.pinConflict
+              : copy.security.pinChangeFailed;
+        toast.error(message);
+        return;
+      }
+      setPinForm({ currentPin: "", newPin: "", confirmPin: "" });
+      toast.success(copy.security.pinChanged);
+      await logoutAction();
+      router.replace(webAdminRoutes.login);
+      router.refresh();
+    } catch {
+      toast.error(copy.security.pinChangeFailed);
+    } finally {
+      setSavingPin(false);
     }
   }
 
@@ -808,6 +855,45 @@ export function TenantProfileView({
                   {savingPassword
                     ? copy.security.changingPassword
                     : copy.security.changePassword}
+                </Button>
+              </div>
+            </form>
+          </ProfileSection>
+
+          <ProfileSection
+            description={copy.security.pinDescription}
+            icon={<KeyRound aria-hidden className="size-4" />}
+            title={copy.security.pinTitle}
+          >
+            <form onSubmit={handlePinSubmit}>
+              <div className="grid gap-4 px-4 py-5 sm:grid-cols-3 sm:px-5">
+                {([
+                  ["currentPin", copy.security.currentPin],
+                  ["newPin", copy.security.newPin],
+                  ["confirmPin", copy.security.confirmPin],
+                ] as const).map(([field, label]) => (
+                  <div className="grid gap-2" key={field}>
+                    <Label htmlFor={`tenant-profile-${field}`}>{label}</Label>
+                    <Input
+                      autoComplete="off"
+                      disabled={savingPin}
+                      id={`tenant-profile-${field}`}
+                      inputMode="numeric"
+                      maxLength={6}
+                      onChange={(event) => setPinForm((current) => ({
+                        ...current,
+                        [field]: event.target.value.replace(/\D/g, "").slice(0, 6),
+                      }))}
+                      pattern="[0-9]{6}"
+                      type="password"
+                      value={pinForm[field]}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end border-t px-4 py-3 sm:px-5">
+                <Button disabled={savingPin} size="sm" type="submit">
+                  {savingPin ? copy.security.changingPin : copy.security.changePin}
                 </Button>
               </div>
             </form>

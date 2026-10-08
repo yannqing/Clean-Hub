@@ -5,6 +5,7 @@ import type {
   OffboardTenantRequest,
   OffboardTenantResponse,
   RestoreTenantRequest,
+  SaasTenantUserSummary,
   SaasTenantTaxSettings,
   UpdateSaasTenantTaxSettingsRequest,
   TenantDetail,
@@ -27,6 +28,11 @@ export function createSaasTenantsApi(client: ApiClient) {
       client.post<CreateTenantResponse>("/saas/tenants", input, options),
     get: (tenantId: string, options?: RequestOptions) =>
       client.get<TenantDetail>(`/saas/tenants/${tenantId}`, options),
+    listUsers: (tenantId: string, options?: RequestOptions) =>
+      client.get<{ data: SaasTenantUserSummary[] }>(
+        `/saas/tenants/${encodeURIComponent(tenantId)}/users`,
+        options,
+      ),
     update: (
       tenantId: string,
       input: UpdateTenantRequest,

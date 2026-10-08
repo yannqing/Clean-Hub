@@ -1,4 +1,5 @@
 import { createId } from "@cleanhub/id";
+import { INITIAL_OWNER_PASSWORD, INITIAL_OWNER_PIN } from "@cleanhub/domain/initial-owner-credentials";
 import { and, count, eq, isNull } from "drizzle-orm";
 
 import {
@@ -11,17 +12,13 @@ import {
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import { isNormalizedEmailUniqueViolation } from "../../auth/email-identity.helper.js";
-import { assertPasswordMeetsPolicy } from "../../auth/password-policy.helper.js";
 import { hashPassword, hashPin } from "../../auth/password.service.js";
-import { resolveEffectiveSecurityPolicy } from "../security/security-policy.js";
 
 export type CreateTenantOwnerUserInput = {
   tenantId: string;
   displayName: string;
   email: string;
   phone?: string;
-  password: string;
-  pin: string;
   actorUserId: string;
   ipAddress?: string;
   userAgent?: string;
@@ -172,13 +169,11 @@ export async function createTenantOwnerUser(
     );
   }
 
-  const securityPolicy = await resolveEffectiveSecurityPolicy(db);
-
-  assertPasswordMeetsPolicy(input.password, securityPolicy);
-
+  // This explicitly requested bootstrap credential is exempt from the normal
+  // password policy; subsequent owner password changes must satisfy it.
   const [passwordHash, pinHash] = await Promise.all([
-    hashPassword(input.password),
-    hashPin(input.pin),
+    hashPassword(INITIAL_OWNER_PASSWORD),
+    hashPin(INITIAL_OWNER_PIN),
   ]);
   const roleId = await ensureTenantOwnerRole(db, input.tenantId);
   const userId = createId();

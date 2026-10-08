@@ -1,6 +1,7 @@
 "use client";
 
-import { PIN_DIGIT_COUNT } from "@cleanhub/domain/pin";
+import { INITIAL_OWNER_PASSWORD, INITIAL_OWNER_PIN } from "@cleanhub/domain/initial-owner-credentials";
+import { getLocalizedCountryName, isoCountryCodes } from "@cleanhub/i18n";
 import {
   Button,
   Card,
@@ -14,8 +15,10 @@ import {
   SelectValue,
   toast,
 } from "@cleanhub/ui";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { PlatformTaxTemplate } from "@cleanhub/api-client";
+import Link from "next/link";
+import { webAdminRoutes } from "@/config/routes";
 import { webAdminApi } from "@/lib/api-client";
 
 import { useSaasI18n } from "@/i18n";
@@ -62,6 +65,10 @@ function normalizeCountry(value: string): string {
     .toLowerCase().replace(/[^a-z]/g, "");
 }
 
+function isUsableTaxTemplate(template: PlatformTaxTemplate | undefined): template is PlatformTaxTemplate {
+  return Boolean(template?.taxEnabled && template.ready);
+}
+
 export function TenantForm({
   aside,
   disabled = false,
@@ -85,7 +92,7 @@ export function TenantForm({
   useEffect(() => {
     let active = true;
     webAdminApi.saas.platformSettings.listTaxTemplates()
-      .then(({ data }) => { if (active) setTaxTemplates(data.filter((entry) => entry.taxEnabled && entry.currencyCode && entry.taxLabel && entry.rates.some((rate) => rate.isDefault))); })
+      .then(({ data }) => { if (active) setTaxTemplates(data); })
       .catch(() => { if (active) setTemplateError(true); });
     return () => { active = false; };
   }, []);
@@ -94,11 +101,14 @@ export function TenantForm({
     normalizeCountry(entry.name) === normalizeCountry(values.country),
   );
   const selectedCountry = selectedTemplate?.countryCode ?? values.country;
+  const countryOptions = useMemo(() => isoCountryCodes
+    .map((code) => ({ code, label: getLocalizedCountryName(code, locale) }))
+    .sort((left, right) => left.label.localeCompare(right.label, locale)), [locale]);
   const countryCopy = locale === "zh-CN"
-    ? { unavailable: "无法加载国家税务模板，请稍后重试。", empty: "尚无可用的国家税务模板，请先在平台设置中配置。", change: "更换国家将同步税务模板及币种，并清除原税号；若已有交易、购物车、价格或绑定终端，跨币种更换需先完成专门迁移。" }
+    ? { unavailable: "无法加载国家税务模板，请稍后重试。", empty: "尚无可用的国家税务模板，请先在平台设置中配置。", missing: "该国家尚未配置可用的税务模板，暂时无法创建租户或结款。", configure: "前往配置税务模板", currency: "货币由所选国家的税务模板自动确定。", change: "更换国家将同步税务模板及币种，并清除原税号；若已有交易、购物车、价格或绑定终端，跨币种更换需先完成专门迁移。" }
     : locale === "fr"
-      ? { unavailable: "Impossible de charger les modèles fiscaux. Réessayez plus tard.", empty: "Aucun modèle fiscal disponible. Configurez-en un dans les paramètres de la plateforme.", change: "Changer de pays synchronise le modèle fiscal et la devise, puis efface l'ancien numéro fiscal. Si des ventes, paniers, prix ou terminaux inscrits existent, le changement de devise exige une migration dédiée." }
-      : { unavailable: "Could not load country tax templates. Try again later.", empty: "No country tax templates are ready. Configure one in platform settings first.", change: "Changing country synchronizes tax and currency and clears the old tax number. Existing sales, carts, prices, or enrolled terminals require a dedicated migration before a currency change." };
+      ? { unavailable: "Impossible de charger les modèles fiscaux. Réessayez plus tard.", empty: "Aucun modèle fiscal disponible. Configurez-en un dans les paramètres de la plateforme.", missing: "Ce pays n'a pas de modèle fiscal utilisable. La création du locataire et l'encaissement sont indisponibles.", configure: "Configurer le modèle fiscal", currency: "La devise est définie automatiquement par le modèle fiscal du pays.", change: "Changer de pays synchronise le modèle fiscal et la devise, puis efface l'ancien numéro fiscal. Si des ventes, paniers, prix ou terminaux inscrits existent, le changement de devise exige une migration dédiée." }
+      : { unavailable: "Could not load country tax templates. Try again later.", empty: "No country tax templates are ready. Configure one in platform settings first.", missing: "This country has no usable tax template. Tenant creation and checkout are unavailable until one is configured.", configure: "Configure tax template", currency: "Currency is set automatically by the selected country's tax template.", change: "Changing country synchronizes tax and currency and clears the old tax number. Existing sales, carts, prices, or enrolled terminals require a dedicated migration before a currency change." };
   const languageOptions = showDefaults
     ? tenantCreateLanguageOptions
     : tenantLanguageOptions;
@@ -131,6 +141,14 @@ export function TenantForm({
     event.preventDefault();
 
     if (disabled) {
+      return;
+    }
+
+    if (showDefaults && values.country && !isUsableTaxTemplate(selectedTemplate)) {
+      const message = templateError ? countryCopy.unavailable : countryCopy.missing;
+      setErrors((current) => ({ ...current, country: message }));
+      setFormError(message);
+      toast.error(message);
       return;
     }
 
@@ -206,23 +224,31 @@ export function TenantForm({
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="pressing-code">
+                  <Label htmlFor={showDefaults ? undefined : "pressing-code"}>
                     {m.tenants.form.fields.pressingCode}
                   </Label>
-                  <Input
-                    aria-invalid={Boolean(errors.pressingCode)}
-                    disabled={disabled || submitting}
-                    id="pressing-code"
-                    onChange={(event) =>
-                      updateValue("pressingCode", event.target.value)
-                    }
-                    value={values.pressingCode}
-                  />
-                  {errors.pressingCode ? (
-                    <p className="text-xs text-destructive">
-                      {errors.pressingCode}
+                  {showDefaults ? (
+                    <p className="flex min-h-9 items-center rounded-md border bg-muted/30 px-3 text-sm text-muted-foreground">
+                      {m.tenants.form.autoGeneratedCode}
                     </p>
-                  ) : null}
+                  ) : (
+                    <>
+                      <Input
+                        aria-invalid={Boolean(errors.pressingCode)}
+                        disabled={disabled || submitting}
+                        id="pressing-code"
+                        onChange={(event) =>
+                          updateValue("pressingCode", event.target.value)
+                        }
+                        value={values.pressingCode}
+                      />
+                      {errors.pressingCode ? (
+                        <p className="text-xs text-destructive">
+                          {errors.pressingCode}
+                        </p>
+                      ) : null}
+                    </>
+                  )}
                 </div>
 
                 <div className="grid gap-2">
@@ -231,17 +257,24 @@ export function TenantForm({
                   </Label>
                   <Select disabled={disabled || submitting} onValueChange={(countryCode) => {
                       const template = taxTemplates.find((entry) => entry.countryCode === countryCode);
-                      setValues((current) => ({ ...current, country: countryCode, defaultCurrency: template?.currencyCode ?? "" }));
+                      setValues((current) => ({ ...current, country: countryCode, defaultCurrency: isUsableTaxTemplate(template) ? template.currencyCode! : "" }));
                       setErrors((current) => ({ ...current, country: undefined, defaultCurrency: undefined }));
+                      setFormError(null);
                     }} value={selectedCountry}>
                       <SelectTrigger aria-invalid={Boolean(errors.country)} id="tenant-country"><SelectValue placeholder={m.tenants.form.fields.country} /></SelectTrigger>
-                      <SelectContent>
-                        {values.country && !selectedTemplate ? <SelectItem value={values.country}>{values.country}</SelectItem> : null}
-                        {taxTemplates.map((template) => <SelectItem key={template.countryCode} value={template.countryCode}>{template.name} ({template.countryCode})</SelectItem>)}
+                      <SelectContent className="max-h-80">
+                        {values.country && !countryOptions.some((country) => country.code === values.country) ? <SelectItem value={values.country}>{values.country}</SelectItem> : null}
+                        {countryOptions.map((country) => <SelectItem key={country.code} value={country.code}>{country.label} ({country.code})</SelectItem>)}
                       </SelectContent>
                     </Select>
                   {templateError ? <p className="text-xs text-destructive">{countryCopy.unavailable}</p> : null}
                   {!templateError && taxTemplates.length === 0 ? <p className="text-xs text-muted-foreground">{countryCopy.empty}</p> : null}
+                  {values.country && !templateError && !isUsableTaxTemplate(selectedTemplate) ? (
+                    <p className="text-xs text-destructive">
+                      {countryCopy.missing}{" "}
+                      <Link className="underline underline-offset-2" href={webAdminRoutes.saas.config.platformSettingsSections.taxTemplates}>{countryCopy.configure}</Link>
+                    </p>
+                  ) : null}
                   {mode === "edit" ? <p className="text-xs text-muted-foreground">{countryCopy.change}</p> : null}
                   {errors.country ? (
                     <p className="text-xs text-destructive">{errors.country}</p>
@@ -341,49 +374,10 @@ export function TenantForm({
                     ) : null}
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="initial-owner-pin">
-                      {m.tenants.form.fields.ownerPin}
-                    </Label>
-                    <Input
-                      aria-invalid={Boolean(errors.initialOwnerPin)}
-                      disabled={disabled || submitting}
-                      id="initial-owner-pin"
-                      inputMode="numeric"
-                      maxLength={PIN_DIGIT_COUNT}
-                      minLength={PIN_DIGIT_COUNT}
-                      pattern="[0-9]{6}"
-                      onChange={(event) =>
-                        updateValue("initialOwnerPin", event.target.value)
-                      }
-                      value={values.initialOwnerPin}
-                    />
-                    {errors.initialOwnerPin ? (
-                      <p className="text-xs text-destructive">
-                        {errors.initialOwnerPin}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="grid gap-2 md:col-span-2">
-                    <Label htmlFor="initial-owner-password">
-                      {m.tenants.form.fields.ownerPassword}
-                    </Label>
-                    <Input
-                      aria-invalid={Boolean(errors.initialOwnerPassword)}
-                      disabled={disabled || submitting}
-                      id="initial-owner-password"
-                      onChange={(event) =>
-                        updateValue("initialOwnerPassword", event.target.value)
-                      }
-                      type="password"
-                      value={values.initialOwnerPassword}
-                    />
-                    {errors.initialOwnerPassword ? (
-                      <p className="text-xs text-destructive">
-                        {errors.initialOwnerPassword}
-                      </p>
-                    ) : null}
+                  <div className="rounded-md border bg-muted/30 p-3 text-sm md:col-span-2">
+                    <p>{m.tenants.form.fields.ownerPassword}: <strong>{INITIAL_OWNER_PASSWORD}</strong></p>
+                    <p>{m.tenants.form.fields.ownerPin}: <strong>{INITIAL_OWNER_PIN}</strong></p>
+                    <p className="mt-2 text-xs text-muted-foreground">{m.tenants.form.initialCredentialHint}</p>
                   </div>
                 </div>
               </CardContent>
@@ -504,17 +498,13 @@ export function TenantForm({
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="default-currency">
+                    <Label>
                       {m.tenants.form.fields.defaultCurrency}
                     </Label>
-                    <Input
-                      aria-invalid={Boolean(errors.defaultCurrency)}
-                      disabled={disabled || submitting}
-                      id="default-currency"
-                      maxLength={3}
-                      readOnly
-                      value={values.defaultCurrency}
-                    />
+                    <p className="flex min-h-9 items-center rounded-md border bg-muted/30 px-3 text-sm" id="default-currency">
+                      {values.defaultCurrency || "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{countryCopy.currency}</p>
                     {errors.defaultCurrency ? (
                       <p className="text-xs text-destructive">
                         {errors.defaultCurrency}

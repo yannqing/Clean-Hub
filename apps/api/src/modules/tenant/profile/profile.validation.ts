@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PIN_DIGIT_PATTERN } from "@cleanhub/domain/pin";
 
 export const tenantProfileLanguageSchema = z.enum(["en", "fr", "zh-CN"]);
 
@@ -21,6 +22,11 @@ export const changeTenantProfilePasswordBodySchema = z
     newPassword: z.string().min(1).max(128),
   })
   .strict();
+
+export const changeTenantProfilePinBodySchema = z.object({
+  currentPin: z.string().regex(PIN_DIGIT_PATTERN),
+  newPin: z.string().regex(PIN_DIGIT_PATTERN),
+}).strict();
 
 export const tenantLoginSessionParamsSchema = z.object({
   sessionId: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/),

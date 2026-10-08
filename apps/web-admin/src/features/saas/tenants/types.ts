@@ -11,6 +11,7 @@ export type {
   TenantStatusCounts,
   TenantStatus,
   TenantSummary,
+  SaasTenantUserSummary,
   UpdateTenantFeatureFlagsRequest,
   UpdateTenantSettingsRequest,
   UpdateTenantRequest,
@@ -31,8 +32,6 @@ export type TenantFormValues = {
   initialOwnerDisplayName: string;
   initialOwnerEmail: string;
   initialOwnerPhone: string;
-  initialOwnerPassword: string;
-  initialOwnerPin: string;
 };
 
 export type TenantSettingsFormValues = {

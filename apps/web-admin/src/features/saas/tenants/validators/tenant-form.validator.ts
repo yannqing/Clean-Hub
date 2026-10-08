@@ -1,10 +1,3 @@
-import { isSixDigitPin } from "@cleanhub/domain/pin";
-
-import {
-  type PasswordPolicyRules,
-  validatePasswordAgainstPolicy,
-} from "@/features/saas/security/validators/password-policy.validator";
-
 import type {
   CreateTenantRequest,
   TenantLanguage,
@@ -64,7 +57,7 @@ function isValidDefaultLanguage(
   return value === "en" || value === "fr" || value === "zh-CN";
 }
 
-function validateTenantBasics(input: TenantFormValues): {
+function validateTenantBasics(input: TenantFormValues, requirePressingCode: boolean): {
   errors: Partial<Record<keyof TenantFormValues, string>>;
   name: string;
   pressingCode: string;
@@ -86,10 +79,10 @@ function validateTenantBasics(input: TenantFormValues): {
     errors.name = "Merchant name must be 160 characters or fewer.";
   }
 
-  if (!pressingCode) {
-    errors.pressingCode = "Pressing code is required.";
-  } else if (pressingCode.length > 80) {
-    errors.pressingCode = "Pressing code must be 80 characters or fewer.";
+  if (requirePressingCode && !pressingCode) {
+    errors.pressingCode = "Tenant code is required.";
+  } else if (requirePressingCode && pressingCode.length > 80) {
+    errors.pressingCode = "Tenant code must be 80 characters or fewer.";
   }
 
   if (!country) {
@@ -179,7 +172,6 @@ function validateCreateDefaults(input: TenantFormValues): {
 
 function validateInitialOwner(
   input: TenantFormValues,
-  passwordPolicy?: PasswordPolicyRules,
 ): {
   errors: Partial<Record<keyof TenantFormValues, string>>;
   initialOwner: CreateTenantRequest["initialOwner"];
@@ -188,8 +180,6 @@ function validateInitialOwner(
   const displayName = input.initialOwnerDisplayName.trim();
   const email = normalizeOptional(input.initialOwnerEmail);
   const phone = normalizeOptional(input.initialOwnerPhone);
-  const password = input.initialOwnerPassword;
-  const pin = input.initialOwnerPin.trim();
 
   if (!displayName) {
     errors.initialOwnerDisplayName = "Owner name is required.";
@@ -209,19 +199,6 @@ function validateInitialOwner(
     errors.initialOwnerPhone = "Owner phone must be 32 characters or fewer.";
   }
 
-  const passwordPolicyError = validatePasswordAgainstPolicy(
-    password,
-    passwordPolicy,
-  );
-
-  if (passwordPolicyError) {
-    errors.initialOwnerPassword = passwordPolicyError;
-  }
-
-  if (!isSixDigitPin(pin)) {
-    errors.initialOwnerPin = "Owner PIN must be exactly 6 digits.";
-  }
-
   return {
     errors,
     initialOwner: email
@@ -229,8 +206,6 @@ function validateInitialOwner(
           displayName,
           email,
           phone,
-          password,
-          pin,
         }
       : undefined,
   };
@@ -238,11 +213,10 @@ function validateInitialOwner(
 
 export function validateTenantForm(
   input: TenantFormValues,
-  passwordPolicy?: PasswordPolicyRules,
 ): TenantFormValidationResult<CreateTenantRequest> {
-  const basics = validateTenantBasics(input);
+  const basics = validateTenantBasics(input, false);
   const settings = validateCreateDefaults(input);
-  const owner = validateInitialOwner(input, passwordPolicy);
+  const owner = validateInitialOwner(input);
   const errors = {
     ...basics.errors,
     ...settings.errors,
@@ -260,7 +234,6 @@ export function validateTenantForm(
     ok: true,
     data: {
       name: basics.name,
-      pressingCode: basics.pressingCode,
       country: basics.country,
       city: normalizeOptional(input.city),
       defaultLanguage: settings.defaultLanguage,
@@ -276,7 +249,7 @@ export function validateTenantForm(
 export function validateTenantUpdateForm(
   input: TenantFormValues,
 ): TenantFormValidationResult<UpdateTenantRequest> {
-  const basics = validateTenantBasics(input);
+  const basics = validateTenantBasics(input, true);
 
   if (Object.keys(basics.errors).length > 0) {
     return {

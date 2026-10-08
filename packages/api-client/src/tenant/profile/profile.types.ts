@@ -64,6 +64,16 @@ export type ChangeTenantProfilePasswordResult = {
   sessionsRevoked: number;
 };
 
+export type ChangeTenantProfilePinRequest = {
+  currentPin: string;
+  newPin: string;
+};
+
+export type ChangeTenantProfilePinResult = {
+  pinChanged: true;
+  sessionsRevoked: number;
+};
+
 export type TenantLoginSession = {
   id: string;
   deviceId: string | null;

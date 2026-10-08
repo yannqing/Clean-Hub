@@ -8,6 +8,7 @@ export type TenantErrorCode =
   | "SAAS_TENANT_SETTINGS_UPDATE_EMPTY"
   | "SAAS_TENANT_FEATURE_FLAGS_UPDATE_EMPTY"
   | "SAAS_TENANT_PRESSING_CODE_CONFLICT"
+  | "SAAS_TENANT_CODE_GENERATION_FAILED"
   | "OWNER_ALREADY_EXISTS"
   | "TENANT_USER_EMAIL_CONFLICT"
   | "VALIDATION_ERROR"
@@ -102,7 +103,7 @@ export type RestoreTenantRequest = {
 
 export type CreateTenantRequest = {
   name: string;
-  pressingCode: string;
+  pressingCode?: string;
   country: string;
   city?: string;
   defaultLanguage?: TenantLanguage;
@@ -115,13 +116,21 @@ export type CreateTenantRequest = {
     displayName: string;
     email: string;
     phone?: string;
-    password: string;
-    pin: string;
   };
 };
 
 export type CreateTenantResponse = TenantDetail & {
   initialOwnerUserId?: string;
+};
+
+export type SaasTenantUserSummary = {
+  id: string;
+  tenantId: string;
+  email: string | null;
+  phone: string | null;
+  displayName: string;
+  status: string;
+  roleCodes: string[];
 };
 
 export type UpdateTenantRequest = {

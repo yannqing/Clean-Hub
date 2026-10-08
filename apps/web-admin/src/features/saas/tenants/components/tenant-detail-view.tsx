@@ -37,8 +37,8 @@ import {
 } from "../actions";
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import { tenantDefaultValues } from "../constants";
-import { getTenantDetailQuery } from "../queries";
-import type { TenantDetail, TenantFormValues, TenantStatus } from "../types";
+import { getTenantDetailQuery, getTenantUsersQuery } from "../queries";
+import type { SaasTenantUserSummary, TenantDetail, TenantFormValues, TenantStatus } from "../types";
 import { TenantForm } from "./tenant-form";
 import { TenantTaxSettingsCard } from "./tenant-tax-settings-card";
 
@@ -111,6 +111,8 @@ export function TenantDetailView({
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [tenant, setTenant] = useState<TenantDetail | null>(null);
+  const [tenantUsers, setTenantUsers] = useState<SaasTenantUserSummary[] | null>(null);
+  const [tenantUsersError, setTenantUsersError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusReason, setStatusReason] = useState("");
@@ -266,8 +268,8 @@ export function TenantDetailView({
   useEffect(() => {
     let isCurrent = true;
 
-    Promise.allSettled([getCurrentAuthQuery(), getTenantDetailQuery(tenantId)])
-      .then(([authResult, tenantResult]) => {
+    Promise.allSettled([getCurrentAuthQuery(), getTenantDetailQuery(tenantId), getTenantUsersQuery(tenantId)])
+      .then(([authResult, tenantResult, usersResult]) => {
         if (!isCurrent) {
           return;
         }
@@ -291,6 +293,13 @@ export function TenantDetailView({
 
         setTenant(tenantResult.value);
         setError(null);
+        if (usersResult.status === "fulfilled") {
+          setTenantUsers(usersResult.value);
+          setTenantUsersError(false);
+        } else {
+          setTenantUsers(null);
+          setTenantUsersError(true);
+        }
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
@@ -457,6 +466,34 @@ export function TenantDetailView({
                         </dd>
                       </div>
                     </dl>
+                  </CardContent>
+                </Card>
+
+                <Card className="gap-0 rounded-lg py-0 shadow-none">
+                  <CardContent className="grid gap-3 py-5">
+                    <div>
+                      <h2 className="text-sm font-semibold">{m.tenants.detail.tenantUsersTitle}</h2>
+                      <p className="mt-1 text-xs text-muted-foreground">{m.tenants.detail.tenantUsersHint}</p>
+                    </div>
+                    {tenantUsersError ? (
+                      <p className="text-xs text-destructive">{m.tenants.detail.tenantUsersLoadError}</p>
+                    ) : tenantUsers === null ? (
+                      <p className="text-xs text-muted-foreground">{m.tenants.detail.tenantUsersLoading}</p>
+                    ) : tenantUsers.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">{m.tenants.detail.tenantUsersEmpty}</p>
+                    ) : (
+                      <ul className="max-h-60 space-y-2 overflow-y-auto">
+                        {tenantUsers.map((user) => (
+                          <li className="rounded-md border p-2 text-xs" key={user.id}>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate font-medium">{user.displayName}</span>
+                              {user.roleCodes.includes("owner") ? <Badge variant="secondary">{locale === "zh-CN" ? "店主" : locale === "fr" ? "Propriétaire" : "Owner"}</Badge> : null}
+                            </div>
+                            <p className="mt-1 break-all text-muted-foreground">{user.email ?? user.phone ?? user.id}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </CardContent>
                 </Card>
 

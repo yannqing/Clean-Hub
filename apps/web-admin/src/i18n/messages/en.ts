@@ -193,7 +193,7 @@ export const enMessages: WebAdminMessages = {
             label: "Tenant Management",
             href: webAdminRoutes.saas.config.tenants,
           },
-          { label: "User Management", href: webAdminRoutes.saas.users },
+          { label: "Platform users", href: webAdminRoutes.saas.users },
           {
             label: "Feedback Tickets",
             href: webAdminRoutes.saas.feedbackTickets,
