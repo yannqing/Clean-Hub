@@ -54,18 +54,23 @@ export type SaasUserSummary = {
   createdAt: string;
 };
 
-export type SaasTenantAdminSummary = {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  tenantCode: string;
-  email: string | null;
-  phone: string | null;
-  displayName: string;
-  roles: string[];
-  status: SaasUserStatus;
-  lastLoginAt: string | null;
-  createdAt: string;
+export type SaasUserDirectoryQuery = {
+  q?: string;
+  status?: SaasUserStatus;
+  accountType?: "saas" | "tenant";
+  limit?: number;
+  offset?: number;
+};
+
+export type SaasUserDirectoryItem = Omit<SaasUserSummary, "tenantId"> & {
+  accountType: "saas" | "tenant";
+  tenantId: string | null;
+  tenantName: string | null;
+  tenantCode: string | null;
+};
+
+export type SaasUserDirectoryResult = SaasUserStats & {
+  items: SaasUserDirectoryItem[];
 };
 
 export type SaasUserDetail = SaasUserSummary & {

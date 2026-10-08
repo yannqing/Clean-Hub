@@ -13,7 +13,9 @@ export type {
   SaasUserStatus,
   SaasUserSummary,
   SaasUserStats,
-  SaasTenantAdminSummary,
+  SaasUserDirectoryQuery,
+  SaasUserDirectoryItem,
+  SaasUserDirectoryResult,
 } from "@cleanhub/api-client";
 
 export type ListSaasUsersQuery = QueryParams;

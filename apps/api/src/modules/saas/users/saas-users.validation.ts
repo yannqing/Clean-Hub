@@ -9,6 +9,10 @@ export const listSaasUsersQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+export const listSaasUserDirectoryQuerySchema = listSaasUsersQuerySchema.extend({
+  accountType: z.enum(["saas", "tenant"]).optional(),
+});
+
 export const getSaasUserParamsSchema = z.object({
   userId: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/),
 });

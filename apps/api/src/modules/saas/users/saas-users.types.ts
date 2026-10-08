@@ -26,6 +26,15 @@ export type ListSaasUsersInput = {
   query: ListSaasUsersQuery;
 };
 
+export type ListSaasUserDirectoryQuery = ListSaasUsersQuery & {
+  accountType?: "saas" | "tenant";
+};
+
+export type ListSaasUserDirectoryInput = {
+  authContext: AuthContext;
+  query: ListSaasUserDirectoryQuery;
+};
+
 export type GetSaasUserDetailInput = {
   authContext: AuthContext;
   userId: string;
@@ -115,18 +124,17 @@ export type SaasUserListItem = {
   createdAt: string;
 };
 
-export type SaasTenantAdminListItem = {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  tenantCode: string;
-  email: string | null;
-  phone: string | null;
-  displayName: string;
-  roles: string[];
-  status: SaasUserStatus;
-  lastLoginAt: string | null;
-  createdAt: string;
+export type SaasUserDirectoryItem = Omit<SaasUserListItem, "tenantId"> & {
+  accountType: "saas" | "tenant";
+  tenantId: string | null;
+  tenantName: string | null;
+  tenantCode: string | null;
+};
+
+export type SaasUserDirectoryResult = {
+  items: SaasUserDirectoryItem[];
+  total: number;
+  statusCounts: Record<SaasUserStatus, number>;
 };
 
 export type SaasUserDetail = SaasUserListItem & {

@@ -4,7 +4,8 @@ import type {
   ListSaasUsersQuery,
   SaasUserStats,
   SaasUserSummary,
-  SaasTenantAdminSummary,
+  SaasUserDirectoryQuery,
+  SaasUserDirectoryResult,
 } from "../types";
 
 export async function getSaasUserListQuery(
@@ -17,8 +18,8 @@ export async function getSaasUserStatsQuery(q?: string): Promise<SaasUserStats> 
   return webAdminApi.saas.users.stats({ q });
 }
 
-export async function getSaasTenantAdminListQuery(
-  query?: ListSaasUsersQuery,
-): Promise<SaasTenantAdminSummary[]> {
-  return webAdminApi.saas.users.listTenantAdmins(query);
+export async function getSaasUserDirectoryQuery(
+  query?: SaasUserDirectoryQuery,
+): Promise<SaasUserDirectoryResult> {
+  return webAdminApi.saas.users.directory(query);
 }

@@ -303,14 +303,11 @@ export type SaasMessages = {
   users: {
     badge: string;
     title: string;
-    directoryLabel: string;
-    platformTab: string;
-    tenantAdminsTab: string;
-    tenantAdminsTitle: string;
-    tenantAdminsHint: string;
-    tenantAdminsSearchPlaceholder: string;
-    tenantAdminsLoadError: string;
-    tenantAdminsEmpty: string;
+    accountTypeLabel: string;
+    allAccounts: string;
+    platformAccount: string;
+    tenantAccount: string;
+    directoryHint: string;
     tenantColumn: string;
     ownerRole: string;
     managerRole: string;

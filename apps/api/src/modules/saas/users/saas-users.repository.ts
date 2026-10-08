@@ -26,6 +26,7 @@ import {
   userRoles,
   users,
   tenants,
+  tenantSettings,
 } from "@cleanhub/db";
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
@@ -39,7 +40,8 @@ import type {
   SaasUserDetail,
   SaasUserLanguage,
   SaasUserListItem,
-  SaasTenantAdminListItem,
+  ListSaasUserDirectoryQuery,
+  SaasUserDirectoryResult,
   SaasUserStatus,
   SaasUserRoleCode,
 } from "./saas-users.types.js";
@@ -994,98 +996,137 @@ export async function findSaasUsers(
   }));
 }
 
-/** Read-only cross-tenant directory of owners and managers. */
-export async function findSaasTenantAdmins(
-  db: Database,
-  query: ListSaasUsersQuery,
-): Promise<SaasTenantAdminListItem[]> {
+/** The same scope drives directory rows and status totals. */
+function userDirectoryCondition(db: Database, query: ListSaasUserDirectoryQuery) {
   const searchQuery = normalizeSearchQuery(query.q);
-  const rows = await db
-    .select({
+  const platformAccount = and(eq(users.userType, "saas"), isNull(users.tenantId));
+  const tenantAdmin = and(
+    eq(users.userType, "tenant"),
+    eq(tenants.id, users.tenantId),
+    isNull(tenants.deletedAt),
+    exists(db.select({ id: userRoles.id }).from(userRoles)
+      .innerJoin(roles, eq(roles.id, userRoles.roleId))
+      .where(and(
+        eq(userRoles.userId, users.id),
+        eq(userRoles.tenantId, users.tenantId),
+        isNull(userRoles.revokedAt),
+        eq(roles.tenantId, users.tenantId),
+        eq(roles.scope, "tenant"),
+        inArray(roles.code, ["owner", "manager"]),
+        eq(roles.status, "active"),
+        isNull(roles.deletedAt),
+      ))),
+  );
+  return and(
+    isNull(users.deletedAt),
+    query.accountType === "saas" ? platformAccount
+      : query.accountType === "tenant" ? tenantAdmin
+        : or(platformAccount, tenantAdmin),
+    searchQuery ? or(
+      ilike(users.email, searchQuery),
+      ilike(users.phone, searchQuery),
+      ilike(userProfiles.displayName, searchQuery),
+      ilike(tenants.name, searchQuery),
+      ilike(tenants.pressingCode, searchQuery),
+    ) : undefined,
+  );
+}
+
+/** Paginate platform members and tenant administrators together in the database. */
+export async function findSaasUserDirectory(
+  db: Database,
+  query: ListSaasUserDirectoryQuery,
+): Promise<SaasUserDirectoryResult> {
+  const condition = userDirectoryCondition(db, query);
+  const [rows, counts] = await Promise.all([
+    db.select({
       id: users.id,
-      tenantId: tenants.id,
+      accountType: users.userType,
+      tenantId: users.tenantId,
       tenantName: tenants.name,
       tenantCode: tenants.pressingCode,
+      tenantLanguage: tenantSettings.defaultLanguage,
       email: users.email,
       phone: users.phone,
       displayName: userProfiles.displayName,
+      language: userProfiles.language,
+      metadata: userProfiles.metadata,
       status: users.status,
       lastLoginAt: users.lastLoginAt,
       createdAt: users.createdAt,
-    })
-    .from(users)
-    .innerJoin(tenants, eq(tenants.id, users.tenantId))
-    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-    .where(and(
-      eq(users.userType, "tenant"),
-      isNull(users.deletedAt),
-      isNull(tenants.deletedAt),
-      query.status ? eq(users.status, query.status) : undefined,
-      exists(db.select({ id: userRoles.id }).from(userRoles)
-        .innerJoin(roles, eq(roles.id, userRoles.roleId))
-        .where(and(
-          eq(userRoles.userId, users.id),
-          eq(userRoles.tenantId, tenants.id),
-          isNull(userRoles.revokedAt),
-          eq(roles.tenantId, tenants.id),
-          eq(roles.scope, "tenant"),
-          inArray(roles.code, ["owner", "manager"]),
-          eq(roles.status, "active"),
-          isNull(roles.deletedAt),
-        ))),
-      searchQuery ? or(
-        ilike(users.email, searchQuery),
-        ilike(users.phone, searchQuery),
-        ilike(userProfiles.displayName, searchQuery),
-        ilike(tenants.name, searchQuery),
-        ilike(tenants.pressingCode, searchQuery),
-      ) : undefined,
-    ))
-    .orderBy(desc(users.createdAt), desc(users.id))
-    .limit(query.limit)
-    .offset(query.offset);
-
-  const userIds = rows.map((row) => row.id);
-  if (userIds.length === 0) return [];
+    }).from(users)
+      .leftJoin(tenants, eq(tenants.id, users.tenantId))
+      .leftJoin(tenantSettings, eq(tenantSettings.tenantId, users.tenantId))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(and(condition, query.status ? eq(users.status, query.status) : undefined))
+      .orderBy(desc(users.createdAt), desc(users.id))
+      .limit(query.limit).offset(query.offset),
+    db.select({ status: users.status, value: count() }).from(users)
+      .leftJoin(tenants, eq(tenants.id, users.tenantId))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(condition).groupBy(users.status),
+  ]);
+  const statusCounts: Record<SaasUserStatus, number> = {
+    active: 0, disabled: 0, invited: 0, suspended: 0,
+  };
+  for (const row of counts) statusCounts[row.status] = row.value;
+  const total = Object.values(statusCounts).reduce((sum, value) => sum + value, 0);
+  if (rows.length === 0) return { items: [], total, statusCounts };
 
   const roleRows = await db.select({
     userId: userRoles.userId,
-    tenantId: userRoles.tenantId,
     roleCode: roles.code,
   }).from(userRoles)
+    .innerJoin(users, eq(users.id, userRoles.userId))
     .innerJoin(roles, eq(roles.id, userRoles.roleId))
     .where(and(
-      inArray(userRoles.userId, userIds),
+      inArray(users.id, rows.map((row) => row.id)),
       isNull(userRoles.revokedAt),
-      eq(roles.scope, "tenant"),
-      inArray(roles.code, ["owner", "manager"]),
       eq(roles.status, "active"),
       isNull(roles.deletedAt),
-      eq(roles.tenantId, userRoles.tenantId),
-    ))
-    .orderBy(asc(roles.code));
-  const rolesByUser = new Map<string, string[]>();
-  for (const role of roleRows) {
-    const row = rows.find((candidate) => candidate.id === role.userId);
-    if (!row || row.tenantId !== role.tenantId) continue;
-    const codes = rolesByUser.get(role.userId) ?? [];
-    if (!codes.includes(role.roleCode)) codes.push(role.roleCode);
-    rolesByUser.set(role.userId, codes);
+      or(
+        and(eq(users.userType, "saas"), isNull(users.tenantId),
+          isNull(userRoles.tenantId), isNull(userRoles.branchId),
+          isNull(roles.tenantId), eq(roles.scope, "saas")),
+        and(eq(users.userType, "tenant"), eq(userRoles.tenantId, users.tenantId),
+          eq(roles.tenantId, users.tenantId), eq(roles.scope, "tenant"),
+          inArray(roles.code, ["owner", "manager"])),
+      ),
+    )).orderBy(asc(roles.code));
+  const rolesByUser = new Map<string, Set<string>>();
+  for (const row of roleRows) {
+    const codes = rolesByUser.get(row.userId) ?? new Set<string>();
+    codes.add(row.roleCode);
+    rolesByUser.set(row.userId, codes);
   }
+  const [platform] = await db.select({ language: platformSettings.defaultLanguage })
+    .from(platformSettings).where(eq(platformSettings.settingKey, "default")).limit(1);
 
-  return rows.map((row) => ({
-    id: row.id,
-    tenantId: row.tenantId,
-    tenantName: row.tenantName,
-    tenantCode: row.tenantCode,
-    email: row.email,
-    phone: row.phone,
-    displayName: resolveDisplayName(row),
-    roles: rolesByUser.get(row.id) ?? [],
-    status: row.status,
-    lastLoginAt: toIsoString(row.lastLoginAt),
-    createdAt: row.createdAt.toISOString(),
-  }));
+  return {
+    total,
+    statusCounts,
+    items: rows.map((row) => {
+      const codes = [...(rolesByUser.get(row.id) ?? [])];
+      return {
+        id: row.id,
+        accountType: row.accountType,
+        tenantId: row.tenantId,
+        tenantName: row.tenantName,
+        tenantCode: row.tenantCode,
+        email: row.email,
+        phone: row.phone,
+        displayName: resolveDisplayName(row),
+        role: codes[0] ?? "unassigned",
+        roles: codes,
+        status: row.status,
+        language: row.accountType === "saas"
+          ? resolveSaasInterfaceLanguage(row.language, row.metadata, platform?.language)
+          : row.tenantLanguage ?? row.language ?? "en",
+        lastLoginAt: toIsoString(row.lastLoginAt),
+        createdAt: row.createdAt.toISOString(),
+      };
+    }),
+  };
 }
 
 export async function findSaasUserStats(

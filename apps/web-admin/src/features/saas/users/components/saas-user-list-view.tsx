@@ -43,15 +43,16 @@ import { interpolate } from "@/i18n/messages/saas";
 import { canManageSaasUsers } from "@/lib/permissions";
 
 import { saasUserStatusOptions } from "../constants";
-import { getSaasUserListQuery, getSaasUserStatsQuery } from "../queries";
+import { getSaasUserDirectoryQuery } from "../queries";
 import type {
   AuthContext,
   SaasUserStatus,
   SaasUserStatusCounts,
-  SaasUserSummary,
+  SaasUserDirectoryItem,
 } from "../types";
 
 type StatusFilter = "all" | SaasUserStatus;
+type AccountTypeFilter = "all" | "saas" | "tenant";
 
 type SaasUserMetrics = SaasUserStatusCounts & {
   total: number;
@@ -91,9 +92,10 @@ export function SaasUserListView() {
   const router = useRouter();
   const captionId = useId();
   const requestIdRef = useRef(0);
-  const [users, setUsers] = useState<SaasUserSummary[]>([]);
+  const [users, setUsers] = useState<SaasUserDirectoryItem[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
+  const [accountType, setAccountType] = useState<AccountTypeFilter>("all");
   const [offset, setOffset] = useState(0);
   const [hasNext, setHasNext] = useState(false);
   const [metrics, setMetrics] = useState<SaasUserMetrics>(emptyMetrics);
@@ -109,8 +111,9 @@ export function SaasUserListView() {
       offset,
       q: query.trim() || undefined,
       status: status === "all" ? undefined : status,
+      accountType: accountType === "all" ? undefined : accountType,
     }),
-    [offset, query, status],
+    [offset, query, status, accountType],
   );
   const canManageMembers =
     !authLoading && !authError && canManageSaasUsers(authContext);
@@ -119,20 +122,17 @@ export function SaasUserListView() {
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
 
-    Promise.all([
-      getSaasUserListQuery(listQuery),
-      getSaasUserStatsQuery(query.trim() || undefined),
-    ])
-      .then(([pageResponse, metricsResponse]) => {
+    getSaasUserDirectoryQuery(listQuery)
+      .then((response) => {
         if (requestIdRef.current !== requestId) {
           return;
         }
 
-        setUsers(pageResponse.slice(0, pageSize));
-        setHasNext(pageResponse.length > pageSize);
+        setUsers(response.items.slice(0, pageSize));
+        setHasNext(response.items.length > pageSize);
         setMetrics({
-          ...metricsResponse.statusCounts,
-          total: metricsResponse.total,
+          ...response.statusCounts,
+          total: response.total,
         });
       })
       .catch((loadError: unknown) => {
@@ -182,6 +182,10 @@ export function SaasUserListView() {
     if (role === "super_admin") {
       return m.common.roleLabels.superAdmin;
     }
+
+    if (role === "owner") return m.users.ownerRole;
+    if (role === "manager") return m.users.managerRole;
+    if (role === "unassigned") return m.common.roleLabels.unassigned;
 
     return role;
   }
@@ -243,6 +247,8 @@ export function SaasUserListView() {
         title={m.users.title}
       />
 
+      <p className="text-sm text-muted-foreground">{m.users.directoryHint}</p>
+
       {authError ? (
         <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-800">
           {interpolate(m.users.sessionReadOnlyHint, { error: authError })}
@@ -289,7 +295,7 @@ export function SaasUserListView() {
       </div>
 
       <SaasTableSurface className="overflow-x-auto">
-        <div className="flex min-w-[680px] items-center gap-2 border-b px-3 py-2.5">
+        <div className="flex min-w-[1000px] items-center gap-2 border-b px-3 py-2.5">
           <div className="min-w-0 flex-1">
             <Label className="sr-only" htmlFor="saas-user-search">
               {m.common.search}
@@ -306,6 +312,30 @@ export function SaasUserListView() {
               placeholder={m.users.searchPlaceholder}
               value={query}
             />
+          </div>
+
+          <div>
+            <Label className="sr-only" htmlFor="saas-user-account-type-filter">
+              {m.users.accountTypeLabel}
+            </Label>
+            <Select
+              onValueChange={(value) => {
+                setLoading(true);
+                setError(null);
+                setOffset(0);
+                setAccountType(value as AccountTypeFilter);
+              }}
+              value={accountType}
+            >
+              <SelectTrigger className="h-8 w-44 text-xs" id="saas-user-account-type-filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{m.users.allAccounts}</SelectItem>
+                <SelectItem value="saas">{m.users.platformAccount}</SelectItem>
+                <SelectItem value="tenant">{m.users.tenantAccount}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
@@ -371,6 +401,8 @@ export function SaasUserListView() {
             <TableHeader>
               <TableRow>
                 <TableHead>{m.users.columns.member}</TableHead>
+                <TableHead>{m.users.accountTypeLabel}</TableHead>
+                <TableHead>{m.users.tenantColumn}</TableHead>
                 <TableHead>{m.users.columns.roles}</TableHead>
                 <TableHead>{m.common.status}</TableHead>
                 <TableHead>{m.users.columns.language}</TableHead>
@@ -380,7 +412,9 @@ export function SaasUserListView() {
             </TableHeader>
             <TableBody>
               {users.map((user) => {
-                const detailHref = webAdminRoutes.saas.user(user.id);
+                const detailHref = user.accountType === "tenant" && user.tenantId
+                  ? webAdminRoutes.saas.tenant(user.tenantId)
+                  : webAdminRoutes.saas.user(user.id);
                 const roles = user.roles.length > 0 ? user.roles : [user.role];
 
                 return (
@@ -410,6 +444,21 @@ export function SaasUserListView() {
                       <div className="text-[11px] text-muted-foreground">
                         {user.email ?? user.phone ?? user.id}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className="px-1.5 py-0 text-[10px]" variant="secondary">
+                        {user.accountType === "saas" ? m.users.platformAccount : m.users.tenantAccount}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {user.tenantId ? (
+                        <>
+                          <Link className="font-medium underline-offset-4 hover:underline" href={webAdminRoutes.saas.tenant(user.tenantId)}>
+                            {user.tenantName}
+                          </Link>
+                          <div className="text-[11px] text-muted-foreground">{user.tenantCode}</div>
+                        </>
+                      ) : m.users.platformAccount}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
