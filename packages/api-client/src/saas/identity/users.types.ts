@@ -73,6 +73,14 @@ export type SaasUserDirectoryResult = SaasUserStats & {
   items: SaasUserDirectoryItem[];
 };
 
+export type SaasUserDirectoryDetail = SaasUserDirectoryItem & {
+  avatarUrl: string | null;
+  timezone: string;
+  updatedAt: string;
+};
+
+export type ResetDirectoryUserPinResult = { temporaryPin: string };
+
 export type SaasUserDetail = SaasUserSummary & {
   avatarUrl: string | null;
   timezone: string;

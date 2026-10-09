@@ -1,16 +1,12 @@
 import { getDb, type Database } from "@cleanhub/db";
-
-import { AuthError } from "../../auth/auth.errors.js";
 import type { AuthContext } from "../../auth/auth.types.js";
+
 import { generateTemporaryPassword } from "../../auth/temporary-password.helper.js";
 import { assertPasswordMeetsPolicy } from "../../auth/password-policy.helper.js";
 import { hashPassword, hashPin } from "../../auth/password.service.js";
 import { resolveEffectiveSecurityPolicy } from "../security/security-policy.js";
 import { randomUUID } from "node:crypto";
-import {
-  requireSaasRole,
-  type SaasRole,
-} from "../../auth/permission.helper.js";
+import { requireSaasUsersAccess } from "./saas-users-access.js";
 import { SaasUsersError } from "./saas-users.errors.js";
 import {
   countActiveSaasSuperAdmins,
@@ -91,17 +87,6 @@ function areRoleCodesEqual(
   }
 
   return left.every((roleCode, index) => roleCode === right[index]);
-}
-
-function requireSaasUsersAccess(
-  authContext: AuthContext,
-  allowedRoles: SaasRole[],
-): void {
-  requireSaasRole(authContext, allowedRoles);
-
-  if (authContext.tenantId !== null) {
-    throw new AuthError("FORBIDDEN", "Tenant users cannot access SaaS users.");
-  }
 }
 
 export async function listSaasUsers(

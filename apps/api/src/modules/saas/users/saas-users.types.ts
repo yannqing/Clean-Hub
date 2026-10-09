@@ -137,6 +137,14 @@ export type SaasUserDirectoryResult = {
   statusCounts: Record<SaasUserStatus, number>;
 };
 
+export type SaasUserDirectoryDetail = SaasUserDirectoryItem & {
+  avatarUrl: string | null;
+  timezone: string;
+  updatedAt: string;
+};
+
+export type ResetDirectoryUserPinResult = { temporaryPin: string };
+
 export type SaasUserDetail = SaasUserListItem & {
   avatarUrl: string | null;
   timezone: string;

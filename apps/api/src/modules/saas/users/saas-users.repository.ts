@@ -42,6 +42,7 @@ import type {
   SaasUserListItem,
   ListSaasUserDirectoryQuery,
   SaasUserDirectoryResult,
+  SaasUserDirectoryDetail,
   SaasUserStatus,
   SaasUserRoleCode,
 } from "./saas-users.types.js";
@@ -997,7 +998,7 @@ export async function findSaasUsers(
 }
 
 /** The same scope drives directory rows and status totals. */
-function userDirectoryCondition(db: Database, query: ListSaasUserDirectoryQuery) {
+function userDirectoryCondition(db: Database, query: ListSaasUserDirectoryQuery, userId?: string) {
   const searchQuery = normalizeSearchQuery(query.q);
   const platformAccount = and(eq(users.userType, "saas"), isNull(users.tenantId));
   const tenantAdmin = and(
@@ -1019,6 +1020,7 @@ function userDirectoryCondition(db: Database, query: ListSaasUserDirectoryQuery)
   );
   return and(
     isNull(users.deletedAt),
+    userId ? eq(users.id, userId) : undefined,
     query.accountType === "saas" ? platformAccount
       : query.accountType === "tenant" ? tenantAdmin
         : or(platformAccount, tenantAdmin),
@@ -1036,8 +1038,9 @@ function userDirectoryCondition(db: Database, query: ListSaasUserDirectoryQuery)
 export async function findSaasUserDirectory(
   db: Database,
   query: ListSaasUserDirectoryQuery,
+  userId?: string,
 ): Promise<SaasUserDirectoryResult> {
-  const condition = userDirectoryCondition(db, query);
+  const condition = userDirectoryCondition(db, query, userId);
   const [rows, counts] = await Promise.all([
     db.select({
       id: users.id,
@@ -1127,6 +1130,133 @@ export async function findSaasUserDirectory(
       };
     }),
   };
+}
+
+export async function findSaasUserDirectoryDetailById(
+  db: Database,
+  userId: string,
+): Promise<SaasUserDirectoryDetail | null> {
+  const directory = await findSaasUserDirectory(
+    db,
+    { limit: 1, offset: 0 },
+    userId,
+  );
+  const user = directory.items[0];
+  if (!user) return null;
+
+  const [profile] = await db
+    .select({
+      avatarUrl: userProfiles.avatarUrl,
+      timezone: userProfiles.timezone,
+      tenantTimezone: tenantSettings.timezone,
+      userUpdatedAt: users.updatedAt,
+      profileUpdatedAt: userProfiles.updatedAt,
+    })
+    .from(users)
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .leftJoin(tenantSettings, eq(tenantSettings.tenantId, users.tenantId))
+    .where(
+      and(
+        eq(users.id, userId),
+        isNull(users.deletedAt),
+        user.tenantId
+          ? eq(users.tenantId, user.tenantId)
+          : isNull(users.tenantId),
+        eq(users.userType, user.accountType),
+      ),
+    )
+    .limit(1);
+  if (!profile) return null;
+
+  return {
+    ...user,
+    avatarUrl: profile.avatarUrl,
+    timezone: profile.timezone ?? profile.tenantTimezone ?? "UTC",
+    updatedAt: getLatestDate(
+      profile.userUpdatedAt,
+      profile.profileUpdatedAt,
+    ).toISOString(),
+  };
+}
+
+function directoryUserIdentity(target: {
+  id: string;
+  accountType: "saas" | "tenant";
+  tenantId: string | null;
+}) {
+  return and(
+    eq(users.id, target.id),
+    eq(users.userType, target.accountType),
+    target.tenantId
+      ? eq(users.tenantId, target.tenantId)
+      : isNull(users.tenantId),
+    isNull(users.deletedAt),
+  );
+}
+
+export async function lockDirectoryUserCredentials(
+  db: Database,
+  target: SaasUserDirectoryDetail,
+): Promise<void> {
+  await db
+    .select({ id: users.id })
+    .from(users)
+    .where(directoryUserIdentity(target))
+    .for("update");
+}
+
+export async function findDirectoryPinCandidates(
+  db: Database,
+  target: SaasUserDirectoryDetail,
+): Promise<Array<{ pinHash: string }>> {
+  return db
+    .select({ pinHash: users.pinHash })
+    .from(users)
+    .where(
+      target.tenantId
+        ? and(
+            eq(users.tenantId, target.tenantId),
+            eq(users.userType, "tenant"),
+            isNull(users.deletedAt),
+          )
+        : directoryUserIdentity(target),
+    );
+}
+
+export async function resetDirectoryUserCredentialRecord(
+  db: Database,
+  input: {
+    target: SaasUserDirectoryDetail;
+    credential: "password" | "pin";
+    hash: string;
+  },
+): Promise<boolean> {
+  const rows = await db
+    .update(users)
+    .set({
+      ...(input.credential === "password"
+        ? { passwordHash: input.hash }
+        : { pinHash: input.hash }),
+      updatedAt: new Date(),
+      version: sql`${users.version} + 1`,
+    })
+    .where(directoryUserIdentity(input.target))
+    .returning({ id: users.id });
+  if (!rows.length) return false;
+
+  await db
+    .update(authRefreshTokens)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(authRefreshTokens.userId, input.target.id),
+        input.target.tenantId
+          ? eq(authRefreshTokens.tenantId, input.target.tenantId)
+          : isNull(authRefreshTokens.tenantId),
+        isNull(authRefreshTokens.revokedAt),
+      ),
+    );
+  return true;
 }
 
 export async function findSaasUserStats(

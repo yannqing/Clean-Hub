@@ -3,6 +3,9 @@
 import {
   Badge,
   Button,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Input,
   Label,
   Select,
@@ -19,6 +22,7 @@ import {
 } from "@cleanhub/ui";
 import { DataTable } from "@cleanhub/ui/data-table";
 import {
+  MoreHorizontal,
   CircleCheck,
   MailCheck,
   ShieldX,
@@ -50,6 +54,8 @@ import type {
   SaasUserStatusCounts,
   SaasUserDirectoryItem,
 } from "../types";
+
+import { UserCredentialResetDialog, type UserCredentialResetTarget } from "./user-credential-reset-dialog";
 
 type StatusFilter = "all" | SaasUserStatus;
 type AccountTypeFilter = "all" | "saas" | "tenant";
@@ -95,6 +101,8 @@ export function SaasUserListView() {
   const [users, setUsers] = useState<SaasUserDirectoryItem[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
+  const [menuUserId, setMenuUserId] = useState<string | null>(null);
+  const [resetTarget, setResetTarget] = useState<UserCredentialResetTarget | null>(null);
   const [accountType, setAccountType] = useState<AccountTypeFilter>("all");
   const [offset, setOffset] = useState(0);
   const [hasNext, setHasNext] = useState(false);
@@ -408,13 +416,12 @@ export function SaasUserListView() {
                 <TableHead>{m.users.columns.language}</TableHead>
                 <TableHead>{m.users.columns.lastLogin}</TableHead>
                 <TableHead>{m.users.columns.created}</TableHead>
+                <TableHead className="w-12">{m.common.actions}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {users.map((user) => {
-                const detailHref = user.accountType === "tenant" && user.tenantId
-                  ? webAdminRoutes.saas.tenant(user.tenantId)
-                  : webAdminRoutes.saas.user(user.id);
+                const detailHref = webAdminRoutes.saas.user(user.id);
                 const roles = user.roles.length > 0 ? user.roles : [user.role];
 
                 return (
@@ -442,23 +449,37 @@ export function SaasUserListView() {
                         {user.displayName}
                       </Link>
                       <div className="text-[11px] text-muted-foreground">
-                        {user.email ?? user.phone ?? user.id}
+                        {user.email ??
+                          user.phone ??
+                          `${m.users.detail.userId}: ${user.id}`}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className="px-1.5 py-0 text-[10px]" variant="secondary">
-                        {user.accountType === "saas" ? m.users.platformAccount : m.users.tenantAccount}
+                      <Badge
+                        className="px-1.5 py-0 text-[10px]"
+                        variant="secondary"
+                      >
+                        {user.accountType === "saas"
+                          ? m.users.platformAccount
+                          : m.users.tenantAccount}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       {user.tenantId ? (
                         <>
-                          <Link className="font-medium underline-offset-4 hover:underline" href={webAdminRoutes.saas.tenant(user.tenantId)}>
+                          <Link
+                            className="font-medium underline-offset-4 hover:underline"
+                            href={webAdminRoutes.saas.tenant(user.tenantId)}
+                          >
                             {user.tenantName}
                           </Link>
-                          <div className="text-[11px] text-muted-foreground">{user.tenantCode}</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {user.tenantCode}
+                          </div>
                         </>
-                      ) : m.users.platformAccount}
+                      ) : (
+                        m.users.platformAccount
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
@@ -490,6 +511,77 @@ export function SaasUserListView() {
                     <TableCell>
                       {formatDate(user.createdAt) || m.common.invalidDate}
                     </TableCell>
+                    <TableCell onClick={(event) => event.stopPropagation()}>
+                      <Popover
+                        open={menuUserId === user.id}
+                        onOpenChange={(open) =>
+                          setMenuUserId(open ? user.id : null)
+                        }
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`${m.common.actions}: ${user.displayName}`}
+                          >
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          align="end"
+                          className="grid w-44 gap-1 p-2"
+                        >
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="ghost"
+                            className="justify-start"
+                          >
+                            <Link href={detailHref}>
+                              {m.users.actions.view}
+                            </Link>
+                          </Button>
+                          {canManageMembers ? (
+                            <>
+                              <div className="my-1 border-t" />
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="justify-start"
+                                disabled={user.id === authContext?.userId}
+                                onClick={() => {
+                                  setMenuUserId(null);
+                                  setResetTarget({
+                                    userId: user.id,
+                                    displayName: user.displayName,
+                                    credential: "password",
+                                  });
+                                }}
+                              >
+                                {m.users.actions.resetPassword}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="justify-start"
+                                disabled={user.id === authContext?.userId}
+                                onClick={() => {
+                                  setMenuUserId(null);
+                                  setResetTarget({
+                                    userId: user.id,
+                                    displayName: user.displayName,
+                                    credential: "pin",
+                                  });
+                                }}
+                              >
+                                {m.users.actions.resetPin}
+                              </Button>
+                            </>
+                          ) : null}
+                        </PopoverContent>
+                      </Popover>
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -511,6 +603,7 @@ export function SaasUserListView() {
           previousLabel={m.common.previousPage}
         />
       </SaasTableSurface>
+      {resetTarget ? <UserCredentialResetDialog target={resetTarget} onClose={() => setResetTarget(null)} key={`${resetTarget.userId}-${resetTarget.credential}`} /> : null}
     </section>
   );
 }

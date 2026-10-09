@@ -1,4 +1,4 @@
-import type { ApiClient, QueryParams } from "../../types";
+import type { ApiClient, ApiRequestOptions, QueryParams } from "../../types";
 import type {
   CreateSaasUserRequest,
   ResetSaasUserPasswordRequest,
@@ -7,6 +7,8 @@ import type {
   SaasUserSummary,
   SaasUserDirectoryQuery,
   SaasUserDirectoryResult,
+  SaasUserDirectoryDetail,
+  ResetDirectoryUserPinResult,
   SaasUserStats,
   UpdateSaasUserRequest,
   UpdateSaasUserRolesRequest,
@@ -58,6 +60,27 @@ export function createSaasUsersApi(client: ApiClient) {
     list: (query?: QueryParams) => getSaasUsers(query),
     directory: (query?: SaasUserDirectoryQuery) =>
       client.get<SaasUserDirectoryResult>("/saas/users/directory", { query }),
+    directoryDetail: (
+      userId: string,
+      options?: Omit<ApiRequestOptions, "method" | "body" | "query">,
+    ) =>
+      client.get<SaasUserDirectoryDetail>(
+        `/saas/users/directory/${encodeURIComponent(userId)}`,
+        options,
+      ),
+    resetDirectoryPassword: (
+      userId: string,
+      input: ResetSaasUserPasswordRequest,
+    ) =>
+      client.patch<ResetSaasUserPasswordResult>(
+        `/saas/users/directory/${encodeURIComponent(userId)}/reset-password`,
+        input,
+      ),
+    resetDirectoryPin: (userId: string, input: ResetSaasUserPasswordRequest) =>
+      client.patch<ResetDirectoryUserPinResult>(
+        `/saas/users/directory/${encodeURIComponent(userId)}/reset-pin`,
+        input,
+      ),
     stats: (query?: { q?: string }) =>
       client.get<SaasUserStats>("/saas/users/stats", { query }),
     update: (userId: string, input: UpdateSaasUserRequest) =>

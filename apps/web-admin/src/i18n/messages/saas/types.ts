@@ -341,6 +341,8 @@ export type SaasMessages = {
       enable: string;
       disable: string;
       resetPassword: string;
+      resetPin: string;
+      view: string;
     };
     invite: {
       title: string;
@@ -368,6 +370,9 @@ export type SaasMessages = {
       account: string;
       activity: string;
       userId: string;
+      userIdHint: string;
+      selfCredentialHint: string;
+      profileLink: string;
       notProvided: string;
     };
     roles: {
@@ -388,6 +393,17 @@ export type SaasMessages = {
       disableSuccess: string;
       enableSuccess: string;
       noAction: string;
+    };
+    resetPin: {
+      title: string;
+      description: string;
+      reason: string;
+      reasonRequired: string;
+      submit: string;
+      success: string;
+      resultTitle: string;
+      resultWarning: string;
+      done: string;
     };
     resetPassword: {
       actionTitle: string;

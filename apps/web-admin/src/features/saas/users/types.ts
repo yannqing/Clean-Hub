@@ -16,6 +16,8 @@ export type {
   SaasUserDirectoryQuery,
   SaasUserDirectoryItem,
   SaasUserDirectoryResult,
+  SaasUserDirectoryDetail,
+  ResetDirectoryUserPinResult,
 } from "@cleanhub/api-client";
 
 export type ListSaasUsersQuery = QueryParams;

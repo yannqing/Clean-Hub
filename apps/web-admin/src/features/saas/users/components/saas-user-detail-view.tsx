@@ -23,20 +23,20 @@ import { webAdminRoutes } from "@/config/routes";
 import { SaasBreadcrumbs } from "@/features/saas/shared";
 import { useSaasI18n } from "@/i18n";
 
+import { updateSaasUserStatusAction } from "../actions";
+import type { SaasUserDirectoryDetail, SaasUserStatus } from "../types";
 import {
-  resetSaasUserPasswordAction,
-  updateSaasUserStatusAction,
-} from "../actions";
-import type { SaasUserDetail, SaasUserStatus } from "../types";
+  UserCredentialResetDialog,
+  type UserCredentialResetTarget,
+} from "./user-credential-reset-dialog";
 
 type SaasUserDetailViewProps = {
   canManage: boolean;
-  initialUser: SaasUserDetail;
+  initialUser: SaasUserDirectoryDetail;
   isCurrentUser: boolean;
 };
 
 const maxStatusReasonLength = 300;
-const maxResetReasonLength = 500;
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "";
@@ -96,17 +96,15 @@ export function SaasUserDetailView({
   const [statusReason, setStatusReason] = useState("");
   const [statusError, setStatusError] = useState<string | null>(null);
   const [statusSubmitting, setStatusSubmitting] = useState(false);
-  const [resetOpen, setResetOpen] = useState(false);
-  const [resetReason, setResetReason] = useState("");
-  const [resetError, setResetError] = useState<string | null>(null);
-  const [resetSubmitting, setResetSubmitting] = useState(false);
-  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(
-    null,
-  );
+  const [resetTarget, setResetTarget] =
+    useState<UserCredentialResetTarget | null>(null);
   const nextStatus = getNextStatus(user.status);
   const roles = user.roles.length > 0 ? user.roles : [user.role];
   const canRunSensitiveActions =
-    canManage && !isCurrentUser && nextStatus !== null;
+    canManage &&
+    !isCurrentUser &&
+    user.accountType === "saas" &&
+    nextStatus !== null;
 
   function getRoleLabel(role: string): string {
     if (role === "support") {
@@ -117,6 +115,8 @@ export function SaasUserDetailView({
       return m.common.roleLabels.superAdmin;
     }
 
+    if (role === "owner") return m.users.ownerRole;
+    if (role === "manager") return m.users.managerRole;
     return role;
   }
 
@@ -160,7 +160,7 @@ export function SaasUserDetailView({
         return;
       }
 
-      setUser(result.data);
+      setUser((current) => ({ ...current, ...result.data }));
       setStatusOpen(false);
       setStatusReason("");
       toast.success(
@@ -177,40 +177,6 @@ export function SaasUserDetailView({
     }
   }
 
-  async function handleResetPassword() {
-    if (!canManage || isCurrentUser || resetSubmitting) {
-      return;
-    }
-
-    if (!resetReason.trim()) {
-      setResetError(m.users.resetPassword.reasonRequired);
-      return;
-    }
-
-    setResetSubmitting(true);
-    setResetError(null);
-
-    try {
-      const result = await resetSaasUserPasswordAction(user.id, resetReason);
-
-      if (!result.ok) {
-        setResetError(result.errors.reason ?? m.users.loadError);
-        return;
-      }
-
-      setResetOpen(false);
-      setResetReason("");
-      setTemporaryPassword(result.data.temporaryPassword);
-      toast.success(m.users.resetPassword.success);
-    } catch (error) {
-      const message = getErrorMessage(error) || m.users.loadError;
-      setResetError(message);
-      toast.error(message);
-    } finally {
-      setResetSubmitting(false);
-    }
-  }
-
   return (
     <section className="mx-auto min-h-[560px] w-full max-w-[960px] space-y-3 pb-20">
       <h1 className="sr-only">{m.users.detail.title}</h1>
@@ -223,7 +189,7 @@ export function SaasUserDetailView({
           rootIcon={Users}
           rootLabel={m.users.title}
         />
-        {canManage ? (
+        {canManage && user.accountType === "saas" ? (
           <Button asChild size="sm" variant="outline">
             <Link href={webAdminRoutes.saas.editUser(user.id)}>
               {m.users.actions.edit}
@@ -238,6 +204,17 @@ export function SaasUserDetailView({
         </div>
       ) : null}
 
+      {isCurrentUser ? (
+        <p className="text-sm text-muted-foreground">
+          {m.users.detail.selfCredentialHint}{" "}
+          <Link
+            className="underline underline-offset-4"
+            href={webAdminRoutes.saas.profile}
+          >
+            {m.users.detail.profileLink}
+          </Link>
+        </p>
+      ) : null}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="grid gap-5">
           <Card className="gap-0 rounded-lg py-0 shadow-none">
@@ -266,7 +243,38 @@ export function SaasUserDetailView({
                   label={m.users.edit.timezone}
                   value={user.timezone || m.users.detail.notProvided}
                 />
-                <DetailRow label={m.users.detail.userId} value={user.id} />
+                <DetailRow
+                  label={m.users.accountTypeLabel}
+                  value={
+                    user.accountType === "saas"
+                      ? m.users.platformAccount
+                      : m.users.tenantAccount
+                  }
+                />
+                {user.tenantId ? (
+                  <DetailRow
+                    label={m.users.tenantColumn}
+                    value={
+                      <Link
+                        className="underline underline-offset-4"
+                        href={webAdminRoutes.saas.tenant(user.tenantId)}
+                      >
+                        {user.tenantName} · {user.tenantCode}
+                      </Link>
+                    }
+                  />
+                ) : null}
+                <DetailRow
+                  label={m.users.detail.userId}
+                  value={
+                    <div className="grid gap-1">
+                      <span className="break-all font-mono">{user.id}</span>
+                      <p className="text-xs text-muted-foreground">
+                        {m.users.detail.userIdHint}
+                      </p>
+                    </div>
+                  }
+                />
               </dl>
             </CardContent>
           </Card>
@@ -327,7 +335,7 @@ export function SaasUserDetailView({
           {canManage && !isCurrentUser ? (
             <Card className="gap-0 rounded-lg py-0 shadow-none">
               <CardContent className="grid gap-2 py-5">
-                {nextStatus ? (
+                {nextStatus && user.accountType === "saas" ? (
                   <Button
                     onClick={() => {
                       setStatusReason(
@@ -349,15 +357,30 @@ export function SaasUserDetailView({
                   </Button>
                 ) : null}
                 <Button
-                  onClick={() => {
-                    setResetReason("");
-                    setResetError(null);
-                    setResetOpen(true);
-                  }}
+                  onClick={() =>
+                    setResetTarget({
+                      userId: user.id,
+                      displayName: user.displayName,
+                      credential: "password",
+                    })
+                  }
                   type="button"
                   variant="outline"
                 >
                   {m.users.actions.resetPassword}
+                </Button>
+                <Button
+                  onClick={() =>
+                    setResetTarget({
+                      userId: user.id,
+                      displayName: user.displayName,
+                      credential: "pin",
+                    })
+                  }
+                  type="button"
+                  variant="outline"
+                >
+                  {m.users.actions.resetPin}
                 </Button>
               </CardContent>
             </Card>
@@ -433,91 +456,13 @@ export function SaasUserDetailView({
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        onOpenChange={(open) => {
-          if (!resetSubmitting) {
-            setResetOpen(open);
-
-            if (!open) {
-              setResetReason("");
-              setResetError(null);
-            }
-          }
-        }}
-        open={resetOpen}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{m.users.resetPassword.title}</DialogTitle>
-            <DialogDescription>
-              {m.users.resetPassword.description}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-2">
-            <Label htmlFor="user-reset-reason">
-              {m.users.resetPassword.reason}
-            </Label>
-            <Textarea
-              disabled={resetSubmitting}
-              id="user-reset-reason"
-              maxLength={maxResetReasonLength}
-              onChange={(event) => {
-                setResetReason(event.target.value);
-                setResetError(null);
-              }}
-              rows={4}
-              value={resetReason}
-            />
-            {resetError ? (
-              <p className="text-xs text-destructive">{resetError}</p>
-            ) : null}
-          </div>
-          <DialogFooter>
-            <Button
-              disabled={resetSubmitting}
-              onClick={() => setResetOpen(false)}
-              type="button"
-              variant="outline"
-            >
-              {m.common.cancel}
-            </Button>
-            <Button
-              disabled={resetSubmitting || !resetReason.trim()}
-              onClick={() => void handleResetPassword()}
-              type="button"
-              variant="destructive"
-            >
-              {resetSubmitting ? m.common.saving : m.users.resetPassword.submit}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        onOpenChange={(open) => {
-          if (!open) {
-            setTemporaryPassword(null);
-          }
-        }}
-        open={temporaryPassword !== null}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{m.users.resetPassword.resultTitle}</DialogTitle>
-            <DialogDescription>
-              {m.users.resetPassword.resultWarning}
-            </DialogDescription>
-          </DialogHeader>
-          <p className="break-all rounded-md border bg-muted/30 p-4 text-center font-mono text-xl font-semibold">
-            {temporaryPassword}
-          </p>
-          <DialogFooter>
-            <Button onClick={() => setTemporaryPassword(null)} type="button">
-              {m.users.resetPassword.done}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {resetTarget ? (
+        <UserCredentialResetDialog
+          target={resetTarget}
+          onClose={() => setResetTarget(null)}
+          key={`${resetTarget.userId}-${resetTarget.credential}`}
+        />
+      ) : null}
     </section>
   );
 }

@@ -15,6 +15,7 @@ import {
   updateSaasUserStatus,
 } from "./saas-users.service.js";
 import { SaasUsersError } from "./saas-users.errors.js";
+import { getSaasUserDirectoryDetail, resetDirectoryUserPassword, resetDirectoryUserPin } from "./user-directory.service.js";
 import {
   createSaasUserBodySchema,
   getSaasUserParamsSchema,
@@ -72,6 +73,56 @@ export async function getSaasUserStatsController(c: Context<AppBindings>) {
     q: query.q,
   }));
 }
+
+export async function getSaasUserDirectoryDetailController(
+  c: Context<AppBindings>,
+) {
+  const { userId } = getSaasUserParamsSchema.parse(c.req.param());
+  try {
+    return c.json(
+      await getSaasUserDirectoryDetail({
+        authContext: c.get("authContext"),
+        userId,
+      }),
+    );
+  } catch (error) {
+    if (error instanceof SaasUsersError)
+      return createSaasUsersErrorResponse(c, error);
+    throw error;
+  }
+}
+
+async function resetDirectoryCredentialController(
+  c: Context<AppBindings>,
+  credential: "password" | "pin",
+) {
+  const { userId } = getSaasUserParamsSchema.parse(c.req.param());
+  const { reason } = resetSaasUserPasswordBodySchema.parse(await c.req.json());
+  try {
+    const reset =
+      credential === "pin" ? resetDirectoryUserPin : resetDirectoryUserPassword;
+    const result = await reset({
+      authContext: c.get("authContext"),
+      userId,
+      reason,
+      requestMeta: {
+        ipAddress: getClientIp(c),
+        userAgent: c.req.header("user-agent"),
+      },
+    });
+    c.header("Cache-Control", "no-store");
+    return c.json(result);
+  } catch (error) {
+    if (error instanceof SaasUsersError)
+      return createSaasUsersErrorResponse(c, error);
+    throw error;
+  }
+}
+
+export const resetDirectoryUserPasswordController = (c: Context<AppBindings>) =>
+  resetDirectoryCredentialController(c, "password");
+export const resetDirectoryUserPinController = (c: Context<AppBindings>) =>
+  resetDirectoryCredentialController(c, "pin");
 
 export async function getSaasUserController(c: Context<AppBindings>) {
   const params = getSaasUserParamsSchema.parse(c.req.param());

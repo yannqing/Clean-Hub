@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
 
 import "../../../config/env.js";
-import { closeDbConnection, getDb, roles, runWithSystemDatabaseContext, tenants, userProfiles, userRoles, users } from "@cleanhub/db";
+import { auditLogs, authRefreshTokens, closeDbConnection, getDb, roles, runWithSystemDatabaseContext, tenants, userProfiles, userRoles, users } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import type { AuthContext } from "../../auth/auth.types.js";
 import { findSaasUserDirectory } from "./saas-users.repository.js";
 import { getSaasUserDetail, listSaasUserDirectory } from "./saas-users.service.js";
+import { getSaasUserDirectoryDetail, resetDirectoryUserPassword, resetDirectoryUserPin } from "./user-directory.service.js";
+import { hashPassword, hashPin, verifyPassword } from "../../auth/password.service.js";
+import { resetSaasUserPasswordBodySchema } from "./saas-users.validation.js";
 
 const rollback = new Error("SAAS_USER_DIRECTORY_ROLLBACK");
 
@@ -86,8 +89,317 @@ async function run() {
           await assert.rejects(listSaasUserDirectory({ authContext: { ...auth, tenantId }, query }, tx), "tenant context cannot query the global directory");
           await assert.rejects(getSaasUserDetail({ authContext: auth, userId: ownerId }, tx), "tenant accounts cannot enter the SaaS member edit path");
 
-          await tx.update(tenants).set({ deletedAt: new Date() }).where(eq(tenants.id, tenantId));
-          assert.equal((await findSaasUserDirectory(tx, query)).total, 1, "deleted tenants disappear from the directory");
+          const ownerDetail = await getSaasUserDirectoryDetail(
+            { authContext: auth, userId: ownerId },
+            tx,
+          );
+          assert.equal(ownerDetail.accountType, "tenant");
+          assert.equal(ownerDetail.tenantId, tenantId);
+          assert.equal(ownerDetail.tenantCode, prefix);
+          assert.deepEqual(ownerDetail.roles, ["owner"]);
+          assert.ok(
+            !("passwordHash" in ownerDetail) && !("pinHash" in ownerDetail),
+            "details never expose credentials",
+          );
+          const supportAuth: AuthContext = {
+            ...auth,
+            role: "support",
+            roles: ["support"],
+          };
+          assert.equal(
+            (
+              await getSaasUserDirectoryDetail(
+                { authContext: supportAuth, userId: managerId },
+                tx,
+              )
+            ).status,
+            "disabled",
+          );
+          for (const hiddenId of [
+            cashierId,
+            revokedId,
+            mismatchedId,
+            createId(),
+          ]) {
+            await assert.rejects(
+              getSaasUserDirectoryDetail(
+                { authContext: auth, userId: hiddenId },
+                tx,
+              ),
+              "detail eligibility matches the directory",
+            );
+          }
+
+          const platformTargetId = await addUser("platform target", null, 1);
+          const originalPassword = "Previous!Password9";
+          const originalPin = "111222";
+          const passwordHash = await hashPassword(originalPassword);
+          const pinHash = await hashPin(originalPin);
+          await tx
+            .update(users)
+            .set({ passwordHash, pinHash })
+            .where(inArray(users.id, [ownerId, platformTargetId, cashierId]));
+          const createSession = async (
+            userId: string,
+            scopedTenantId: string | null,
+          ) => {
+            const id = createId();
+            await tx
+              .insert(authRefreshTokens)
+              .values({
+                id,
+                userId,
+                tenantId: scopedTenantId,
+                tokenHash: createId(),
+                familyId: createId(),
+                expiresAt: new Date(Date.now() + 60_000),
+              });
+            return id;
+          };
+          const otherSessionId = await createSession(cashierId, tenantId);
+          const otherTenantUserId = await addUser(
+            "other credential",
+            otherTenantId,
+            1,
+          );
+          const otherTenantSessionId = await createSession(
+            otherTenantUserId,
+            otherTenantId,
+          );
+          const otherHashBefore = (
+            await tx
+              .select({
+                passwordHash: users.passwordHash,
+                pinHash: users.pinHash,
+              })
+              .from(users)
+              .where(eq(users.id, otherTenantUserId))
+          )[0];
+
+          for (const targetId of [ownerId, platformTargetId]) {
+            const scopedTenantId = targetId === ownerId ? tenantId : null;
+            const passwordSessionId = await createSession(
+              targetId,
+              scopedTenantId,
+            );
+            const resetInput = {
+              authContext: auth,
+              userId: targetId,
+              reason: "Integration credential recovery",
+            };
+            const passwordResult = await resetDirectoryUserPassword(
+              resetInput,
+              tx,
+            );
+            const [passwordRecord] = await tx
+              .select({
+                passwordHash: users.passwordHash,
+                pinHash: users.pinHash,
+              })
+              .from(users)
+              .where(eq(users.id, targetId));
+            assert.ok(passwordRecord);
+            assert.ok(
+              await verifyPassword(
+                passwordResult.temporaryPassword,
+                passwordRecord.passwordHash,
+              ),
+              "new password authenticates",
+            );
+            assert.equal(
+              await verifyPassword(
+                originalPassword,
+                passwordRecord.passwordHash,
+              ),
+              false,
+              "old password no longer authenticates",
+            );
+            assert.equal(
+              passwordRecord.pinHash,
+              pinHash,
+              "password reset preserves PIN",
+            );
+            assert.ok(
+              (
+                await tx
+                  .select()
+                  .from(authRefreshTokens)
+                  .where(eq(authRefreshTokens.id, passwordSessionId))
+              )[0]?.revokedAt,
+            );
+
+            const pinSessionId = await createSession(targetId, scopedTenantId);
+            const pinResult = await resetDirectoryUserPin(resetInput, tx);
+            assert.match(pinResult.temporaryPin, /^\d{6}$/);
+            const [pinRecord] = await tx
+              .select({
+                passwordHash: users.passwordHash,
+                pinHash: users.pinHash,
+              })
+              .from(users)
+              .where(eq(users.id, targetId));
+            assert.ok(pinRecord);
+            assert.ok(
+              await verifyPassword(pinResult.temporaryPin, pinRecord.pinHash),
+              "new PIN authenticates",
+            );
+            assert.equal(
+              await verifyPassword(originalPin, pinRecord.pinHash),
+              false,
+              "old PIN no longer authenticates",
+            );
+            assert.equal(
+              pinRecord.passwordHash,
+              passwordRecord.passwordHash,
+              "PIN reset preserves password",
+            );
+            assert.ok(
+              (
+                await tx
+                  .select()
+                  .from(authRefreshTokens)
+                  .where(eq(authRefreshTokens.id, pinSessionId))
+              )[0]?.revokedAt,
+            );
+            assert.equal(
+              await verifyPassword(pinResult.temporaryPin, pinHash),
+              false,
+              "generated PIN differs from another employee's PIN",
+            );
+
+            const audits = await tx
+              .select()
+              .from(auditLogs)
+              .where(
+                and(
+                  eq(auditLogs.entityId, targetId),
+                  eq(auditLogs.reason, resetInput.reason),
+                ),
+              );
+            assert.equal(audits.length, 2);
+            assert.deepEqual(
+              new Set(audits.map((row) => row.eventType)),
+              new Set(
+                scopedTenantId
+                  ? ["tenant_user.password_reset", "tenant_user.pin_reset"]
+                  : ["saas_user.password_reset", "saas_user.pin_reset"],
+              ),
+            );
+            for (const audit of audits) {
+              assert.equal(audit.tenantId, scopedTenantId);
+              assert.equal(audit.actorUserId, platformId);
+              assert.deepEqual(audit.metadata, {
+                accountType: scopedTenantId ? "tenant" : "saas",
+                initiatedFrom: "platform_user_directory",
+              });
+              assert.equal(audit.before, null);
+              assert.equal(audit.after, null);
+            }
+          }
+          for (const reset of [
+            resetDirectoryUserPassword,
+            resetDirectoryUserPin,
+          ]) {
+            const request = {
+              authContext: auth,
+              userId: ownerId,
+              reason: "Blocked request",
+            };
+            await assert.rejects(
+              reset({ ...request, authContext: supportAuth }, tx),
+              "support cannot reset credentials",
+            );
+            await assert.rejects(
+              reset({ ...request, authContext: { ...auth, tenantId } }, tx),
+              "tenant-scoped actors cannot reset from the platform",
+            );
+            await assert.rejects(
+              reset({ ...request, userId: platformId }, tx),
+              "self-service uses the profile flow",
+            );
+            await assert.rejects(
+              reset({ ...request, reason: " " }, tx),
+              "blank reasons are rejected at service level",
+            );
+            await assert.rejects(
+              reset({ ...request, reason: "x".repeat(501) }, tx),
+              "oversized reasons are rejected",
+            );
+            for (const hiddenId of [
+              cashierId,
+              revokedId,
+              mismatchedId,
+              createId(),
+            ]) {
+              await assert.rejects(
+                reset({ ...request, userId: hiddenId }, tx),
+                "credential reset has the same directory scope",
+              );
+            }
+          }
+          assert.equal(
+            resetSaasUserPasswordBodySchema.safeParse({ reason: " " }).success,
+            false,
+          );
+          assert.equal(
+            resetSaasUserPasswordBodySchema.safeParse({
+              reason: "x".repeat(501),
+            }).success,
+            false,
+          );
+          for (const sessionId of [otherSessionId, otherTenantSessionId]) {
+            assert.equal(
+              (
+                await tx
+                  .select()
+                  .from(authRefreshTokens)
+                  .where(eq(authRefreshTokens.id, sessionId))
+              )[0]?.revokedAt,
+              null,
+              "other accounts' sessions stay valid",
+            );
+          }
+          const [otherHashAfter] = await tx
+            .select({
+              passwordHash: users.passwordHash,
+              pinHash: users.pinHash,
+            })
+            .from(users)
+            .where(eq(users.id, otherTenantUserId));
+          assert.deepEqual(
+            otherHashAfter,
+            otherHashBefore,
+            "another tenant's credentials remain unchanged",
+          );
+
+          await tx
+            .update(tenants)
+            .set({ deletedAt: new Date() })
+            .where(eq(tenants.id, tenantId));
+          assert.equal(
+            (await findSaasUserDirectory(tx, query)).total,
+            2,
+            "deleted tenants disappear from the directory",
+          );
+          await assert.rejects(
+            getSaasUserDirectoryDetail(
+              { authContext: auth, userId: ownerId },
+              tx,
+            ),
+            "deleted tenants cannot enter user details",
+          );
+          await assert.rejects(
+            resetDirectoryUserPassword(
+              { authContext: auth, userId: ownerId, reason: "Deleted target" },
+              tx,
+            ),
+          );
+          await assert.rejects(
+            resetDirectoryUserPin(
+              { authContext: auth, userId: ownerId, reason: "Deleted target" },
+              tx,
+            ),
+          );
           throw rollback;
         });
       } catch (error) {

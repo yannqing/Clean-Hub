@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { getCurrentAuthQuery } from "@/features/auth/queries";
 import { SaasUserDetailView } from "@/features/saas/users/components";
-import { getSaasUserDetailQuery } from "@/features/saas/users/queries";
+import { getUserDirectoryDetailQuery } from "@/features/saas/users/queries";
 import { getSaasServerApiRequestOptions } from "@/features/saas/server/api-request-options";
 import { canManageSaasUsers } from "@/lib/permissions";
 
@@ -21,13 +21,13 @@ export default async function SaasUserDetailPage({
     notFound();
   }
 
-  let user: Awaited<ReturnType<typeof getSaasUserDetailQuery>> | undefined;
+  let user: Awaited<ReturnType<typeof getUserDirectoryDetailQuery>> | undefined;
   let authContext: Awaited<ReturnType<typeof getCurrentAuthQuery>> | undefined;
 
   try {
     const requestOptions = await getSaasServerApiRequestOptions();
     [user, authContext] = await Promise.all([
-      getSaasUserDetailQuery(userId, requestOptions),
+      getUserDirectoryDetailQuery(userId, requestOptions),
       getCurrentAuthQuery(requestOptions),
     ]);
   } catch (error) {
@@ -47,6 +47,7 @@ export default async function SaasUserDetailPage({
 
   return (
     <SaasUserDetailView
+      key={user.id}
       canManage={canManageSaasUsers(authContext)}
       initialUser={user}
       isCurrentUser={authContext.userId === user.id}

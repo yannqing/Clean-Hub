@@ -38,6 +38,8 @@ export const AUDIT_EVENT_DICTIONARY = {
     "saas_user.updated",
     "saas_user.roles_updated",
     "saas_user.status_updated",
+    "saas_user.password_reset",
+    "saas_user.pin_reset",
   ],
   tenant_branch: ["branch.created", "branch.updated", "branch.status_changed"],
   tenant_user: [
@@ -45,6 +47,7 @@ export const AUDIT_EVENT_DICTIONARY = {
     "tenant_user.updated",
     "tenant_user.disabled",
     "tenant_user.pin_reset",
+    "tenant_user.password_reset",
     "tenant_user.owner_created",
   ],
   tenant_service: [

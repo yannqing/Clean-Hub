@@ -4,6 +4,9 @@ import type { AppBindings } from "../../../http/types.js";
 import {
   createSaasUserController,
   getSaasUserController,
+  getSaasUserDirectoryDetailController,
+  resetDirectoryUserPasswordController,
+  resetDirectoryUserPinController,
   listSaasUsersController,
   listSaasUserDirectoryController,
   getSaasUserStatsController,
@@ -19,6 +22,9 @@ export function createSaasUsersRoutes() {
   routes.get("/", listSaasUsersController);
   routes.get("/stats", getSaasUserStatsController);
   routes.get("/directory", listSaasUserDirectoryController);
+  routes.get("/directory/:userId", getSaasUserDirectoryDetailController);
+  routes.patch("/directory/:userId/reset-password", resetDirectoryUserPasswordController);
+  routes.patch("/directory/:userId/reset-pin", resetDirectoryUserPinController);
   routes.post("/", createSaasUserController);
   routes.get("/:userId", getSaasUserController);
   routes.patch("/:userId/roles", updateSaasUserRolesController);
