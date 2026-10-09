@@ -140,6 +140,7 @@ export type SaasMessages = {
     };
   };
   tenants: {
+    identity: { systemId: string; systemIdHint: string; tenantCodeHint: string };
     list: {
       badge: string;
       title: string;
@@ -256,6 +257,8 @@ export type SaasMessages = {
       defaultsSaved: string;
       defaultsSaveFailed: string;
       flagsSaved: string;
+      flagsLoading: string;
+      flagsLoadFailed: string;
       flagsSaveFailed: string;
       pilotStatus: string;
       enabledFeatures: string;

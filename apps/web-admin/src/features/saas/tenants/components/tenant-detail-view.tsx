@@ -39,6 +39,8 @@ import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import { tenantDefaultValues } from "../constants";
 import { getTenantDetailQuery, getTenantUsersQuery } from "../queries";
 import type { SaasTenantUserSummary, TenantDetail, TenantFormValues, TenantStatus } from "../types";
+import { TenantIdentitySummary } from "./tenant-identity-summary";
+import { TenantFeatureFlagsPanel } from "./tenant-feature-flags-panel";
 import { TenantForm } from "./tenant-form";
 import { TenantTaxSettingsCard } from "./tenant-tax-settings-card";
 
@@ -344,9 +346,9 @@ export function TenantDetailView({
           <DialogTitle className="text-lg">
             {tenant?.name ?? m.tenants.detail.title}
           </DialogTitle>
-          <p className="break-all text-sm text-muted-foreground">
-            {tenant?.id ?? tenantId}
-          </p>
+          {tenant ? <TenantIdentitySummary tenantId={tenant.id} tenantCode={tenant.pressingCode} /> : (
+            <p className="break-all text-sm text-muted-foreground">{m.tenants.identity.systemId}: {tenantId}</p>
+          )}
         </div>
         {tenant && onOpenSettings ? (
           <Button
@@ -394,6 +396,14 @@ export function TenantDetailView({
 
           <TenantForm
             disabled={!canManageTenant}
+            featureFlagsContent={
+              <TenantFeatureFlagsPanel
+                disabled={!canManageTenant}
+                key={tenant.id}
+                onTenantUpdated={onTenantUpdated}
+                tenantId={tenant.id}
+              />
+            }
             initialValues={toFormValues(tenant)}
             key={`${tenant.id}-${tenant.updatedAt}`}
             mode="edit"
@@ -406,9 +416,7 @@ export function TenantDetailView({
                         <h2 className="truncate text-sm font-semibold">
                           {tenant.name}
                         </h2>
-                        <p className="mt-1 break-all text-xs text-muted-foreground">
-                          {tenant.id}
-                        </p>
+                        <div className="mt-2"><TenantIdentitySummary tenantId={tenant.id} tenantCode={tenant.pressingCode} /></div>
                       </div>
                       <Badge
                         className="shrink-0"

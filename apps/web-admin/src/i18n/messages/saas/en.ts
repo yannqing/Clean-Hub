@@ -142,6 +142,7 @@ export const saasMessagesEn: SaasMessages = {
     },
   },
   tenants: {
+    identity: { systemId: "System ID", systemIdHint: "An automatically generated unique ID used for internal links and technical support. You do not need to remember it. Use the tenant code for business enquiries.", tenantCodeHint: "The tenant code identifies this business for searches and communication. Changing it does not change the system ID." },
     list: {
       badge: "SaaS tenants",
       title: "Tenant Management",
@@ -264,6 +265,8 @@ export const saasMessagesEn: SaasMessages = {
       defaultsSaved: "Tenant settings updated.",
       defaultsSaveFailed: "Tenant settings update failed.",
       flagsSaved: "Tenant feature flags updated.",
+      flagsLoading: "Loading tenant feature flags…",
+      flagsLoadFailed: "Could not load this tenant's feature flags. Refresh to try again.",
       flagsSaveFailed: "Tenant feature flags update failed.",
       pilotStatus: "Pilot status",
       enabledFeatures: "Enabled features",

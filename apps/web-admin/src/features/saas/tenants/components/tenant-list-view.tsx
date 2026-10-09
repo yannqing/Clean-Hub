@@ -449,9 +449,6 @@ export function TenantListView() {
                         >
                           {tenant.name}
                         </Link>
-                        <div className="max-w-52 truncate text-[11px] text-muted-foreground">
-                          {tenant.id}
-                        </div>
                       </TableCell>
                       <TableCell>{tenant.pressingCode}</TableCell>
                       <TableCell>

@@ -141,6 +141,7 @@ export const saasMessagesZhCN: SaasMessages = {
     },
   },
   tenants: {
+    identity: { systemId: "系统 ID", systemIdHint: "系统自动生成的唯一标识，用于内部数据关联和技术排查，无需记忆。业务查询和沟通请使用租户编码。", tenantCodeHint: "租户编码用于识别该商户、查询和业务沟通。修改编码不会改变系统 ID。" },
     list: {
       badge: "SaaS 租户",
       title: "租户管理",
@@ -260,6 +261,8 @@ export const saasMessagesZhCN: SaasMessages = {
       defaultsSaved: "租户设置已更新。",
       defaultsSaveFailed: "租户设置更新失败。",
       flagsSaved: "租户功能开关已更新。",
+      flagsLoading: "正在加载租户功能配置…",
+      flagsLoadFailed: "无法加载该租户的功能配置，请点击刷新重试。",
       flagsSaveFailed: "租户功能开关更新失败。",
       pilotStatus: "试点状态",
       enabledFeatures: "已启用功能",

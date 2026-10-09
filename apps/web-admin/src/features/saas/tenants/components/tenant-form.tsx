@@ -46,6 +46,7 @@ type TenantFormResult =
 type TenantFormProps = {
   aside?: ReactNode;
   disabled?: boolean;
+  featureFlagsContent?: ReactNode;
   initialValues?: Partial<TenantFormValues>;
   mode: "create" | "edit";
   onSubmit: (values: TenantFormValues) => Promise<TenantFormResult>;
@@ -77,6 +78,7 @@ function isUsableTaxTemplate(template: PlatformTaxTemplate | undefined): templat
 export function TenantForm({
   aside,
   disabled = false,
+  featureFlagsContent,
   initialValues,
   mode,
   onSubmit,
@@ -251,11 +253,13 @@ export function TenantForm({
                         aria-invalid={Boolean(errors.pressingCode)}
                         disabled={disabled || submitting}
                         id="pressing-code"
+                        aria-describedby="pressing-code-hint"
                         onChange={(event) =>
                           updateValue("pressingCode", event.target.value)
                         }
                         value={values.pressingCode}
                       />
+                      <p className="text-xs text-muted-foreground" id="pressing-code-hint">{m.tenants.identity.tenantCodeHint}</p>
                       {errors.pressingCode ? (
                         <p className="text-xs text-destructive">
                           {errors.pressingCode}
@@ -414,7 +418,7 @@ export function TenantForm({
                 ) : null}
               </CardContent>
             </Card>
-          ) : null}
+          ) : featureFlagsContent}
 
           <Card className="gap-0 rounded-lg py-0 shadow-none">
             <CardContent className="grid gap-4 py-5">

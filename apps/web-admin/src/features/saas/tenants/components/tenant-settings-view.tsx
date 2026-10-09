@@ -29,12 +29,12 @@ import { interpolate } from "@/i18n/messages/saas";
 import { canUpdateTenantStatus, canWriteTenant } from "@/lib/permissions";
 
 import {
-  updateTenantFeatureFlagsAction,
   updateTenantSettingsAction,
   updateTenantStatusAction,
 } from "../actions";
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import { tenantFeatureFlagOptions, tenantLanguageOptions } from "../constants";
+import { toFeatureFlagsFormValues } from "../feature-flags";
 import {
   getTenantDetailQuery,
   getTenantFeatureFlagsQuery,
@@ -43,12 +43,12 @@ import {
 import type {
   TenantDetail,
   TenantFeatureFlags,
-  TenantFeatureFlagsFormValues,
   TenantSettings,
   TenantSettingsFormValues,
   TenantStatus,
 } from "../types";
-import { TenantFeatureFlagFields } from "./tenant-feature-flag-fields";
+import { TenantIdentitySummary } from "./tenant-identity-summary";
+import { TenantFeatureFlagsEditor } from "./tenant-feature-flags-editor";
 
 export type TenantSettingsPresentation = "page" | "dialog";
 
@@ -103,20 +103,6 @@ function toSettingsFormValues(
   };
 }
 
-function toFeatureFlagsFormValues(
-  featureFlags: TenantFeatureFlags,
-): TenantFeatureFlagsFormValues {
-  return {
-    laundryEnabled: featureFlags.laundryEnabled,
-    carWashEnabled: featureFlags.carWashEnabled,
-    retailProductsEnabled: featureFlags.retailProductsEnabled,
-    deliveryEnabled: featureFlags.deliveryEnabled,
-    notificationsEnabled: featureFlags.notificationsEnabled,
-    emailEnabled: featureFlags.emailEnabled,
-    customerOtpEnabled: featureFlags.customerOtpEnabled,
-  };
-}
-
 function SettingsSummary({
   tenant,
   settings,
@@ -137,9 +123,7 @@ function SettingsSummary({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold">{tenant.name}</h2>
-            <p className="mt-1 break-all text-xs text-muted-foreground">
-              {tenant.id}
-            </p>
+            <div className="mt-2"><TenantIdentitySummary tenantId={tenant.id} tenantCode={tenant.pressingCode} /></div>
           </div>
           <Badge className="shrink-0" variant={getStatusVariant(tenant.status)}>
             {m.common.statusLabels[tenant.status]}
@@ -312,88 +296,6 @@ function TenantSettingsForm({
           <div className="flex justify-end">
             <Button disabled={disabled || submitting} type="submit">
               {submitting ? m.common.saving : m.tenants.settings.saveDefaults}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </form>
-  );
-}
-
-function TenantFeatureFlagsForm({
-  disabled,
-  initialValues,
-  onUpdated,
-  tenantId,
-}: {
-  disabled: boolean;
-  initialValues: TenantFeatureFlagsFormValues;
-  onUpdated: (featureFlags: TenantFeatureFlags) => void;
-  tenantId: string;
-}) {
-  const { m } = useSaasI18n();
-  const [values, setValues] =
-    useState<TenantFeatureFlagsFormValues>(initialValues);
-  const [submitting, setSubmitting] = useState(false);
-
-  function updateValue(
-    key: keyof TenantFeatureFlagsFormValues,
-    value: boolean,
-  ): void {
-    setValues((current) => ({
-      ...current,
-      [key]: value,
-    }));
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (disabled) {
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      const result = await updateTenantFeatureFlagsAction(tenantId, values);
-
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-
-      setValues(toFeatureFlagsFormValues(result.data));
-      onUpdated(result.data);
-      toast.success(m.tenants.settings.flagsSaved);
-    } catch (error) {
-      toast.error(
-        getTenantLoadErrorMessage(error, m.tenants.settings.flagsSaveFailed),
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <Card className="gap-0 rounded-lg py-0 shadow-none">
-        <CardContent className="grid gap-4 py-5">
-          <h2 className="text-sm font-semibold">
-            {m.tenants.settings.featureFlagsSection}
-          </h2>
-
-          <TenantFeatureFlagFields
-            disabled={disabled || submitting}
-            onChange={updateValue}
-            values={values}
-          />
-
-          <div className="flex justify-end">
-            <Button disabled={disabled || submitting} type="submit">
-              {submitting
-                ? m.common.saving
-                : m.tenants.settings.saveFeatureFlags}
             </Button>
           </div>
         </CardContent>
@@ -667,9 +569,9 @@ export function TenantSettingsView({
           <DialogTitle className="text-lg">
             {tenant?.name ?? m.tenants.settings.title}
           </DialogTitle>
-          <p className="break-all text-sm text-muted-foreground">
-            {tenant?.id ?? tenantId}
-          </p>
+          {tenant ? <TenantIdentitySummary tenantId={tenant.id} tenantCode={tenant.pressingCode} /> : (
+            <p className="break-all text-sm text-muted-foreground">{m.tenants.identity.systemId}: {tenantId}</p>
+          )}
         </div>
         {refreshButton}
       </div>
@@ -728,10 +630,10 @@ export function TenantSettingsView({
                 tenantId={tenantId}
               />
 
-              <TenantFeatureFlagsForm
+              <TenantFeatureFlagsEditor
                 disabled={!canManageTenantSettings}
                 initialValues={toFeatureFlagsFormValues(featureFlags)}
-                key={`flags-${featureFlags.tenantId}-${featureFlags.updatedAt ?? "initial"}`}
+                key={`flags-${featureFlags.tenantId}-${featureFlags.version}`}
                 onUpdated={(nextFlags) => {
                   setFeatureFlags(nextFlags);
                   onTenantUpdated?.();
