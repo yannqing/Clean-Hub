@@ -1,14 +1,20 @@
+import type { AdminRole } from "@cleanhub/domain";
 import { NextResponse, type NextRequest } from "next/server";
+
+import {
+  AUTH_REDIRECT_REASONS,
+  AUTH_REDIRECT_REASON_PARAM,
+  getWebAdminHomePath,
+  type AuthRedirectReason,
+} from "@/config/auth-routing";
 
 const ACCESS_COOKIE_NAME = "cleanhub_access_token";
 const REFRESH_COOKIE_NAME = "cleanhub_refresh_token";
 const DEFAULT_API_BASE_URL = "http://localhost:4000";
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
   process.env.CLEANHUB_API_BASE_URL ??
+  process.env.NEXT_PUBLIC_API_BASE_URL ??
   DEFAULT_API_BASE_URL;
-
-type AdminRole = "super_admin" | "support" | "owner" | "manager";
 
 type AuthContext = {
   userId: string;
@@ -24,14 +30,6 @@ type AuthResolution = {
   authContext: AuthContext;
   setCookieHeaders: string[];
 };
-
-function isSaasRole(role: AdminRole): boolean {
-  return role === "super_admin" || role === "support";
-}
-
-function getDefaultPathForRole(role: AdminRole): string {
-  return isSaasRole(role) ? "/saas" : "/tenant";
-}
 
 function isSaasPath(pathname: string): boolean {
   return pathname === "/saas" || pathname.startsWith("/saas/");
@@ -69,6 +67,67 @@ function appendSetCookieHeaders(
   return response;
 }
 
+function createNextResponse(
+  request: NextRequest,
+  setCookieHeaders: string[] = [],
+): NextResponse {
+  if (setCookieHeaders.length === 0) {
+    return NextResponse.next();
+  }
+
+  const requestHeaders = new Headers(request.headers);
+  const cookieValues = new Map<string, string>();
+
+  for (const cookie of request.headers.get("cookie")?.split(";") ?? []) {
+    const separatorIndex = cookie.indexOf("=");
+
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    cookieValues.set(
+      cookie.slice(0, separatorIndex).trim(),
+      cookie.slice(separatorIndex + 1).trim(),
+    );
+  }
+
+  for (const setCookie of setCookieHeaders) {
+    const cookie = setCookie.split(";", 1)[0];
+    const separatorIndex = cookie?.indexOf("=") ?? -1;
+
+    if (!cookie || separatorIndex <= 0) {
+      continue;
+    }
+
+    const name = cookie.slice(0, separatorIndex).trim();
+    const value = cookie.slice(separatorIndex + 1).trim();
+
+    if (value) {
+      cookieValues.set(name, value);
+    } else {
+      cookieValues.delete(name);
+    }
+  }
+
+  if (cookieValues.size > 0) {
+    requestHeaders.set(
+      "cookie",
+      [...cookieValues].map(([name, value]) => `${name}=${value}`).join("; "),
+    );
+  } else {
+    requestHeaders.delete("cookie");
+  }
+
+  return appendSetCookieHeaders(
+    NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    }),
+    setCookieHeaders,
+  );
+}
+
 function createRedirect(
   request: NextRequest,
   path: string,
@@ -81,18 +140,33 @@ function createRedirect(
   return appendSetCookieHeaders(NextResponse.redirect(url), setCookieHeaders);
 }
 
-function redirectToLogin(request: NextRequest): NextResponse {
+function redirectToLogin(
+  request: NextRequest,
+  setCookieHeaders: string[] = [],
+  reason?: AuthRedirectReason,
+): NextResponse {
   const url = request.nextUrl.clone();
   url.pathname = "/login";
+  url.search = "";
   url.searchParams.set("next", request.nextUrl.pathname);
+  if (reason) {
+    url.searchParams.set(AUTH_REDIRECT_REASON_PARAM, reason);
+  }
 
-  return NextResponse.redirect(url);
+  return appendSetCookieHeaders(NextResponse.redirect(url), setCookieHeaders);
 }
+
+/**
+ * "unavailable" means the auth backend could not answer (5xx or network
+ * failure). Session cookies must be kept in that case: bouncing an admin to
+ * /login on an infrastructure hiccup would wrongly discard a valid session.
+ */
+type AuthOutcome = AuthResolution | null | "unavailable";
 
 async function requestAuthContext(
   path: "/auth/me" | "/auth/refresh",
   request: NextRequest,
-): Promise<AuthResolution | null> {
+): Promise<AuthOutcome> {
   const cookie = request.headers.get("cookie");
 
   if (!cookie) {
@@ -110,6 +184,10 @@ async function requestAuthContext(
       cache: "no-store",
     });
 
+    if (response.status >= 500) {
+      return "unavailable";
+    }
+
     if (!response.ok) {
       return null;
     }
@@ -119,19 +197,56 @@ async function requestAuthContext(
       setCookieHeaders: getSetCookieHeaders(response.headers),
     };
   } catch {
-    return null;
+    return "unavailable";
   }
 }
 
-async function resolveAuth(request: NextRequest): Promise<AuthResolution | null> {
+/**
+ * Ask the API to end the session and return the cookie-clearing headers.
+ *
+ * The API owns these cookies, so it is the only thing that can delete them
+ * with attributes that match what it set. Forging expired cookies here would
+ * silently miss on any domain or path difference and leave the session alive.
+ */
+async function requestLogoutCookies(request: NextRequest): Promise<string[]> {
+  const cookie = request.headers.get("cookie");
+
+  if (!cookie) {
+    return [];
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        cookie,
+        "x-request-id": request.headers.get("x-request-id") ?? "",
+      },
+      cache: "no-store",
+    });
+
+    return response.ok ? getSetCookieHeaders(response.headers) : [];
+  } catch {
+    // The redirect to /login still happens; the stale session simply outlives
+    // this request, which is the same position we were in before.
+    return [];
+  }
+}
+
+async function resolveAuth(request: NextRequest): Promise<AuthOutcome> {
   const accessToken = request.cookies.get(ACCESS_COOKIE_NAME)?.value;
   const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
 
   if (accessToken) {
-    const authContext = await requestAuthContext("/auth/me", request);
+    const outcome = await requestAuthContext("/auth/me", request);
 
-    if (authContext) {
-      return authContext;
+    if (outcome === "unavailable") {
+      return "unavailable";
+    }
+
+    if (outcome) {
+      return outcome;
     }
   }
 
@@ -144,39 +259,62 @@ async function resolveAuth(request: NextRequest): Promise<AuthResolution | null>
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const auth = await resolveAuth(request);
+  const resolution = await resolveAuth(request);
+
+  if (resolution === "unavailable" && pathname !== "/login") {
+    // Auth backend is temporarily unreachable. Keep the session cookies and
+    // let the page-level error boundary surface the failure with a retry,
+    // rather than signing every admin out over one bad response.
+    return createNextResponse(request);
+  }
+
+  const auth = resolution === "unavailable" ? null : resolution;
 
   if (pathname === "/login") {
     if (!auth) {
       return NextResponse.next();
     }
 
-    return createRedirect(
-      request,
-      getDefaultPathForRole(auth.authContext.role),
-      auth.setCookieHeaders,
-    );
+    const defaultPath = getWebAdminHomePath(auth.authContext);
+    if (!defaultPath) {
+      return createNextResponse(request, auth.setCookieHeaders);
+    }
+
+    return createRedirect(request, defaultPath, auth.setCookieHeaders);
   }
 
   if (!auth) {
     return redirectToLogin(request);
   }
 
-  const defaultPath = getDefaultPathForRole(auth.authContext.role);
+  const defaultPath = getWebAdminHomePath(auth.authContext);
+
+  if (!defaultPath) {
+    // The account authenticates but has no home in this app -- a cashier, or an
+    // owner demoted mid-session. Without ending the session here they would be
+    // parked on /login still holding valid cookies, with no way to sign out:
+    // the login page is the one route this proxy lets an authenticated user
+    // sit on.
+    return redirectToLogin(
+      request,
+      await requestLogoutCookies(request),
+      AUTH_REDIRECT_REASONS.tenantAccessDenied,
+    );
+  }
 
   if (pathname === "/") {
     return createRedirect(request, defaultPath, auth.setCookieHeaders);
   }
 
-  if (isSaasPath(pathname) && !isSaasRole(auth.authContext.role)) {
+  if (isSaasPath(pathname) && defaultPath !== "/saas") {
     return createRedirect(request, defaultPath, auth.setCookieHeaders);
   }
 
-  if (isTenantPath(pathname) && isSaasRole(auth.authContext.role)) {
+  if (isTenantPath(pathname) && defaultPath !== "/tenant") {
     return createRedirect(request, defaultPath, auth.setCookieHeaders);
   }
 
-  return appendSetCookieHeaders(NextResponse.next(), auth.setCookieHeaders);
+  return createNextResponse(request, auth.setCookieHeaders);
 }
 
 export const config = {

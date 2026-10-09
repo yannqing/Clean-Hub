@@ -46,6 +46,9 @@ export async function hashPassword(password: string): Promise<string> {
   ].join("$");
 }
 
+/** PIN uses the same scrypt parameters as login passwords. */
+export const hashPin = hashPassword;
+
 export async function verifyPassword(
   password: string,
   storedHash: string,

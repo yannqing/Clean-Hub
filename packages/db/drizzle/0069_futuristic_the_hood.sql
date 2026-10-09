@@ -1,0 +1,1 @@
+ALTER TABLE "pos_z_reports" ADD COLUMN "tax_components" jsonb DEFAULT '[]'::jsonb NOT NULL;

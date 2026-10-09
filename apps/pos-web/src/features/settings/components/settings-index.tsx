@@ -1,0 +1,167 @@
+"use client";
+
+import Link from "next/link";
+import type { ReactNode } from "react";
+
+import { Icon } from "@/components/app-shell";
+import { posRoutes } from "@/config";
+import { posMessage } from "@/lib/pos-message";
+import { getSettingsSectionTitle } from "@/lib/settings-labels";
+
+import {
+  LOCK_TIMEOUT_OPTIONS,
+  PAYMENT_METHOD_OPTIONS,
+  PRINT_COPIES_OPTIONS,
+  ROUNDING_RULE_OPTIONS,
+  SETTINGS_PAGE_TITLE,
+} from "../constants";
+import type { TerminalSettingsFormValues } from "../types";
+
+type SettingsIndexProps = {
+  branchName: string;
+  formValues: TerminalSettingsFormValues;
+  hardwareCount: number;
+  loading: boolean;
+};
+
+type SettingsItem = {
+  description: ReactNode;
+  href: string;
+  title: string;
+};
+
+function optionLabel<T extends string | number>(
+  options: readonly { label: string; value: T }[],
+  value: T,
+): string {
+  return (
+    options.find((option) => option.value === value)?.label ?? String(value)
+  );
+}
+
+function SettingsGroup({
+  items,
+  title,
+}: {
+  items: SettingsItem[];
+  title: string;
+}) {
+  return (
+    <section aria-labelledby={`settings-group-${title}`}>
+      <h2
+        className="mb-2 text-sm font-medium text-muted-foreground"
+        id={`settings-group-${title}`}
+      >
+        {title}
+      </h2>
+      <div>
+        {items.map((item) => (
+          <Link
+            className="group flex min-h-[76px] items-center gap-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            href={item.href}
+            key={item.href}
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-base font-medium text-foreground">
+                {item.title}
+              </span>
+              <span className="mt-0.5 block truncate text-sm text-muted-foreground">
+                {item.description}
+              </span>
+            </span>
+            <Icon
+              className="size-5 shrink-0 text-foreground transition-transform group-active:translate-x-0.5"
+              name="chevron-right"
+            />
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The settings landing page on every breakpoint: a list of entry points, one
+ * per section, each showing its current value so the cashier can see what is
+ * set without opening it.
+ */
+export function SettingsIndex({
+  branchName,
+  formValues,
+  hardwareCount,
+  loading,
+}: SettingsIndexProps) {
+  const terminalItems: SettingsItem[] = [
+    {
+      description: loading ? "正在加载…" : formValues.label || "未设置设备标签",
+      href: posRoutes.settingsTerminal,
+      title: getSettingsSectionTitle("terminal"),
+    },
+    {
+      description: loading
+        ? "正在加载…"
+        : `${optionLabel(PAYMENT_METHOD_OPTIONS, formValues.defaultPaymentMethod)} · ${optionLabel(ROUNDING_RULE_OPTIONS, formValues.roundingRule)}`,
+      href: posRoutes.settingsCheckout,
+      title: getSettingsSectionTitle("checkout"),
+    },
+    {
+      description: loading
+        ? "正在加载…"
+        : posMessage("pos.inline.printingSummary", {
+            mode: posMessage(
+              formValues.autoPrintReceipt
+                ? "pos.inline.autoPrintOn"
+                : "pos.inline.autoPrintOff",
+            ),
+            copies: optionLabel(PRINT_COPIES_OPTIONS, formValues.printCopies),
+          }),
+      href: posRoutes.settingsPrinting,
+      title: getSettingsSectionTitle("printing"),
+    },
+    {
+      description: loading
+        ? "正在加载…"
+        : posMessage("pos.inline.autoLockSummary", {
+            value: optionLabel(
+              LOCK_TIMEOUT_OPTIONS,
+              formValues.lockTimeoutSeconds,
+            ),
+          }),
+      href: posRoutes.settingsSecurity,
+      title: getSettingsSectionTitle("security"),
+    },
+  ];
+
+  const storeItems: SettingsItem[] = [
+    {
+      description: loading ? "正在加载…" : branchName || "未获取门店信息",
+      href: posRoutes.settingsStore,
+      title: getSettingsSectionTitle("store"),
+    },
+    {
+      description: loading
+        ? "正在加载…"
+        : hardwareCount > 0
+          ? posMessage("pos.inline.deviceCount", { count: hardwareCount })
+          : "打开查看本机可用设备",
+      href: posRoutes.settingsHardware,
+      title: getSettingsSectionTitle("hardware"),
+    },
+  ];
+
+  return (
+    <section
+      aria-busy={loading}
+      className="mx-auto w-full max-w-lg space-y-9 pb-8 lg:max-w-[720px]"
+    >
+      <header className="pt-1">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          {SETTINGS_PAGE_TITLE}
+        </h1>
+      </header>
+
+      <SettingsGroup items={terminalItems} title="终端" />
+      <SettingsGroup items={storeItems} title="门店与设备" />
+    </section>
+  );
+}

@@ -1,0 +1,1 @@
+ALTER TABLE "tenant_feature_flags" ADD COLUMN "customer_otp_enabled" boolean DEFAULT false NOT NULL;

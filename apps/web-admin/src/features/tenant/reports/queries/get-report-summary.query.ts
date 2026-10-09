@@ -1,8 +1,13 @@
-import type { ReportSummary } from "../types";
+import { webAdminApi } from "@/lib/api-client";
 
-export async function getReportSummaryQuery(): Promise<ReportSummary> {
-  return {
-    grossSales: 0,
-    orderCount: 0,
-  };
+import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
+import type { ReportSummary, ReportSummaryQuery } from "../types";
+
+export async function getReportSummaryQuery(
+  query?: ReportSummaryQuery,
+): Promise<ReportSummary> {
+  return webAdminApi.tenant.reports.getSummary(
+    query,
+    await getTenantServerApiRequestOptions(),
+  );
 }

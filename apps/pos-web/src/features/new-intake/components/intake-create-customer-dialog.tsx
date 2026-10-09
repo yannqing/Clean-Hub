@@ -1,0 +1,187 @@
+"use client";
+
+import { getPosApiErrorMessage } from "@/lib/api-error-message";
+import { posToast as toast } from "@/lib/pos-toast";
+import { usePosOfflineWrites } from "@/features/offline/lib";
+import { useState } from "react";
+import { useTranslation } from "@cleanhub/i18n/react";
+
+import { translatePosText } from "@/components/i18n/pos-runtime-text";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@cleanhub/ui";
+
+import type { IntakeCreatedAccount } from "../queries";
+import type { IntakeCreateAccountInput } from "../types";
+
+type IntakeCreateCustomerDialogProps = {
+  initialForm: IntakeCreateAccountInput;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (account: IntakeCreatedAccount) => void;
+};
+
+/**
+ * 新建客户账户 dialog for the intake page. Creates a customer account (the
+ * shared contact holder). Mirrors the customer-management AccountFormDialog
+ * layout (Dialog primitives, h-11 inputs, text-xs labels). Phone and email are
+ * mutually optional but at least one is required.
+ *
+ * The parent remounts this component via `key` when the dialog target changes,
+ * so form state initializes from the empty form without an effect.
+ */
+export function IntakeCreateCustomerDialog({
+  initialForm,
+  open,
+  onOpenChange,
+  onCreated,
+}: IntakeCreateCustomerDialogProps) {
+  const { locale } = useTranslation();
+  const text = (value: string) => translatePosText(value, locale);
+  const [form, setForm] = useState<IntakeCreateAccountInput>(initialForm);
+  const [submitting, setSubmitting] = useState(false);
+  const { createCustomerAccount } = usePosOfflineWrites();
+
+  function update<K extends keyof IntakeCreateAccountInput>(
+    key: K,
+    value: IntakeCreateAccountInput[K],
+  ) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function handleSubmit() {
+    if (!form.accountName.trim()) {
+      toast.error("请填写账户名称");
+      return;
+    }
+    if (!form.accountPhone.trim() && !form.accountEmail.trim()) {
+      toast.error("请至少填写账户手机号或邮箱");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const result = await createCustomerAccount({
+        accountName: form.accountName.trim(),
+        phone: form.accountPhone.trim() || undefined,
+        email: form.accountEmail.trim() || undefined,
+      });
+      const account = result.queued
+        ? {
+            accountId: result.entityId,
+            accountName: form.accountName.trim(),
+            phone: form.accountPhone.trim() || null,
+            email: form.accountEmail.trim() || null,
+          }
+        : {
+            accountId: result.data.id,
+            accountName: result.data.accountName,
+            phone: result.data.phone,
+            email: result.data.email,
+          };
+      toast.success(
+        result.queued
+          ? "网络不可用，客户账户已加入同步队列。"
+          : "新增客户账户已保存",
+      );
+      onOpenChange(false);
+      onCreated(account);
+    } catch (error) {
+      toast.error(getPosApiErrorMessage(error, "保存失败，请重试。"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
+        <DialogHeader>
+          <DialogTitle>{text("新建客户账户")}</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormField
+            id="form-intake-account-name"
+            label={text("账户名称")}
+            onChange={(value) => update("accountName", value)}
+            placeholder={text("例如：Diop Family")}
+            value={form.accountName}
+          />
+          <FormField
+            id="form-intake-account-phone"
+            label={text("账户手机号")}
+            onChange={(value) => update("accountPhone", value)}
+            placeholder="+221 ..."
+            value={form.accountPhone}
+          />
+          <FormField
+            id="form-intake-account-email"
+            label={text("账户邮箱")}
+            onChange={(value) => update("accountEmail", value)}
+            placeholder="name@example.com"
+            type="email"
+            value={form.accountEmail}
+          />
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {text("账户保存共享联系方式，可关联多个客户档案。")}
+        </p>
+        <DialogFooter>
+          <button
+            className="h-10 rounded-lg border border-border px-4 text-sm font-semibold"
+            disabled={submitting}
+            type="button"
+            onClick={() => onOpenChange(false)}
+          >
+            {text("取消")}
+          </button>
+          <button
+            className="h-10 rounded-lg bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-60"
+            disabled={submitting}
+            type="button"
+            onClick={handleSubmit}
+          >
+            {text(submitting ? "保存中…" : "保存")}
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FormField({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
+        {label}
+      </span>
+      <input
+        className="h-11 w-full rounded-lg border border-border px-3 text-sm outline-none focus:border-foreground/40 focus:ring-2 focus:ring-ring/20"
+        id={id}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        type={type}
+        value={value}
+      />
+    </label>
+  );
+}

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."order_item_source_type" ADD VALUE 'service' BEFORE 'subscription';

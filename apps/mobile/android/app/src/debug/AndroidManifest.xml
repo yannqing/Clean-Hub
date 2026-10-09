@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+        The debug bundle targets the local API through adb reverse at
+        http://localhost:4000. Release builds retain Android's default HTTPS
+        requirement because this manifest is included only in the debug source
+        set.
+    -->
+    <application android:usesCleartextTraffic="true" />
+</manifest>

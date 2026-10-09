@@ -1,0 +1,680 @@
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  getTableColumns,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  sql,
+  type SQL,
+} from "drizzle-orm";
+import { createId } from "@cleanhub/id";
+
+import {
+  appointments,
+  branches,
+  customers,
+  deliveryTasks,
+  orders,
+  paymentTransactions,
+  roles,
+  serviceTickets,
+  tenantFeatureFlags,
+  tenantSettings,
+  tenants,
+  userProfiles,
+  userRoles,
+  users,
+  type Database,
+} from "@cleanhub/db";
+
+import type {
+  OwnerAppointment,
+  OwnerAppointmentStatus,
+  OwnerBranchOption,
+  OwnerDriverOption,
+  OwnerTodaySummary,
+} from "./owner.types.js";
+
+type TenantBase = Pick<
+  OwnerTodaySummary,
+  "tenantId" | "tenantName" | "tenantStatus" | "currency" | "featureFlags"
+>;
+
+function emptyAppointmentSummary(): OwnerTodaySummary["appointmentSummary"] {
+  return {
+    pending: 0,
+    accepted: 0,
+    cancelled: 0,
+    done: 0,
+  };
+}
+
+function emptyDeliverySummary(): OwnerTodaySummary["deliverySummary"] {
+  return {
+    pendingDispatch: 0,
+    inProgress: 0,
+    signed: 0,
+    exception: 0,
+  };
+}
+
+function toNumber(value: unknown): number {
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return Number(value);
+  }
+
+  return 0;
+}
+
+function toIsoString(value: Date | null): string | null {
+  return value ? value.toISOString() : null;
+}
+
+type OwnerAppointmentRow = typeof appointments.$inferSelect & {
+  customerName: string;
+  customerPhone: string | null;
+  assigneeUserId: string | null;
+  assigneeName: string | null;
+};
+
+function toAppointment(row: OwnerAppointmentRow): OwnerAppointment {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    branchId: row.branchId,
+    customerId: row.customerId,
+    customerName: row.customerName,
+    customerPhone: row.customerPhone,
+    type: row.type,
+    status: row.status,
+    expectedAt: row.expectedAt.toISOString(),
+    address: row.address,
+    notes: row.notes,
+    deliveryTaskId: row.deliveryTaskId,
+    assigneeUserId: row.assigneeUserId,
+    assigneeName: row.assigneeName,
+    acceptedAt: toIsoString(row.acceptedAt),
+    acceptedBy: row.acceptedBy,
+    cancelledAt: toIsoString(row.cancelledAt),
+    cancelledBy: row.cancelledBy,
+    cancellationReason: row.cancellationReason,
+    doneAt: toIsoString(row.doneAt),
+    doneBy: row.doneBy,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function toAppointmentRow(row: typeof appointments.$inferSelect): OwnerAppointmentRow {
+  return {
+    ...row,
+    customerName: row.customerId,
+    customerPhone: null,
+    assigneeUserId: null,
+    assigneeName: null,
+  };
+}
+
+export class OwnerRepository {
+  constructor(private readonly db: Database) {}
+
+  async listBranches(input: {
+    tenantId: string;
+    allowedBranchIds?: string[];
+  }): Promise<OwnerBranchOption[]> {
+    if (input.allowedBranchIds?.length === 0) {
+      return [];
+    }
+
+    const filters: SQL[] = [
+      eq(branches.tenantId, input.tenantId),
+      isNull(branches.deletedAt),
+    ];
+
+    if (input.allowedBranchIds) {
+      filters.push(inArray(branches.id, input.allowedBranchIds));
+    }
+
+    const rows = await this.db
+      .select({
+        id: branches.id,
+        name: branches.name,
+        address: branches.address,
+        status: branches.status,
+      })
+      .from(branches)
+      .where(and(...filters))
+      .orderBy(asc(branches.name));
+
+    return rows;
+  }
+
+  async listDrivers(input: {
+    tenantId: string;
+    branchId?: string;
+    allowedBranchIds?: string[];
+  }): Promise<OwnerDriverOption[]> {
+    if (input.allowedBranchIds?.length === 0) {
+      return [];
+    }
+
+    const filters: SQL[] = [
+      eq(users.tenantId, input.tenantId),
+      eq(users.userType, "tenant"),
+      eq(users.status, "active"),
+      isNull(users.deletedAt),
+      eq(userRoles.tenantId, input.tenantId),
+      isNull(userRoles.revokedAt),
+      eq(roles.scope, "tenant"),
+      eq(roles.code, "driver"),
+      eq(roles.status, "active"),
+      isNull(roles.deletedAt),
+    ];
+
+    // Both filters apply. An explicit branch narrows the result *within* the
+    // caller's allow-list; it must never replace it, or a future call path
+    // that forgets to check access first would read another branch's drivers.
+    if (input.branchId) {
+      filters.push(eq(userRoles.branchId, input.branchId));
+    }
+    if (input.allowedBranchIds) {
+      filters.push(inArray(userRoles.branchId, input.allowedBranchIds));
+    }
+
+    const rows = await this.db
+      .select({
+        id: users.id,
+        displayName: userProfiles.displayName,
+        email: users.email,
+        phone: users.phone,
+        status: users.status,
+        branchId: userRoles.branchId,
+      })
+      .from(users)
+      .innerJoin(userRoles, eq(userRoles.userId, users.id))
+      .innerJoin(roles, eq(roles.id, userRoles.roleId))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(and(...filters))
+      .orderBy(asc(userProfiles.displayName), asc(users.email), asc(users.id));
+
+    const driversById = new Map<string, OwnerDriverOption>();
+
+    for (const row of rows) {
+      const driver = driversById.get(row.id) ?? {
+        id: row.id,
+        displayName: row.displayName ?? row.email ?? row.id,
+        email: row.email,
+        phone: row.phone,
+        status: "active" as const,
+        branchIds: [],
+      };
+
+      if (row.branchId && !driver.branchIds.includes(row.branchId)) {
+        driver.branchIds.push(row.branchId);
+      }
+
+      driversById.set(row.id, driver);
+    }
+
+    return [...driversById.values()];
+  }
+
+  async findTenantBase(tenantId: string): Promise<TenantBase | null> {
+    const rows = await this.db
+      .select({
+        tenantId: tenants.id,
+        tenantName: tenants.name,
+        tenantStatus: tenants.status,
+        currency: sql<string>`coalesce(${tenantSettings.defaultCurrency}, 'XOF')`,
+        laundryEnabled: tenantFeatureFlags.laundryEnabled,
+        carWashEnabled: tenantFeatureFlags.carWashEnabled,
+        retailProductsEnabled: tenantFeatureFlags.retailProductsEnabled,
+        deliveryEnabled: tenantFeatureFlags.deliveryEnabled,
+        notificationsEnabled: tenantFeatureFlags.notificationsEnabled,
+      })
+      .from(tenants)
+      .innerJoin(tenantFeatureFlags, eq(tenantFeatureFlags.tenantId, tenants.id))
+      .leftJoin(tenantSettings, eq(tenantSettings.tenantId, tenants.id))
+      .where(and(eq(tenants.id, tenantId), isNull(tenants.deletedAt)))
+      .limit(1);
+
+    const row = rows[0];
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      tenantId: row.tenantId,
+      tenantName: row.tenantName,
+      tenantStatus: row.tenantStatus,
+      currency: row.currency,
+      featureFlags: {
+        laundryEnabled: row.laundryEnabled,
+        carWashEnabled: row.carWashEnabled,
+        retailProductsEnabled: row.retailProductsEnabled,
+        deliveryEnabled: row.deliveryEnabled,
+        notificationsEnabled: row.notificationsEnabled,
+      },
+    };
+  }
+
+  async countTodayOrders(input: {
+    tenantId: string;
+    start: Date;
+    end: Date;
+  }): Promise<number> {
+    const rows = await this.db
+      .select({ value: count() })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.tenantId, input.tenantId),
+          gte(orders.createdAt, input.start),
+          lt(orders.createdAt, input.end),
+          isNull(orders.deletedAt),
+        ),
+      );
+
+    return rows[0]?.value ?? 0;
+  }
+
+  async sumTodayRevenue(input: {
+    tenantId: string;
+    start: Date;
+    end: Date;
+  }): Promise<number> {
+    const rows = await this.db
+      .select({
+        value: sql<string>`coalesce(sum(${paymentTransactions.amount}), 0)::text`,
+      })
+      .from(paymentTransactions)
+      .where(
+        and(
+          eq(paymentTransactions.tenantId, input.tenantId),
+          eq(paymentTransactions.paymentStatus, "paid"),
+          gte(paymentTransactions.paidAt, input.start),
+          lt(paymentTransactions.paidAt, input.end),
+          isNull(paymentTransactions.deletedAt),
+        ),
+      );
+
+    return toNumber(rows[0]?.value);
+  }
+
+  async countPendingPickup(tenantId: string): Promise<number> {
+    const rows = await this.db
+      .select({ value: count() })
+      .from(serviceTickets)
+      .where(
+        and(
+          eq(serviceTickets.tenantId, tenantId),
+          inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
+          eq(serviceTickets.ticketStatus, "ready_to_pick"),
+          isNull(serviceTickets.deletedAt),
+        ),
+      );
+
+    return rows[0]?.value ?? 0;
+  }
+
+  async countInProgressOrders(tenantId: string): Promise<number> {
+    const rows = await this.db
+      .select({ value: count() })
+      .from(serviceTickets)
+      .where(
+        and(
+          eq(serviceTickets.tenantId, tenantId),
+          inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
+          eq(serviceTickets.ticketStatus, "in_progress"),
+          isNull(serviceTickets.deletedAt),
+        ),
+      );
+
+    return rows[0]?.value ?? 0;
+  }
+
+  async getAppointmentSummary(input: {
+    tenantId: string;
+    start: Date;
+    end: Date;
+  }): Promise<OwnerTodaySummary["appointmentSummary"]> {
+    const rows = await this.db
+      .select({
+        status: appointments.status,
+        value: count(),
+      })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.tenantId, input.tenantId),
+          gte(appointments.expectedAt, input.start),
+          lt(appointments.expectedAt, input.end),
+          isNull(appointments.deletedAt),
+        ),
+      )
+      .groupBy(appointments.status);
+
+    const summary = emptyAppointmentSummary();
+
+    for (const row of rows) {
+      summary[row.status] = row.value;
+    }
+
+    return summary;
+  }
+
+  async getDeliverySummary(input: {
+    tenantId: string;
+    start: Date;
+    end: Date;
+  }): Promise<OwnerTodaySummary["deliverySummary"]> {
+    const rows = await this.db
+      .select({
+        status: deliveryTasks.status,
+        value: count(),
+      })
+      .from(deliveryTasks)
+      .where(
+        and(
+          eq(deliveryTasks.tenantId, input.tenantId),
+          gte(deliveryTasks.expectedAt, input.start),
+          lt(deliveryTasks.expectedAt, input.end),
+          isNull(deliveryTasks.deletedAt),
+        ),
+      )
+      .groupBy(deliveryTasks.status);
+
+    const summary = emptyDeliverySummary();
+
+    for (const row of rows) {
+      if (row.status === "pending_dispatch") {
+        summary.pendingDispatch += row.value;
+      } else if (row.status === "signed") {
+        summary.signed += row.value;
+      } else if (row.status === "exception") {
+        summary.exception += row.value;
+      } else if (
+        row.status === "en_route" ||
+        row.status === "arrived" ||
+        row.status === "picked_up" ||
+        row.status === "delivering"
+      ) {
+        summary.inProgress += row.value;
+      }
+    }
+
+    return summary;
+  }
+
+  async listAppointments(input: {
+    tenantId: string;
+    branchId?: string;
+    status?: OwnerAppointmentStatus;
+  }): Promise<OwnerAppointment[]> {
+    const rows = await this.db
+      .select({
+        ...getTableColumns(appointments),
+        customerName: customers.fullName,
+        customerPhone: customers.phone,
+        assigneeUserId: deliveryTasks.assigneeUserId,
+        assigneeDisplayName: userProfiles.displayName,
+        assigneeEmail: users.email,
+      })
+      .from(appointments)
+      .innerJoin(
+        customers,
+        and(
+          eq(customers.id, appointments.customerId),
+          eq(customers.tenantId, appointments.tenantId),
+          isNull(customers.deletedAt),
+        ),
+      )
+      .leftJoin(
+        deliveryTasks,
+        and(
+          eq(deliveryTasks.id, appointments.deliveryTaskId),
+          eq(deliveryTasks.tenantId, appointments.tenantId),
+          isNull(deliveryTasks.deletedAt),
+        ),
+      )
+      .leftJoin(users, eq(users.id, deliveryTasks.assigneeUserId))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(
+        and(
+          eq(appointments.tenantId, input.tenantId),
+          input.branchId ? eq(appointments.branchId, input.branchId) : undefined,
+          input.status ? eq(appointments.status, input.status) : undefined,
+          isNull(appointments.deletedAt),
+        ),
+      )
+      .orderBy(asc(appointments.expectedAt), desc(appointments.createdAt));
+
+    return rows.map((row) =>
+      toAppointment({
+        ...row,
+        assigneeName: row.assigneeDisplayName ?? row.assigneeEmail ?? row.assigneeUserId ?? null,
+      }),
+    );
+  }
+
+  async findAppointmentById(input: {
+    tenantId: string;
+    appointmentId: string;
+  }): Promise<OwnerAppointment | null> {
+    const rows = await this.db
+      .select({ ...getTableColumns(appointments) })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.id, input.appointmentId),
+          eq(appointments.tenantId, input.tenantId),
+          isNull(appointments.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return rows[0] ? toAppointment(toAppointmentRow(rows[0])) : null;
+  }
+
+  async acceptAppointmentAndCreateTask(input: {
+    tenantId: string;
+    appointmentId: string;
+    operatorUserId: string;
+    assigneeUserId?: string;
+    notes?: string;
+  }): Promise<{ appointment: OwnerAppointment; taskId: string } | null> {
+    return this.db.transaction(async (tx) => {
+      const [appointment] = await tx
+        .select({ ...getTableColumns(appointments) })
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.id, input.appointmentId),
+            eq(appointments.tenantId, input.tenantId),
+            isNull(appointments.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (!appointment) {
+        return null;
+      }
+
+      if (appointment.deliveryTaskId && appointment.status === "accepted") {
+        return {
+          appointment: toAppointment(toAppointmentRow(appointment)),
+          taskId: appointment.deliveryTaskId,
+        };
+      }
+
+      if (appointment.status !== "pending") {
+        return null;
+      }
+
+      const [customer] = await tx
+        .select({
+          fullName: customers.fullName,
+          phone: customers.phone,
+        })
+        .from(customers)
+        .where(
+          and(
+            eq(customers.id, appointment.customerId),
+            eq(customers.tenantId, input.tenantId),
+            isNull(customers.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (!customer) {
+        return null;
+      }
+
+      const now = new Date();
+      const taskId = createId();
+
+      await tx.insert(deliveryTasks).values({
+        id: taskId,
+        tenantId: appointment.tenantId,
+        branchId: appointment.branchId,
+        assigneeUserId: input.assigneeUserId,
+        appointmentId: appointment.id,
+        customerId: appointment.customerId,
+        type: appointment.type,
+        status: "pending_dispatch",
+        expectedAt: appointment.expectedAt,
+        customerName: customer.fullName,
+        customerPhone: customer.phone,
+        address: appointment.address,
+        notes: input.notes ?? appointment.notes,
+        createdBy: input.operatorUserId,
+        updatedBy: input.operatorUserId,
+        dispatchedAt: input.assigneeUserId ? now : undefined,
+        dispatchedBy: input.assigneeUserId ? input.operatorUserId : undefined,
+      });
+
+      const [updated] = await tx
+        .update(appointments)
+        .set({
+          status: "accepted",
+          deliveryTaskId: taskId,
+          acceptedAt: now,
+          acceptedBy: input.operatorUserId,
+          updatedAt: now,
+          updatedBy: input.operatorUserId,
+          version: sql`${appointments.version} + 1`,
+        })
+        .where(
+          and(
+            eq(appointments.id, input.appointmentId),
+            eq(appointments.tenantId, input.tenantId),
+            eq(appointments.status, "pending"),
+            isNull(appointments.deletedAt),
+          ),
+        )
+        .returning({ ...getTableColumns(appointments) });
+
+      return updated
+        ? { appointment: toAppointment(toAppointmentRow(updated)), taskId }
+        : null;
+    });
+  }
+
+  async rejectPendingAppointment(input: {
+    tenantId: string;
+    appointmentId: string;
+    operatorUserId: string;
+    reason: string;
+  }): Promise<OwnerAppointment | null> {
+    const now = new Date();
+    const rows = await this.db
+      .update(appointments)
+      .set({
+        status: "cancelled",
+        cancelledAt: now,
+        cancelledBy: input.operatorUserId,
+        cancellationReason: input.reason,
+        updatedAt: now,
+        updatedBy: input.operatorUserId,
+        version: sql`${appointments.version} + 1`,
+      })
+      .where(
+        and(
+          eq(appointments.id, input.appointmentId),
+          eq(appointments.tenantId, input.tenantId),
+          eq(appointments.status, "pending"),
+          isNull(appointments.deletedAt),
+        ),
+      )
+      .returning({ ...getTableColumns(appointments) });
+
+    return rows[0] ? toAppointment(toAppointmentRow(rows[0])) : null;
+  }
+
+  async markAppointmentDoneFromDelivery(input: {
+    tenantId: string;
+    appointmentId: string;
+    taskId: string;
+    operatorUserId: string;
+  }): Promise<void> {
+    const now = new Date();
+
+    await this.db
+      .update(appointments)
+      .set({
+        status: "done",
+        doneAt: now,
+        doneBy: input.operatorUserId,
+        updatedAt: now,
+        updatedBy: input.operatorUserId,
+        version: sql`${appointments.version} + 1`,
+      })
+      .where(
+        and(
+          eq(appointments.id, input.appointmentId),
+          eq(appointments.tenantId, input.tenantId),
+          eq(appointments.deliveryTaskId, input.taskId),
+          isNull(appointments.deletedAt),
+        ),
+      );
+  }
+
+  async reopenAppointmentFromCancelledDelivery(input: {
+    tenantId: string;
+    appointmentId: string;
+    taskId: string;
+    operatorUserId: string;
+  }): Promise<void> {
+    const now = new Date();
+
+    await this.db
+      .update(appointments)
+      .set({
+        status: "accepted",
+        deliveryTaskId: null,
+        doneAt: null,
+        doneBy: null,
+        updatedAt: now,
+        updatedBy: input.operatorUserId,
+        version: sql`${appointments.version} + 1`,
+      })
+      .where(
+        and(
+          eq(appointments.id, input.appointmentId),
+          eq(appointments.tenantId, input.tenantId),
+          eq(appointments.deliveryTaskId, input.taskId),
+          isNull(appointments.deletedAt),
+        ),
+      );
+  }
+}

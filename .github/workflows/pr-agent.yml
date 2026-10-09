@@ -1,0 +1,36 @@
+name: AI Code Review Agent
+
+on:
+  pull_request:
+    types: [opened, synchronize] # 新建 PR，或向现有 PR 追加提交时触发
+
+permissions:
+  pull-requests: write
+  contents: read
+  issues: write
+
+jobs:
+  pr_agent_job:
+    if: ${{ github.event.sender.type != 'Bot' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run PR Agent
+        uses: the-pr-agent/pr-agent@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          # 锁定 Google AI Studio / Gemini 模型，避免回退到默认 OpenAI 模型。
+          config.model: "gemini/gemini-2.5-flash"
+          config.fallback_models: '["gemini/gemini-2.5-flash"]'
+          config.response_language: "zh-CN"
+          GOOGLE_AI_STUDIO.GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+          # GitHub Action 自动执行项。
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "true"
+          github_action_config.auto_improve: "false"
+
+          # 小团队体验优化。
+          pr_reviewer.require_security_review: "true"
+          pr_reviewer.require_tests_review: "false"
+          pr_description.publish_labels: "true"

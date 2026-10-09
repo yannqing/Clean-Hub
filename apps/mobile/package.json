@@ -3,21 +3,42 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
-    "dev": "echo \"Mobile shell placeholder. Run Capacitor commands after native platforms are added.\"",
+    "dev": "cross-env CLEANHUB_MOBILE_DEV_SERVER_URL=http://localhost:3002 cap open android",
     "build": "tsc -p tsconfig.json",
+    "sync": "pnpm --filter @cleanhub/mobile-web build && cap sync",
+    "sync:env": "node ../../scripts/mobile/sync-mobile.mjs",
+    "sync:android": "pnpm --filter @cleanhub/mobile-web build && cap sync android",
+    "sync:ios": "pnpm --filter @cleanhub/mobile-web build && cap sync ios",
+    "package:android": "node ../../scripts/mobile/package-android.mjs",
+    "release:validate": "node ../../scripts/mobile/validate-mobile-release.mjs",
+    "smoke:release-validation": "node ../../scripts/mobile/mobile-release-validation.smoke.mjs",
+    "package:ios": "node ../../scripts/mobile/package-ios.mjs",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@capacitor/android": "^8.1.0",
-    "@capacitor/cli": "^8.1.0",
-    "@capacitor/core": "^8.1.0",
-    "@capacitor/ios": "^8.1.0",
-    "@cleanhub/offline": "workspace:*"
+    "@capacitor-community/bluetooth-le": "^8.2.0",
+    "@capacitor-firebase/messaging": "^8.5.2",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/camera": "^8.2.0",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/geolocation": "^8.2.0",
+    "@capacitor/ios": "^8.5.2",
+    "@capacitor/preferences": "^8.0.1",
+    "@cleanhub/hardware": "workspace:*",
+    "@cleanhub/offline": "workspace:*",
+    "firebase": "^12.19.0"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "cross-env": "^10.1.0",
     "eslint": "^9",
     "typescript": "^5"
   }

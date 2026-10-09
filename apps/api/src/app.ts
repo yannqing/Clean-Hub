@@ -1,19 +1,79 @@
+import {
+  getDbConnection,
+  runWithSystemDatabaseContext,
+  runWithTenantDatabaseContext,
+} from "@cleanhub/db";
 import { createLogger } from "@cleanhub/logger";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 
 import { loadApiEnv } from "./config/env.js";
 import { handleApiError } from "./http/error-handler.js";
 import { createRequireAuthMiddleware } from "./http/auth.middleware.js";
+import {
+  isUnsafeRequestOriginAllowed,
+  resolveCredentialedCorsOrigin,
+} from "./http/cors-origin.js";
+import { createRequirePosTerminalMiddleware } from "./http/pos-terminal.middleware.js";
+import { createTenantMaintenanceMiddleware } from "./http/maintenance.middleware.js";
 import { createRequestContextMiddleware } from "./http/request-context.middleware.js";
 import type { AppBindings } from "./http/types.js";
+import { requireNonTerminalWebSession } from "./http/web-session.middleware.js";
+import {
+  createSystemDatabaseContextMiddleware,
+  createTenantDatabaseContextMiddleware,
+} from "./http/database-context.middleware.js";
 import { createAuthServiceFromEnv } from "./modules/auth/auth.factory.js";
 import { createAuthRoutes } from "./modules/auth/auth.routes.js";
+import { resolveAuthCookieSecure } from "./modules/auth/cookie.service.js";
+import { createMobileAuthServiceFromEnv } from "./modules/mobile/auth/auth.service.js";
+import { createMobileRoutes } from "./modules/mobile/mobile.routes.js";
+import { NotificationsService } from "./modules/notifications/index.js";
+import { createSaasAuditRoutes } from "./modules/saas/audit/audit.routes.js";
 import {
-  createSaasUserRoutes,
-  createTenantUserRoutes,
-} from "./modules/users/users.routes.js";
-import {createSaaSTestRoutes} from "./modules/saas/saas.routes.js";
+  createSaasBackupRoutes,
+  createSaasRestoreRequestRoutes,
+} from "./modules/saas/backups/backups.routes.js";
+import { createSaasFeedbackTicketRoutes } from "./modules/saas/feedback/feedback-tickets.routes.js";
+import { createSaasOperationLogRoutes } from "./modules/saas/ops/operation-logs.routes.js";
+import { createSaasOverviewRoutes } from "./modules/saas/overview/overview.routes.js";
+import { createSaasPlatformSettingsRoutes } from "./modules/saas/platform-settings/platform-settings.routes.js";
+import { createSaasSecurityRoutes } from "./modules/saas/security/security.routes.js";
+import { createSaasTenantsRoutes } from "./modules/saas/tenants/tenants.routes.js";
+import { createSaasRolesRoutes } from "./modules/saas/users/saas-roles.routes.js";
+import { createSaasUsersRoutes } from "./modules/saas/users/saas-users.routes.js";
+import { createSaasProfileRoutes } from "./modules/saas/profile/profile.routes.js";
+import { createTenantAuditRoutes } from "./modules/tenant/audit/audit.routes.js";
+import { createTenantBackupRoutes } from "./modules/tenant/backups/backups.routes.js";
+import { createTenantCustomerRoutes } from "./modules/tenant/customers/customers.routes.js";
+import { createTenantDiscountRoutes } from "./modules/tenant/discounts/discounts.routes.js";
+import { createTenantFinanceRoutes } from "./modules/tenant/finance/finance.routes.js";
+import { createTenantHardwareRoutes } from "./modules/tenant/hardware/hardware.routes.js";
+import { createTenantBranchRoutes } from "./modules/tenant/branches/branches.routes.js";
+import { createTenantNotificationsRoutes } from "./modules/tenant/notifications/notifications.routes.js";
+import { createTenantOrderRoutes } from "./modules/tenant/orders/orders.routes.js";
+import { createTenantOverviewRoutes } from "./modules/tenant/overview/overview.routes.js";
+import { createTenantPaymentIntegrationRoutes } from "./modules/tenant/payment-integrations/payment-integrations.routes.js";
+import { createTenantPosChannelRoutes } from "./modules/tenant/pos-channel/pos-channel.routes.js";
+import { createTenantProfileRoutes } from "./modules/tenant/profile/profile.routes.js";
+import { createTenantProductRoutes } from "./modules/tenant/products/products.routes.js";
+import { createTenantReportRoutes } from "./modules/tenant/reports/reports.routes.js";
+import { createTenantSearchRoutes } from "./modules/tenant/search/search.routes.js";
+import { createTenantServiceCategoryRoutes } from "./modules/tenant/service-categories/service-categories.routes.js";
+import { createTenantTaxRateRoutes } from "./modules/tenant/tax-rates/tax-rates.routes.js";
+import { createTenantServiceRoutes } from "./modules/tenant/services/services.routes.js";
+import { createTenantSettingsRoutes } from "./modules/tenant/settings/settings.routes.js";
+import { createTenantUsersRoutes } from "./modules/tenant/users/tenant-users.routes.js";
+import { createPosRoutes } from "./modules/pos/pos.routes.js";
+import {
+  createRealtimeRoutes,
+  persistRealtimeConnected,
+  persistRealtimeDisconnected,
+  persistRealtimeLease,
+  reconcileExpiredRealtimeLeases,
+  REALTIME_LEASE_DURATION_MS,
+  RealtimeHub,
+} from "./realtime/index.js";
 
 export type CreateApiAppOptions = {
   env?: NodeJS.ProcessEnv;
@@ -26,6 +86,56 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
     service: "cleanhub-api",
   });
   const authService = createAuthServiceFromEnv({ env });
+  const authCookieSecure = resolveAuthCookieSecure(env);
+  const mobileAuthService = createMobileAuthServiceFromEnv({ env });
+  const notificationsService = new NotificationsService({ env });
+  const realtimeHub = new RealtimeHub({
+    logger,
+    onFirstPosConnection: async (identity) => {
+      try {
+        const state = await runWithTenantDatabaseContext(
+          identity.tenantId,
+          () => persistRealtimeConnected(identity, REALTIME_LEASE_DURATION_MS),
+        );
+        realtimeHub.markServiceHealthy();
+        if (state) realtimeHub.broadcastDeviceState(identity.tenantId, state);
+        return Boolean(state);
+      } catch (error) {
+        realtimeHub.markServiceDegraded();
+        throw error;
+      }
+    },
+    onPosLeaseRefresh: async (identity) => {
+      try {
+        const state = await runWithTenantDatabaseContext(
+          identity.tenantId,
+          () => persistRealtimeLease(identity, REALTIME_LEASE_DURATION_MS),
+        );
+        realtimeHub.markServiceHealthy();
+        return Boolean(state);
+      } catch (error) {
+        realtimeHub.markServiceDegraded();
+        throw error;
+      }
+    },
+    onLastPosDisconnection: async (identity, reason) => {
+      try {
+        const state = await runWithTenantDatabaseContext(
+          identity.tenantId,
+          () => persistRealtimeDisconnected(identity, reason),
+        );
+        realtimeHub.markServiceHealthy();
+        if (state) realtimeHub.broadcastDeviceState(identity.tenantId, state);
+      } catch (error) {
+        realtimeHub.markServiceDegraded();
+        throw error;
+      }
+    },
+    onExpiredPosLeaseSweep: (activeTerminalIds) =>
+      runWithSystemDatabaseContext(() =>
+        reconcileExpiredRealtimeLeases(activeTerminalIds),
+      ),
+  });
   const app = new Hono<AppBindings>();
 
   app.use("*", async (c, next) => {
@@ -35,36 +145,174 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
 
   app.use("*", createRequestContextMiddleware());
 
+  app.use("*", async (c, next) => {
+    if (
+      !isUnsafeRequestOriginAllowed({
+        method: c.req.method,
+        origin: c.req.header("origin"),
+        allowedOrigins: apiEnv.corsOrigins,
+        mobileNativeOrigins: apiEnv.mobileNativeOrigins,
+        authClient: c.req.header("x-cleanhub-auth-client"),
+        enforceSameOrigin: apiEnv.corsEnforceSameOrigin,
+        requestUrl: c.req.url,
+        forwardedProto: c.req.header("x-forwarded-proto"),
+        forwardedHost: c.req.header("x-forwarded-host"),
+        secFetchSite: c.req.header("sec-fetch-site"),
+      })
+    ) {
+      return c.json(
+        {
+          message: "Cross-origin state-changing request is not allowed.",
+          code: "CROSS_ORIGIN_REQUEST_FORBIDDEN",
+          requestId: c.get("requestId"),
+        },
+        403,
+      );
+    }
+
+    await next();
+  });
+
   app.use(
     "*",
     cors({
-      origin: (origin) => {
-        if (!origin) {
-          return null;
-        }
-
-        return apiEnv.corsOrigins.includes(origin) ? origin : null;
-      },
-      allowHeaders: ["Content-Type", "Authorization", "X-Request-Id", "X-Device-Id"],
+      origin: (origin, c) =>
+        resolveCredentialedCorsOrigin({
+          origin,
+          allowedOrigins: apiEnv.corsOrigins,
+          mobileNativeOrigins: apiEnv.mobileNativeOrigins,
+          authClient: c.req.header("x-cleanhub-auth-client"),
+          enforceSameOrigin: apiEnv.corsEnforceSameOrigin,
+          requestUrl: c.req.url,
+          forwardedProto: c.req.header("x-forwarded-proto"),
+          forwardedHost: c.req.header("x-forwarded-host"),
+        }),
+      allowHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Request-Id",
+        "X-Device-Id",
+        "X-CleanHub-Auth-Client",
+        "Idempotency-Key",
+      ],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       credentials: true,
     }),
   );
 
-  app.get("/health", (c) =>
-    c.json({
-      status: "ok",
+  app.get("/health/live", (c) =>
+    c.json({ status: "ok", service: "cleanhub-api" }),
+  );
+
+  const readiness = async (c: Context<AppBindings>) => {
+    let database: "healthy" | "unavailable" = "healthy";
+    try {
+      await getDbConnection().pool.query("select 1");
+      realtimeHub.markServiceHealthy();
+    } catch (error) {
+      database = "unavailable";
+      realtimeHub.markServiceDegraded();
+      logger.warn({ err: error }, "API readiness database probe failed");
+    }
+    const realtime = realtimeHub.getHealth();
+    const ready = database === "healthy" && realtime.started;
+    const body = {
+      status: ready ? "ok" : "not_ready",
       service: "cleanhub-api",
+      checks: { database, realtime },
+    };
+    return ready ? c.json(body, 200) : c.json(body, 503);
+  };
+
+  app.get("/health", readiness);
+  app.get("/health/ready", readiness);
+
+  app.route(
+    "/realtime",
+    createRealtimeRoutes({ authService, env: apiEnv, hub: realtimeHub }),
+  );
+
+  app.use("/auth/*", createSystemDatabaseContextMiddleware());
+  app.route("/auth", createAuthRoutes({ authService }));
+  app.use("/mobile/auth/*", createSystemDatabaseContextMiddleware());
+  app.use(
+    "/mobile/payment/webhooks/*",
+    createSystemDatabaseContextMiddleware(),
+  );
+  app.route(
+    "/mobile",
+    createMobileRoutes({
+      mobileAuthService,
+      notificationPublisher: notificationsService,
     }),
   );
 
-  app.route("/auth", createAuthRoutes({ authService }));
   app.use("/saas/*", createRequireAuthMiddleware(authService));
+  app.use("/saas/*", requireNonTerminalWebSession());
+  app.use("/saas/*", createSystemDatabaseContextMiddleware());
   app.use("/tenant/*", createRequireAuthMiddleware(authService));
-  app.route("/saas/users", createSaasUserRoutes());
-  app.route("/tenant/users", createTenantUserRoutes());
+  app.use("/tenant/*", requireNonTerminalWebSession());
+  app.use("/tenant/*", createTenantMaintenanceMiddleware());
+  app.use("/tenant/*", createTenantDatabaseContextMiddleware());
+  app.use("/pos/*", createRequireAuthMiddleware(authService));
+  app.use("/pos/*", createRequirePosTerminalMiddleware());
+  app.use("/pos/*", createTenantMaintenanceMiddleware());
+  app.use("/pos/*", createTenantDatabaseContextMiddleware());
 
-  app.route("/saas/test/user", createSaaSTestRoutes());
+  // SaaS 平台 - 公共模块
+  app.route("/saas/overview", createSaasOverviewRoutes());
+  app.route("/saas/audit-logs", createSaasAuditRoutes());
+  app.route("/saas/platform-settings", createSaasPlatformSettingsRoutes());
+
+  // SaaS 平台 - 租户管理
+  app.route("/saas/tenants", createSaasTenantsRoutes());
+
+  // SaaS 平台 - 用户与权限
+  app.route("/saas/roles", createSaasRolesRoutes());
+  app.route("/saas/users", createSaasUsersRoutes());
+  app.route("/saas/profile", createSaasProfileRoutes());
+
+  // SaaS 平台 - 运营管理
+  app.route("/saas/feedback-tickets", createSaasFeedbackTicketRoutes());
+  app.route("/saas/backups", createSaasBackupRoutes());
+  app.route("/saas/restore-requests", createSaasRestoreRequestRoutes());
+  app.route("/saas/operation-logs", createSaasOperationLogRoutes());
+  app.route("/saas/security", createSaasSecurityRoutes());
+
+  // 租户侧
+  app.route("/tenant/overview", createTenantOverviewRoutes());
+  app.route("/tenant/settings", createTenantSettingsRoutes());
+  app.route(
+    "/tenant/payment-integrations",
+    createTenantPaymentIntegrationRoutes(),
+  );
+  app.route("/tenant/branches", createTenantBranchRoutes());
+  app.route("/tenant/customers", createTenantCustomerRoutes());
+  app.route("/tenant/orders", createTenantOrderRoutes());
+  app.route("/tenant/audit-logs", createTenantAuditRoutes());
+  app.route("/tenant/hardware-configs", createTenantHardwareRoutes());
+  app.route("/tenant/notifications", createTenantNotificationsRoutes());
+  app.route("/tenant/service-categories", createTenantServiceCategoryRoutes());
+  app.route("/tenant/tax-rates", createTenantTaxRateRoutes());
+  app.route("/tenant/services", createTenantServiceRoutes());
+  app.route("/tenant/profile", createTenantProfileRoutes());
+  app.route("/tenant/products", createTenantProductRoutes());
+  app.route("/tenant/backups", createTenantBackupRoutes());
+  app.route("/tenant/discounts", createTenantDiscountRoutes());
+  app.route("/tenant/finance", createTenantFinanceRoutes());
+  app.route("/tenant/pos-channel", createTenantPosChannelRoutes());
+  app.route("/tenant/reports", createTenantReportRoutes());
+  app.route("/tenant/search", createTenantSearchRoutes());
+  app.route("/tenant/users", createTenantUsersRoutes());
+
+  // POS 终端侧（收银员 / 店长 / 店主）
+  app.route(
+    "/pos",
+    createPosRoutes({
+      notificationPublisher: notificationsService,
+      terminalCredentialCookieSecure: authCookieSecure,
+    }),
+  );
 
   app.notFound((c) =>
     c.json(
@@ -83,5 +331,6 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
     app,
     env: apiEnv,
     logger,
+    realtimeHub,
   };
 }

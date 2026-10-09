@@ -6,6 +6,7 @@ import {
   ApiParseError,
   ApiTimeoutError,
   type ApiErrorDetails,
+  type ApiFieldError,
 } from "./errors";
 import type {
   ApiClient,
@@ -32,6 +33,20 @@ function ensureLeadingSlash(value: string): string {
   return value.startsWith("/") ? value : `/${value}`;
 }
 
+function isAbsoluteUrl(value: string): boolean {
+  return value.startsWith("http://") || value.startsWith("https://");
+}
+
+function getRuntimeOrigin(): string {
+  if (typeof globalThis.location?.origin === "string") {
+    return globalThis.location.origin;
+  }
+
+  throw new Error(
+    "Relative API URLs require a browser origin. Use an absolute baseUrl on the server.",
+  );
+}
+
 function createRequestId(): string {
   return createId();
 }
@@ -52,11 +67,12 @@ function appendQueryValue(searchParams: URLSearchParams, key: string, value: Que
 }
 
 export function buildApiUrl(baseUrl: string, path: string, query?: QueryParams): string {
-  const url = new URL(
-    path.startsWith("http://") || path.startsWith("https://")
-      ? path
-      : `${trimTrailingSlash(baseUrl)}${ensureLeadingSlash(path)}`,
-  );
+  const requestUrl = isAbsoluteUrl(path)
+    ? path
+    : `${trimTrailingSlash(baseUrl)}${ensureLeadingSlash(path)}`;
+  const url = isAbsoluteUrl(requestUrl)
+    ? new URL(requestUrl)
+    : new URL(requestUrl, getRuntimeOrigin());
 
   if (!query) {
     return url.toString();
@@ -78,6 +94,21 @@ export function buildApiUrl(baseUrl: string, path: string, query?: QueryParams):
     appendQueryValue(url.searchParams, key, value);
   }
 
+  return url.toString();
+}
+
+/**
+ * Builds a WebSocket URL through the same public API prefix as HTTP requests.
+ * For example, a browser API base of `/api` resolves the realtime endpoint to
+ * `wss://example.com/api/realtime/pos`, allowing the reverse proxy to strip the
+ * `/api` prefix before forwarding the upgrade to the API service.
+ */
+export function buildWebSocketUrl(baseUrl: string, path: string): string {
+  const url = new URL(buildApiUrl(baseUrl, path));
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("WebSocket API base URL must use HTTP or HTTPS.");
+  }
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   return url.toString();
 }
 
@@ -110,12 +141,19 @@ function mergeHeaders(...headersList: (HeadersInit | undefined)[]): Headers {
 
 async function resolveHeaders(
   defaultHeaders: ApiClientConfig["defaultHeaders"],
+  tokenProvider: ApiClientConfig["tokenProvider"],
   requestHeaders?: HeadersInit,
 ): Promise<Headers> {
   const resolvedDefaultHeaders =
     typeof defaultHeaders === "function" ? await defaultHeaders() : defaultHeaders;
+  const headers = mergeHeaders(resolvedDefaultHeaders, requestHeaders);
+  const token = await tokenProvider?.();
 
-  return mergeHeaders(resolvedDefaultHeaders, requestHeaders);
+  if (token && !headers.has("authorization")) {
+    headers.set("authorization", `Bearer ${token}`);
+  }
+
+  return headers;
 }
 
 function prepareBody(body: ApiRequestBody, headers: Headers): BodyInit | undefined {
@@ -207,16 +245,76 @@ function getErrorCode(parsedBody: unknown): string | undefined {
   return undefined;
 }
 
-function getValidationErrors(parsedBody: unknown): ApiErrorDetails["validationErrors"] {
+function getErrorLockedUntil(parsedBody: unknown): string | undefined {
   if (
-    parsedBody &&
-    typeof parsedBody === "object" &&
-    "validationErrors" in parsedBody
+    !parsedBody ||
+    typeof parsedBody !== "object" ||
+    !("lockedUntil" in parsedBody)
   ) {
-    return (parsedBody as ApiErrorDetails).validationErrors;
+    return undefined;
   }
 
-  return undefined;
+  const lockedUntil = (parsedBody as ApiErrorDetails).lockedUntil;
+  if (
+    typeof lockedUntil !== "string" ||
+    !Number.isFinite(Date.parse(lockedUntil))
+  ) {
+    return undefined;
+  }
+
+  return lockedUntil;
+}
+
+function isApiFieldError(value: unknown): value is ApiFieldError {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "field" in value &&
+    typeof (value as { field?: unknown }).field === "string" &&
+    "message" in value &&
+    typeof (value as { message?: unknown }).message === "string"
+  );
+}
+
+function getValidationErrors(
+  parsedBody: unknown,
+): ApiErrorDetails["validationErrors"] {
+  if (!parsedBody || typeof parsedBody !== "object") {
+    return undefined;
+  }
+
+  const validationErrors = (
+    parsedBody as {
+      validationErrors?: unknown;
+    }
+  ).validationErrors;
+
+  if (Array.isArray(validationErrors)) {
+    return validationErrors.filter(isApiFieldError);
+  }
+
+  if (
+    !validationErrors ||
+    typeof validationErrors !== "object" ||
+    !("fieldErrors" in validationErrors)
+  ) {
+    return undefined;
+  }
+
+  const fieldErrors = (validationErrors as { fieldErrors?: unknown })
+    .fieldErrors;
+
+  if (!fieldErrors || typeof fieldErrors !== "object") {
+    return undefined;
+  }
+
+  return Object.entries(fieldErrors).flatMap(([field, messages]) =>
+    Array.isArray(messages)
+      ? messages
+          .filter((message): message is string => typeof message === "string")
+          .map((message) => ({ field, message }))
+      : [],
+  );
 }
 
 function shouldRetry({
@@ -315,7 +413,11 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
         attempt,
         metadata: options.metadata,
       };
-      const headers = await resolveHeaders(config.defaultHeaders, options.headers);
+      const headers = await resolveHeaders(
+        config.defaultHeaders,
+        config.tokenProvider,
+        options.headers,
+      );
 
       if (options.idempotencyKey) {
         headers.set("idempotency-key", options.idempotencyKey);
@@ -355,6 +457,12 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
           ok: response.ok,
           response,
         });
+        await options.afterResponse?.(response, {
+          ...context,
+          status: response.status,
+          ok: response.ok,
+          response,
+        });
 
         if (response.ok) {
           return parseResponseBody<TResponse>(
@@ -378,6 +486,7 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
           url,
           requestId,
           code: getErrorCode(parsedError),
+          lockedUntil: getErrorLockedUntil(parsedError),
           responseData: parsedError,
           validationErrors: getValidationErrors(parsedError),
         });

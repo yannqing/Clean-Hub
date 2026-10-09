@@ -1,0 +1,104 @@
+import { normalizeLocale } from "./notification-renderer.js";
+
+export type EmailConfig = {
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecure: boolean;
+  smtpUser?: string;
+  smtpPass?: string;
+  from: string;
+  defaultLocale: string;
+  retryBaseSeconds: number;
+  retryMaxSeconds: number;
+};
+
+function readPositiveInteger(
+  value: string | undefined,
+  fallback: number,
+): number {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function readBoolean(value: string | undefined, fallback = false): boolean {
+  if (!value) {
+    return fallback;
+  }
+
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}
+
+/**
+ * Whether the platform has SMTP at all.
+ *
+ * SMTP is one platform-wide configuration, not per tenant, so this is the
+ * ceiling on every tenant's email capability: without it, `loadEmailConfig`
+ * throws and nothing can be sent for anybody.
+ */
+/**
+ * Email retry backoff, independent of whether SMTP is configured.
+ *
+ * Recording a failed delivery needs these numbers, and a delivery that failed
+ * *because* there is no SMTP host still has to be recorded. Reading them from
+ * the full config would throw again inside the failure handler and take the
+ * whole delivery loop down with it.
+ */
+export function loadEmailRetrySettings(
+  env: NodeJS.ProcessEnv = process.env,
+): { retryBaseSeconds: number; retryMaxSeconds: number } {
+  return {
+    retryBaseSeconds: readPositiveInteger(
+      env.EMAIL_DELIVERY_RETRY_BASE_SECONDS,
+      60,
+    ),
+    retryMaxSeconds: readPositiveInteger(
+      env.EMAIL_DELIVERY_RETRY_MAX_SECONDS,
+      3600,
+    ),
+  };
+}
+
+export function isEmailConfigured(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return Boolean((env.EMAIL_SMTP_HOST ?? env.SMTP_HOST)?.trim());
+}
+
+export function loadEmailConfig(
+  env: NodeJS.ProcessEnv = process.env,
+): EmailConfig {
+  const smtpHost = env.EMAIL_SMTP_HOST ?? env.SMTP_HOST;
+
+  if (!smtpHost) {
+    throw new Error("EMAIL_SMTP_HOST is required to send email notifications.");
+  }
+
+  const smtpUser = env.EMAIL_SMTP_USER ?? env.SMTP_USER;
+  const smtpPass = env.EMAIL_SMTP_PASS ?? env.SMTP_PASS;
+
+  return {
+    smtpHost,
+    smtpPort: readPositiveInteger(env.EMAIL_SMTP_PORT ?? env.SMTP_PORT, 1025),
+    smtpSecure: readBoolean(env.EMAIL_SMTP_SECURE ?? env.SMTP_SECURE),
+    smtpUser: smtpUser || undefined,
+    smtpPass: smtpPass || undefined,
+    from: env.EMAIL_FROM ?? "CleanHub <no-reply@cleanhub.local>",
+    defaultLocale:
+      normalizeLocale(env.EMAIL_DEFAULT_LOCALE) ??
+      normalizeLocale(env.DEFAULT_LOCALE) ??
+      "en",
+    retryBaseSeconds: readPositiveInteger(
+      env.EMAIL_DELIVERY_RETRY_BASE_SECONDS,
+      60,
+    ),
+    retryMaxSeconds: readPositiveInteger(
+      env.EMAIL_DELIVERY_RETRY_MAX_SECONDS,
+      3600,
+    ),
+  };
+}

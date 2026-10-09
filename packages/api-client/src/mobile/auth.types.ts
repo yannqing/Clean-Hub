@@ -1,0 +1,64 @@
+export type MobileSubjectType = "customer" | "staff";
+export type MobileRole = "customer" | "driver" | "owner";
+
+export type MobileAuthContext = {
+  subjectType: MobileSubjectType;
+  subjectId: string;
+  displayName: string;
+  tenantId: string;
+  currency: string;
+  timezone?: string;
+  branchIds: string[];
+  role: MobileRole;
+  roles: MobileRole[];
+  permissions: string[];
+  /**
+   * True while a customer still carries the shared starter password issued at
+   * the counter. The API refuses every customer endpoint except
+   * `POST /mobile/customer/password` until it is false.
+   */
+  mustChangePassword?: boolean;
+  accessTokenExpiresAt: string;
+};
+
+export type MobileTokenResponse = {
+  authContext: MobileAuthContext;
+  accessToken: string;
+  refreshToken: string;
+  accessTokenExpiresAt: string;
+  refreshTokenExpiresAt: string;
+  tokenType: "Bearer";
+};
+
+export type MobileCustomerLoginOptions = {
+  customerOtpEnabled: boolean;
+};
+
+export type MobileRequestOtpRequest = {
+  tenantCode: string;
+  phone: string;
+  deviceId?: string;
+};
+
+export type MobileVerifyOtpRequest = MobileRequestOtpRequest & {
+  code: string;
+};
+
+export type MobilePasswordLoginRequest = {
+  tenantCode: string;
+  identifier: string;
+  password: string;
+  deviceId?: string;
+};
+
+export type MobileRefreshRequest = {
+  refreshToken: string;
+  deviceId?: string;
+};
+
+export type MobileLogoutRequest = MobileRefreshRequest;
+
+export type MobileTestOtpResponse = {
+  code?: string;
+  expiresAt: string;
+};

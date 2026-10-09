@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@cleanhub/api", "dev"],
+      "port": 4000,
+      "autoPort": false
+    },
+    {
+      "name": "web-admin",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@cleanhub/web-admin", "dev"],
+      "port": 3000,
+      "autoPort": false
+    },
+    {
+      "name": "pos-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@cleanhub/pos-web", "dev"],
+      "port": 3001,
+      "autoPort": false
+    }
+  ]
+}

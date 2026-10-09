@@ -92,7 +92,7 @@ export async function createTenantAction(input: CreateTenantInput) {
 }
 ```
 
-> **兼容说明：** 当前仍保留 `webAdminApi.saas.listTenants()`、`webAdminApi.saas.createTenant()` 这类旧快捷方法，避免早期代码断裂。但新增业务代码建议使用 `webAdminApi.saas.tenants.list()` 这种按资源分组的调用方式。
+> **调用方式说明：** 所有业务调用统一使用按资源分组的方式，例如 `webAdminApi.saas.tenants.list()`、`webAdminApi.tenant.branches.get(id)`。每个资源是一个命名空间对象，其下挂该资源的方法。不再提供 `listTenants()`、`getTenant()` 这类扁平快捷方法。
 
 ## 5. 不推荐怎么用
 
@@ -119,7 +119,7 @@ packages/api-client/src/
   http-client.ts             核心请求封装
   errors.ts                  统一错误类型
   types.ts                   通用请求/响应类型
-  cleanhub-client.ts         组合 auth / saas / tenant
+  cleanhub-client.ts         组合 auth / saas / tenant / pos
   index.ts                   统一导出
 
   auth/
@@ -129,31 +129,34 @@ packages/api-client/src/
 
   saas/
     index.ts                 SaaS Admin API 聚合入口
-    tenants.ts               租户接口方法
-    tenants.types.ts         租户 DTO 类型
-    users.ts                 SaaS 用户接口方法
-    users.types.ts           SaaS 用户 DTO 类型
-    audit-logs.ts            审计日志接口方法
-    audit-logs.types.ts      审计日志 DTO 类型
+    identity/                身份与权限：users + roles
+    security/                安全：security-events + security-settings
+    backups/                 备份与恢复：backups + restore-requests
+    audit/                   审计与日志：audit-logs + operation-logs
+    tenants/                 租户管理
+    feedback-tickets/        工单反馈
+    overview/                概览
+    platform-settings/       平台设置
 
   tenant/
     index.ts                 Tenant Admin API 聚合入口
-    branches.ts              门店接口方法
-    branches.types.ts        门店 DTO 类型
-    users.ts                 租户用户接口方法
-    users.types.ts           租户用户 DTO 类型
-    services.ts              服务项目接口方法
-    services.types.ts        服务项目 DTO 类型
-    prices.ts                价格接口方法
-    prices.types.ts          价格 DTO 类型
-    hardware.ts              硬件配置接口方法
-    hardware.types.ts        硬件配置 DTO 类型
-    reports.ts               报表接口方法
-    reports.types.ts         报表 DTO 类型
+    identity/                租户用户
+    branches/                门店
+    catalog/                 服务目录：services + prices
+    backups/                 备份
+    insights/                运营洞察：overview + reports + audit-logs
+    hardware/                硬件配置
+    notifications/           通知设置
+    settings/                租户后台设置
+
+  pos/
+    index.ts                 POS API 聚合入口
+    branches.ts              POS 终端可见的本店信息
 
   auth-client.ts             旧入口兼容转发
   saas-client.ts             旧入口兼容转发
   tenant-client.ts           旧入口兼容转发
+  pos-client.ts              旧入口兼容转发
 
 apps/web-admin/src/lib/
   api-client.ts        创建 web-admin 专用 API client

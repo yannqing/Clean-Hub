@@ -1,6 +1,14 @@
 export type AuthErrorCode =
+  | "ACCOUNT_LOCKED"
   | "FORBIDDEN"
+  | "FEATURE_DISABLED"
   | "INVALID_CREDENTIALS"
+  | "PASSWORD_CHANGE_REQUIRED"
+  | "PASSWORD_POLICY_VIOLATION"
+  | "POS_TERMINAL_CREDENTIAL_INVALID"
+  | "POS_TERMINAL_DISABLED"
+  | "POS_TERMINAL_ENROLLMENT_REQUIRED"
+  | "TENANT_CODE_REQUIRED"
   | "USER_DISABLED"
   | "USER_SUSPENDED"
   | "TOKEN_INVALID"
@@ -12,6 +20,7 @@ export class AuthError extends Error {
   constructor(
     public readonly code: AuthErrorCode,
     message: string,
+    public readonly lockedUntil?: Date,
   ) {
     super(message);
     this.name = "AuthError";

@@ -1,0 +1,45 @@
+# mobile-offline-sync Specification
+
+## Purpose
+TBD - created by archiving change add-mobile-mvp. Update Purpose after archive.
+## Requirements
+### Requirement: 配送任务本地缓存
+
+移动端 SHALL 将已加载的配送任务缓存到本地，使配送员在网络中断时仍能查看已加载的任务与详情。在线获取首屏任务、OTP 登录与客户查单 MUST NOT 承诺离线可用。
+
+#### Scenario: 断网仍可查看已加载任务
+
+- **WHEN** 配送员先在有网络时加载了任务，随后网络中断
+- **THEN** 配送员仍能从本地缓存查看这些任务及其详情
+
+### Requirement: 离线提交排队
+
+移动端 SHALL 在离线时把任务状态更新、拍照凭证与客户签收放入本地队列，恢复网络后自动回放上传。
+
+#### Scenario: 离线操作进入队列
+
+- **WHEN** 配送员在离线状态下更新状态、拍照或采集签收
+- **THEN** 这些操作被写入本地队列并标记为待同步，界面给出"待同步"反馈
+
+#### Scenario: 恢复网络后自动回放
+
+- **WHEN** 设备恢复网络
+- **THEN** 队列中的操作按顺序自动上传，成功后从队列移除
+
+### Requirement: 幂等回放防重复
+
+离线队列回放 SHALL 为每个操作携带 idempotency key，服务端 MUST 据此去重，确保重复回放不会产生重复的状态变更、凭证或签收。
+
+#### Scenario: 重复回放不产生重复记录
+
+- **WHEN** 同一离线操作因重试被回放多次（携带相同 idempotency key）
+- **THEN** 服务端只生效一次，不产生重复的状态变更/凭证/签收记录
+
+### Requirement: 最小冲突规则
+
+当本地离线操作与服务端状态冲突时，系统 SHALL 应用最小冲突规则：若服务端对应任务已处于完成态，客户端后到的较旧状态 MUST NOT 覆盖它。
+
+#### Scenario: 旧状态不覆盖已完成态
+
+- **WHEN** 服务端任务已为已签收/完成，而客户端回放一条较旧的中间状态
+- **THEN** 服务端保留完成态、拒绝被旧状态覆盖，并向客户端返回当前权威状态

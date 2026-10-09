@@ -11,12 +11,14 @@ type PagePlaceholderProps = {
   title: string;
   description?: string;
   items?: string[];
+  modulePlaceholderLabel?: string;
 };
 
 export function PagePlaceholder({
   title,
   description,
   items = [],
+  modulePlaceholderLabel = "Module placeholder",
 }: PagePlaceholderProps) {
   return (
     <section className="p-6">
@@ -34,7 +36,7 @@ export function PagePlaceholder({
               <Card className="rounded-lg py-0" key={item}>
                 <CardHeader className="px-4 py-4">
                   <CardTitle className="text-sm">{item}</CardTitle>
-                  <CardDescription>Module placeholder</CardDescription>
+                  <CardDescription>{modulePlaceholderLabel}</CardDescription>
                 </CardHeader>
                 <CardContent className="px-4 pb-4">
                   <div className="h-2 rounded bg-muted" />

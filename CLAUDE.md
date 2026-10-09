@@ -75,7 +75,19 @@ pnpm lint
 - `apps/web-admin`: Next.js admin app for SaaS admin and tenant back office.
 - `apps/pos-web`: Next.js POS frontend for in-store staff workflows. This should remain fast, offline-friendly, and optimized for cashier/scanner/printing usage.
 - `apps/desktop`: Electron shell for the official Windows/macOS in-store POS runtime and local hardware integration.
-- `apps/mobile`: Capacitor shell for customer-facing and delivery-facing Android/iOS workflows. Do not treat it as the default mobile cashier POS.
+- `apps/mobile`: Capacitor shell for customer-facing and delivery-facing Android/iOS workflows. Do not treat it as the default mobile cashier POS. It loads the static export of `apps/mobile-web`.
+- `apps/mobile-web`: Next.js customer/delivery web UI loaded by `apps/mobile`. It is a client-rendered SPA with no route-guard proxy; authentication is enforced by `apps/api`. The session lives in Capacitor Preferences, which is native storage on a device. Do not serve this app as a website: in a browser Preferences resolves to `localStorage`, which does not meet the HttpOnly cookie rule the web apps follow.
+- `apps/pos-mobile`: the Android and iOS POS, whose two platforms are built
+  differently. **Android is a native Jetpack Compose app**, not a WebView:
+  `MainActivity` is a plain `ComponentActivity` that starts `NativePosApp`, and
+  the whole POS lives in
+  `android/app/src/main/kotlin/com/cleanhub/pos/nativepos/` with its own API
+  client, SQLite store, offline replay queue and hardware bridge. Its API origin
+  is compiled into `BuildConfig.CLEANHUB_POS_API_BASE_URL`, and
+  `CLEANHUB_POS_NATIVE_ANDROID=true` drops Capacitor's `server` field for a
+  native package. **iOS is still a Capacitor shell** around the server-rendered
+  `apps/pos-web`. See "Native Android POS" below before changing POS business
+  rules.
 - `apps/api`: standalone backend API service.
 
 ## Shared Packages
@@ -108,7 +120,7 @@ pnpm lint
 - `pos-web` is the in-store staff POS UI. It can run in a browser for development, but the store cashier entry point should normally be the desktop shell.
 - `desktop` owns Windows/macOS local hardware integration, including printing, scanners, cash drawer, local storage, offline sync runtime, and local device capabilities.
 - `mobile` owns customer-facing and delivery-facing Android/iOS capabilities such as appointment booking, order status, pickup/delivery tracking, proof photos, GPS, Bluetooth portable printing, and push-style mobile workflows.
-- If customer mobile UI becomes substantial, prefer a dedicated `apps/customer-web` or `apps/mobile-web` loaded by `apps/mobile`.
+- Customer-facing mobile UI lives in `apps/mobile-web`, which `apps/mobile` loads; keep it there rather than growing it inside the shell.
 - `apps/api` should own backend business APIs, payment webhooks, sync queues, audit logic, and third-party integrations.
 - Avoid placing all backend business logic in Next.js route handlers.
 - Use `@cleanhub/logger` for server-side logs. Do not add ad hoc file logging from business code.
@@ -126,6 +138,140 @@ Rules:
 - SaaS roles should only enter `/saas`; tenant roles should only enter `/tenant`.
 - Refresh token handling should go through backend auth endpoints.
 - Logout should call the backend logout endpoint so the API clears auth cookies.
+
+## Mobile Payment Model
+
+Customers do not pay through `apps/mobile` / `apps/mobile-web`. Staff collect
+payment at the counter through the POS, which is the only path that moves real
+money. The customer app is read-only about payment: it shows total, paid amount
+and payment status, and tells the customer to settle at the counter.
+
+Do not re-add a customer-facing payment entry point until a real PSP is
+integrated. `apps/api/src/modules/mobile/payment` still has only
+`MockPaymentGateway`, and `readGateway()` returns `"mock"` on every branch, so
+any "is this the mock gateway?" guard is always true.
+
+Customer-facing refund requests are unaffected and still supported.
+
+## Native Android POS
+
+`apps/pos-mobile` on Android does not run `apps/pos-web`. It is a separate
+implementation of the same POS in Kotlin, roughly 10k lines under
+`android/app/src/main/kotlin/com/cleanhub/pos/nativepos/`:
+
+- `NativePosApp.kt` — the entire UI and its view-model logic
+- `NativePosDatabase.kt` — local SQLite: catalog cache, cart, offline queue
+- `NativePosSync.kt` — snapshot refresh and offline checkout replay
+- `NativePosHardware.kt` — T1101 printer, scanner and cash drawer
+- `NativePosApiClient.kt` / `NativePosSession.kt` — transport and credentials
+- `NativePosStrings.kt` — every cashier-facing string, in zh-CN, en and fr
+
+**All user-facing copy lives in `NativePosStrings.kt`.** Do not write a
+display string inline; add a key and its three translations, then read it
+through `copy.<key>`. Two rules follow from how that file is built:
+
+- It is a **map**, not a data class with one parameter per string. A data
+  class stops loading past roughly 254 parameters
+  (`ClassFormatError: Too many arguments in method signature`), which
+  compiles cleanly and only fails on a running terminal. `NativePosCopyTest`
+  enforces what the compiler no longer can: same keys in all three
+  languages, every accessor resolving, matching `%s`/`%d` placeholders.
+- Classes built once and kept — `NativePosHardware`, `NativePosDatabase`,
+  `NativePosApiClient` — take a **language supplier** (`() -> String?`),
+  not a fixed language. The operator can switch language during setup or at
+  the PIN screen; an explicit device choice takes precedence over the SaaS
+  tenant default received at login. A handover must change the printer's
+  error text too.
+
+The API localises the errors it raises for POS and auth paths, so a
+server-supplied message arrives in the terminal's language. The POS sends
+`Accept-Language` on every request from `session.pinLanguageCode()`; the
+catalogue is `apps/api/src/http/error-messages.ts`, keyed by the **English
+message text**, not by the error code. When adding or rewording an error
+message on a POS or auth path, add its `fr`/`zh-CN` translations there —
+`pnpm --filter @cleanhub/api smoke:error-messages` names any message that
+has drifted. Back-office modules keep English messages.
+
+**Server business rules are duplicated here.** Changing any of these in
+`apps/api` or `packages/domain` without changing the Kotlin lets the two drift
+apart silently, and no test catches it:
+
+- ticket and ticket-item state machines — `TICKET_STATUS_TRANSITIONS` and
+  `TICKET_ITEM_STATUS_TRANSITIONS` mirror
+  `pos/service-tickets/service-tickets.state-machine.ts`
+- offline pricing, tax and rounding — `calculateNativeLocalPricing` mirrors
+  `pos/orders/orders.financial.ts`
+- currency minor units — the native code currently special-cases XOF/XAF only,
+  while `packages/domain/src/currency.ts` lists sixteen zero-decimal currencies
+
+Rules that must hold when touching the offline path:
+
+- Money is `Long` minor units or `BigDecimal`. Never `Double`.
+- A request that can be retried carries an idempotency key that survives the
+  retry. Queued checkouts use a deterministic `"$orderId:cash"`; an online
+  payment holds its key until the payment lands (`NativePaymentIdempotency`).
+- Queued sales are independent of each other. One rejected sale must not stop
+  the rest of the queue replaying.
+- A replay is bounded by `NATIVE_REPLAY_MAX_ATTEMPTS`, matching
+  `OFFLINE_QUEUE_MAX_ATTEMPTS` in `packages/offline`.
+- Transport failures reach callers as `NativePosApiException` with status 0.
+  `NativePosApiClient` wraps `IOException` for this: the replay loop classifies
+  by status, and a raw `IOException` would slip past it.
+- Offline work is stamped with `NativeServerClock.now()`, not the device clock.
+  The server rejects cash payments dated more than five minutes ahead, so a fast
+  tablet clock would write sales that can never be uploaded.
+- Offline PINs are per user id (`NativeOfflinePinRoster` bounds the roster).
+  One slot for the device locks the outgoing cashier out after a handover.
+- The idle lock is enforced by the app (`NativeIdleLock`), and
+  `lockTimeoutSeconds` is cached with the checkout settings so it still works
+  offline.
+
+Android unit tests live in `android/app/src/test` and run with:
+
+```bash
+cd apps/pos-mobile/android && ./gradlew :app:testDebugUnitTest
+```
+
+## Mobile Release Builds
+
+Both mobile shells validate their own release configuration and refuse to build
+an unsafe artifact.
+
+```bash
+pnpm --filter @cleanhub/mobile release:validate
+pnpm --filter @cleanhub/pos-mobile release:validate
+```
+
+For `apps/mobile`, a release build requires real values; the defaults are
+development placeholders and will be rejected:
+
+```bash
+CLEANHUB_MOBILE_ENV=prod
+CLEANHUB_MOBILE_API_BASE_URL=https://<real-api-host>
+CLEANHUB_MOBILE_UPDATE_URL=https://<real-update-host>
+```
+
+Android signing is supplied through `CLEANHUB_ANDROID_KEYSTORE_PATH`,
+`CLEANHUB_ANDROID_KEYSTORE_PASSWORD`, `CLEANHUB_ANDROID_KEY_ALIAS` and
+`CLEANHUB_ANDROID_KEY_PASSWORD`. Never commit a keystore or its passwords.
+A release build without them now fails at Gradle configuration time rather
+than producing an uninstallable unsigned APK.
+
+The POS APK is published by `.github/workflows/release-pos-apk.yml` — push a
+`pos-v*` tag or run it from the Actions tab. It signs from repository secrets
+and verifies the artifact (signature, not debuggable, cleartext disabled, API
+origin actually compiled in) before publishing a GitHub Release. The runbook,
+including the one-time keystore and secret setup, is
+`docs/06-delivery/rollout/CleanHub_POS安卓APK发布操作手册.md`.
+
+An Android-only package does not need `CLEANHUB_POS_SERVER_URL`: that origin
+is the iOS WebView's, and `capacitor.config.ts` drops it when
+`CLEANHUB_POS_NATIVE_ANDROID=true`. Requiring it used to fail Android
+releases for a value nothing reads.
+
+Backups stay disabled on both Android apps. The session lives in Capacitor
+Preferences, which is backed by `SharedPreferences`, so enabling backup would
+sync auth tokens to the user's cloud account.
 
 ## High-Risk Product Areas
 

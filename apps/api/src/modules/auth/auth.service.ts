@@ -1,26 +1,145 @@
+import { createHmac } from "node:crypto";
+
+import type { Database } from "@cleanhub/db";
+import { isSixDigitPin } from "@cleanhub/domain/pin";
+import { resolveTimeZone } from "@cleanhub/domain/timezone";
+
+import {
+  getRefreshTokenTtlSeconds,
+  resolveEffectiveSecurityPolicy,
+} from "../saas/security/security-policy.js";
 import { AuthError, invalidCredentials } from "./auth.errors.js";
-import { AuthRepository } from "./auth.repository.js";
+import {
+  AuthRepository,
+  lockPosPinAttempt,
+  type PosBootstrapTerminalRecord,
+  type PosTerminalLoginContext,
+  type ValidatedUserAccess,
+} from "./auth.repository.js";
 import type {
-  AdminRole,
   AuthContext,
+  AuthRequestMeta,
   AuthResult,
   AuthServiceOptions,
   AuthenticatedUser,
   LoginInput,
   LogoutInput,
+  PosBootstrapInput,
+  PosBootstrapState,
+  PosPinLoginInput,
   RefreshInput,
   RefreshResult,
-  UserAccess,
 } from "./auth.types.js";
 import {
   createAuthCookieHeaders,
   createClearAuthCookieHeaders,
+  resolveAuthCookieSecure,
 } from "./cookie.service.js";
+import {
+  assertLoginNotLocked,
+  buildLoginLockKey,
+  clearLoginLockout,
+  recordLoginFailure,
+} from "./login-lockout.helper.js";
+import {
+  isUserIdentityShapeValid,
+  isWebRoleBranchScopeValid,
+  resolveSessionPrimaryRole,
+} from "./login-identity.helper.js";
 import { verifyPassword } from "./password.service.js";
+import {
+  assertEnrolledTerminalCredential,
+  buildPosPinLockKeys,
+  hashTerminalCredential,
+} from "./pos-terminal-credential.js";
+import { resolvePosBootstrapState } from "./pos-bootstrap-state.js";
 import { hashOpaqueToken, TokenService } from "./token.service.js";
+
+const REFRESH_TOKEN_ROTATION_GRACE_MS = 10_000;
+
+function resolveTenantLanguage(
+  value: string | null | undefined,
+): "en" | "fr" | "zh-CN" {
+  return value === "fr" || value === "zh-CN" ? value : "en";
+}
+
+function deriveRefreshTokenSuccessor(
+  secret: string,
+  predecessorTokenHash: string,
+  familyId: string,
+): string {
+  return createHmac("sha384", secret)
+    .update("cleanhub-refresh-successor-v1")
+    .update("\0")
+    .update(familyId)
+    .update("\0")
+    .update(predecessorTokenHash)
+    .digest("base64url");
+}
 
 function normalizeIdentifier(identifier: string): string {
   return identifier.trim().toLowerCase();
+}
+
+function toEffectiveTerminalContext(
+  terminal: PosBootstrapTerminalRecord,
+): PosTerminalLoginContext {
+  return {
+    id: terminal.id,
+    tenantId: terminal.tenantId,
+    branchId: terminal.branchId,
+    deviceId: terminal.deviceId,
+    status:
+      terminal.status === "active" &&
+      terminal.tenantStatus === "active" &&
+      !terminal.tenantDeleted &&
+      terminal.branchStatus === "active" &&
+      !terminal.branchDeleted
+        ? "active"
+        : "inactive",
+    credentialDigest: terminal.credentialDigest,
+    credentialVersion: terminal.credentialVersion,
+  };
+}
+
+function requireUnchangedPosTerminal(
+  terminal: PosTerminalLoginContext | null,
+  expected: PosTerminalLoginContext,
+  terminalCredential: string | undefined,
+): PosTerminalLoginContext {
+  if (!terminal) {
+    throw new AuthError(
+      "POS_TERMINAL_DISABLED",
+      "The POS terminal session is no longer active.",
+    );
+  }
+
+  assertEnrolledTerminalCredential(terminal, terminalCredential);
+
+  if (
+    terminal.tenantId !== expected.tenantId ||
+    terminal.branchId !== expected.branchId ||
+    terminal.deviceId !== expected.deviceId ||
+    terminal.credentialDigest !== expected.credentialDigest ||
+    terminal.credentialVersion !== expected.credentialVersion
+  ) {
+    throw new AuthError(
+      "POS_TERMINAL_CREDENTIAL_INVALID",
+      "The POS terminal changed while signing in. Try again.",
+    );
+  }
+
+  return terminal;
+}
+
+function buildRequestMeta(
+  input: LoginInput | PosPinLoginInput,
+): AuthRequestMeta {
+  return {
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    deviceId: input.deviceId,
+  };
 }
 
 function assertActiveUser(user: AuthenticatedUser): void {
@@ -37,52 +156,268 @@ function assertActiveUser(user: AuthenticatedUser): void {
   }
 }
 
-function resolvePrimaryRole(user: AuthenticatedUser, access: UserAccess): AdminRole {
-  const rolePriority: AdminRole[] =
-    user.userType === "saas"
-      ? ["super_admin", "support"]
-      : ["owner", "manager"];
-
-  const role = rolePriority.find((candidate) =>
-    access.roles.includes(candidate),
-  );
-
-  if (!role) {
-    throw invalidCredentials();
+function laterAccountLockError(
+  current: AuthError | undefined,
+  candidate: AuthError,
+): AuthError {
+  if (!current) {
+    return candidate;
   }
 
-  return role;
+  const currentTime = current.lockedUntil?.getTime() ?? 0;
+  const candidateTime = candidate.lockedUntil?.getTime() ?? 0;
+
+  return candidateTime > currentTime ? candidate : current;
+}
+
+async function assertLockKeysNotLocked(
+  db: Database,
+  lockKeys: readonly string[],
+): Promise<void> {
+  let lockError: AuthError | undefined;
+
+  for (const lockKey of lockKeys) {
+    try {
+      await assertLoginNotLocked(db, lockKey);
+    } catch (error) {
+      if (error instanceof AuthError && error.code === "ACCOUNT_LOCKED") {
+        lockError = laterAccountLockError(lockError, error);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  if (lockError) {
+    throw lockError;
+  }
+}
+
+async function recordFailureForLockKeys(
+  db: Database,
+  lockKeys: readonly string[],
+  policy: Awaited<ReturnType<typeof resolveEffectiveSecurityPolicy>>,
+): Promise<void> {
+  let lockError: AuthError | undefined;
+
+  for (const lockKey of lockKeys) {
+    try {
+      await recordLoginFailure(db, lockKey, policy);
+    } catch (error) {
+      if (error instanceof AuthError && error.code === "ACCOUNT_LOCKED") {
+        lockError = laterAccountLockError(lockError, error);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  if (lockError) {
+    throw lockError;
+  }
 }
 
 export class AuthService {
+  private readonly db: Database;
   private readonly repository: AuthRepository;
   private readonly tokenService: TokenService;
   private readonly cookieSecure: boolean;
+  private readonly envRefreshTokenTtlSeconds: number;
+  private readonly refreshTokenRotationSecret: string;
 
   constructor({
     db,
     accessTokenSecret,
-    cookieSecure = process.env.NODE_ENV === "production",
+    cookieSecure = resolveAuthCookieSecure(),
     accessTokenTtlSeconds,
     refreshTokenTtlSeconds,
   }: AuthServiceOptions) {
+    this.db = db;
     this.repository = new AuthRepository(db);
+    this.envRefreshTokenTtlSeconds =
+      refreshTokenTtlSeconds ?? 30 * 24 * 60 * 60;
+    this.refreshTokenRotationSecret = accessTokenSecret;
     this.tokenService = new TokenService({
       secret: accessTokenSecret,
       accessTokenTtlSeconds,
-      refreshTokenTtlSeconds,
+      refreshTokenTtlSeconds: this.envRefreshTokenTtlSeconds,
     });
     this.cookieSecure = cookieSecure;
   }
 
-  async login(input: LoginInput): Promise<AuthResult> {
-    const normalizedIdentifier = normalizeIdentifier(input.identifier);
-    const user = await this.repository.findLoginUser({
-      identifier: normalizedIdentifier,
-      tenantCode: input.tenantCode,
+  private async getRefreshTokenTtlSeconds(): Promise<number> {
+    const policy = await resolveEffectiveSecurityPolicy(this.db);
+
+    return getRefreshTokenTtlSeconds(policy);
+  }
+
+  private async issueAuthResult(
+    user: AuthenticatedUser,
+    input: {
+      eventType: string;
+      meta?: AuthRequestMeta;
+      metadata?: Record<string, unknown>;
+      terminal?: PosTerminalLoginContext;
+    },
+  ): Promise<AuthResult> {
+    const access = await this.repository.getUserAccess(
+      user,
+      input.terminal ? "pos" : "web",
+    );
+    const authContextBase = this.buildAuthContextBase(
+      user,
+      access,
+      input.terminal,
+    );
+    const refreshTokenTtlSeconds = await this.getRefreshTokenTtlSeconds();
+    const tokens = await this.tokenService.issueTokenPair(authContextBase, {
+      refreshTokenTtlSeconds,
+    });
+    const authContext = this.withAccessTokenExpiresAt(
+      authContextBase,
+      tokens.accessTokenExpiresAt,
+    );
+    const refreshTokenId =
+      await this.repository.createWebRefreshTokenReplacingDeviceSessions({
+        userId: user.id,
+        tenantId: user.tenantId,
+        tokenHash: hashOpaqueToken(tokens.refreshToken),
+        familyId: tokens.refreshTokenFamilyId,
+        expiresAt: tokens.refreshTokenExpiresAt,
+        meta: input.meta,
+      });
+
+    if (!refreshTokenId) {
+      throw new AuthError("TOKEN_INVALID", "Failed to create refresh token.");
+    }
+
+    await this.repository.updateLastLoginAt({
+      tenantId: user.tenantId,
+      userId: user.id,
+    });
+    await this.repository.writeAuditLog({
+      tenantId: user.tenantId,
+      actorUserId: user.id,
+      eventType: input.eventType,
+      success: true,
+      meta: input.meta,
+      metadata: input.metadata,
     });
 
+    return {
+      authContext,
+      tokens,
+      setCookieHeaders: createAuthCookieHeaders(tokens, {
+        secure: this.cookieSecure,
+      }),
+    };
+  }
+
+  private async issuePosAuthResult(
+    repository: AuthRepository,
+    user: AuthenticatedUser,
+    input: {
+      eventType: string;
+      meta: AuthRequestMeta;
+      metadata: Record<string, unknown>;
+      terminal: PosTerminalLoginContext;
+      refreshTokenTtlSeconds: number;
+    },
+  ): Promise<AuthResult> {
+    const terminal = input.terminal;
+    const currentUser = await repository.findUserById(user.id);
+    if (!currentUser || currentUser.tenantId !== terminal.tenantId) {
+      throw new AuthError(
+        "TOKEN_INVALID",
+        "Authenticated user identity is no longer available.",
+      );
+    }
+
+    assertActiveUser(currentUser);
+    await this.assertUserIdentityAvailable(currentUser, true, repository);
+
+    const access = await repository.getUserAccess(currentUser, "pos");
+    const authContextBase = this.buildAuthContextBase(
+      currentUser,
+      access,
+      terminal,
+    );
+    const tokens = await this.tokenService.issueTokenPair(authContextBase, {
+      refreshTokenTtlSeconds: input.refreshTokenTtlSeconds,
+    });
+    const authContext = this.withAccessTokenExpiresAt(
+      authContextBase,
+      tokens.accessTokenExpiresAt,
+    );
+    const refreshTokenId = await repository.createRefreshToken({
+      userId: currentUser.id,
+      tenantId: currentUser.tenantId,
+      tokenHash: hashOpaqueToken(tokens.refreshToken),
+      familyId: tokens.refreshTokenFamilyId,
+      expiresAt: tokens.refreshTokenExpiresAt,
+      terminalId: terminal.id,
+      meta: {
+        ...input.meta,
+        deviceId: terminal.deviceId,
+      },
+    });
+
+    if (!refreshTokenId) {
+      throw new AuthError("TOKEN_INVALID", "Failed to create refresh token.");
+    }
+
+    await repository.markPosTerminalCredentialUsed({
+      tenantId: terminal.tenantId,
+      terminalId: terminal.id,
+    });
+    await repository.updateLastLoginAt({
+      tenantId: currentUser.tenantId,
+      userId: currentUser.id,
+    });
+    await repository.writeAuditLog({
+      tenantId: currentUser.tenantId,
+      actorUserId: currentUser.id,
+      eventType: input.eventType,
+      success: true,
+      meta: input.meta,
+      metadata: input.metadata,
+    });
+
+    return {
+      authContext,
+      tokens,
+      setCookieHeaders: createAuthCookieHeaders(tokens, {
+        secure: this.cookieSecure,
+      }),
+    };
+  }
+
+  async login(input: LoginInput): Promise<AuthResult> {
+    const normalizedIdentifier = normalizeIdentifier(input.identifier);
+    const lockKey = buildLoginLockKey(normalizedIdentifier);
+    const policy = await resolveEffectiveSecurityPolicy(this.db);
+
+    await assertLoginNotLocked(this.db, lockKey);
+
+    const user = await this.repository.findLoginUser(normalizedIdentifier);
+
     if (!user) {
+      try {
+        await recordLoginFailure(this.db, lockKey, policy);
+      } catch (error) {
+        if (error instanceof AuthError && error.code === "ACCOUNT_LOCKED") {
+          await this.repository.writeAuditLog({
+            eventType: "auth.login.failed",
+            success: false,
+            reason: error.code,
+            meta: input,
+            metadata: { identifier: normalizedIdentifier },
+          });
+        }
+
+        throw error;
+      }
+
       await this.repository.writeAuditLog({
         eventType: "auth.login.failed",
         success: false,
@@ -95,50 +430,50 @@ export class AuthService {
 
     try {
       assertActiveUser(user);
-      const passwordValid = await verifyPassword(input.password, user.passwordHash);
+      await this.assertUserIdentityAvailable(user, false);
+      const passwordValid = await verifyPassword(
+        input.password,
+        user.passwordHash,
+      );
 
       if (!passwordValid) {
+        try {
+          await recordLoginFailure(this.db, lockKey, policy);
+        } catch (error) {
+          if (error instanceof AuthError && error.code === "ACCOUNT_LOCKED") {
+            await this.repository.writeAuditLog({
+              tenantId: user.tenantId,
+              actorUserId: user.id,
+              eventType: "auth.login.failed",
+              success: false,
+              reason: error.code,
+              meta: input,
+            });
+          }
+
+          throw error;
+        }
+
         throw invalidCredentials();
       }
 
-      const access = await this.repository.getUserAccess(user.id);
-      const authContextBase = this.buildAuthContextBase(user, access);
-      const tokens = await this.tokenService.issueTokenPair(authContextBase);
-      const authContext = this.withAccessTokenExpiresAt(
-        authContextBase,
-        tokens.accessTokenExpiresAt,
-      );
-      const refreshTokenId = await this.repository.createRefreshToken({
-        userId: user.id,
-        tenantId: user.tenantId,
-        tokenHash: hashOpaqueToken(tokens.refreshToken),
-        familyId: tokens.refreshTokenFamilyId,
-        expiresAt: tokens.refreshTokenExpiresAt,
-        meta: input,
-      });
+      await clearLoginLockout(this.db, lockKey);
 
-      if (!refreshTokenId) {
-        throw new AuthError("TOKEN_INVALID", "Failed to create refresh token.");
-      }
-
-      await this.repository.updateLastLoginAt(user.id);
-      await this.repository.writeAuditLog({
-        tenantId: user.tenantId,
-        actorUserId: user.id,
+      return this.issueAuthResult(user, {
         eventType: "auth.login.success",
-        success: true,
-        meta: input,
+        meta: buildRequestMeta(input),
       });
-
-      return {
-        authContext,
-        tokens,
-        setCookieHeaders: createAuthCookieHeaders(tokens, {
-          secure: this.cookieSecure,
-        }),
-      };
     } catch (error) {
-      if (error instanceof AuthError) {
+      if (error instanceof AuthError && error.code === "INVALID_CREDENTIALS") {
+        await this.repository.writeAuditLog({
+          tenantId: user.tenantId,
+          actorUserId: user.id,
+          eventType: "auth.login.failed",
+          success: false,
+          reason: error.code,
+          meta: input,
+        });
+      } else if (error instanceof AuthError) {
         await this.repository.writeAuditLog({
           tenantId: user.tenantId,
           actorUserId: user.id,
@@ -153,91 +488,583 @@ export class AuthService {
     }
   }
 
+  async getPosBootstrapState(
+    input: PosBootstrapInput,
+  ): Promise<PosBootstrapState> {
+    let authContext: AuthContext | null = null;
+
+    if (input.accessToken) {
+      try {
+        authContext = await this.getAuthContext(input.accessToken);
+      } catch (error) {
+        if (!(error instanceof AuthError)) {
+          throw error;
+        }
+      }
+    }
+
+    const credentialDigest = input.terminalCredential
+      ? hashTerminalCredential(input.terminalCredential)
+      : null;
+    const credentialTerminal = credentialDigest
+      ? await this.repository.findPosBootstrapTerminalByCredential({
+          deviceId: input.deviceId,
+          credentialDigest,
+        })
+      : null;
+    const setupTenantId =
+      authContext?.tenantId &&
+      !authContext.terminalId &&
+      (authContext.role === "owner" || authContext.role === "manager")
+        ? authContext.tenantId
+        : null;
+    const [adminTerminal, adminTenant] = setupTenantId
+      ? await Promise.all([
+          this.repository.findPosBootstrapTerminalByTenantAndDevice({
+            tenantId: setupTenantId,
+            deviceId: input.deviceId,
+          }),
+          this.repository.findPosBootstrapTenant(setupTenantId),
+        ])
+      : [null, null];
+
+    return resolvePosBootstrapState({
+      deviceId: input.deviceId,
+      authContext,
+      credentialPresented: Boolean(input.terminalCredential),
+      credentialTerminal,
+      adminTerminal,
+      adminTenant,
+    });
+  }
+
+  async loginWithPosPin(input: PosPinLoginInput): Promise<AuthResult> {
+    const deviceId = input.deviceId.trim();
+    const hasValidPinFormat = isSixDigitPin(input.pin);
+    const policy = await resolveEffectiveSecurityPolicy(this.db);
+
+    const credentialTerminal = input.terminalCredential
+      ? await this.repository.findPosBootstrapTerminalByCredential({
+          deviceId,
+          credentialDigest: hashTerminalCredential(input.terminalCredential),
+        })
+      : null;
+    const terminalContext = credentialTerminal
+      ? toEffectiveTerminalContext(credentialTerminal)
+      : null;
+    const lockKeys = buildPosPinLockKeys({
+      tenantId: terminalContext?.tenantId ?? "unresolved",
+      terminalId: terminalContext?.id,
+      ipAddress: input.ipAddress,
+    });
+    const meta: AuthRequestMeta = terminalContext
+      ? {
+          ipAddress: input.ipAddress,
+          userAgent: input.userAgent,
+          deviceId: terminalContext.deviceId,
+        }
+      : buildRequestMeta(input);
+    const auditMetadata = {
+      deviceId,
+      terminalId: terminalContext?.id,
+      branchId: terminalContext?.branchId,
+    };
+
+    await assertLockKeysNotLocked(this.db, lockKeys);
+
+    if (!terminalContext) {
+      let error = new AuthError(
+        input.terminalCredential
+          ? "POS_TERMINAL_CREDENTIAL_INVALID"
+          : "POS_TERMINAL_ENROLLMENT_REQUIRED",
+        input.terminalCredential
+          ? "This POS terminal credential is invalid or expired."
+          : "This POS terminal must be enrolled before PIN login.",
+      );
+
+      try {
+        await recordFailureForLockKeys(this.db, lockKeys, policy);
+      } catch (lockError) {
+        if (!(lockError instanceof AuthError)) throw lockError;
+        error = lockError;
+      }
+      await this.repository.writeAuditLog({
+        eventType: "auth.pos_pin_login.failed",
+        success: false,
+        reason: error.code,
+        meta,
+        metadata: auditMetadata,
+      });
+      throw error;
+    }
+
+    const refreshTokenTtlSeconds = await this.getRefreshTokenTtlSeconds();
+    let outcome:
+      | { ok: true; result: AuthResult }
+      | { ok: false; error: AuthError };
+    try {
+      outcome = await this.repository.runInTransaction(
+        async (repository, tx) => {
+          // Serialize PIN attempts with a transaction-scoped advisory lock.
+          // Terminal lifecycle mutations intentionally do not take this lock,
+          // so an emergency disable/revoke can overtake slow PIN hashing.
+          await lockPosPinAttempt(tx, terminalContext.id);
+          await assertLockKeysNotLocked(tx, lockKeys);
+
+          let terminal: PosTerminalLoginContext | undefined;
+          let terminalError: AuthError | undefined;
+
+          try {
+            terminal = requireUnchangedPosTerminal(
+              await repository.findPosTerminalById(terminalContext.id),
+              terminalContext,
+              input.terminalCredential,
+            );
+          } catch (error) {
+            if (!(error instanceof AuthError)) throw error;
+            terminalError = error;
+          }
+
+          if (terminalError) {
+            let effectiveError = terminalError;
+            if (terminalError.code !== "POS_TERMINAL_DISABLED") {
+              try {
+                await recordFailureForLockKeys(tx, lockKeys, policy);
+              } catch (lockError) {
+                if (!(lockError instanceof AuthError)) throw lockError;
+                effectiveError = lockError;
+              }
+            }
+
+            await repository.writeAuditLog({
+              tenantId: terminalContext.tenantId,
+              eventType: "auth.pos_pin_login.failed",
+              success: false,
+              reason: effectiveError.code,
+              meta,
+              metadata: auditMetadata,
+            });
+            return { ok: false as const, error: effectiveError };
+          }
+
+          if (!terminal) {
+            throw new AuthError(
+              "POS_TERMINAL_DISABLED",
+              "The POS terminal session is no longer active.",
+            );
+          }
+
+          const candidates = await repository.findPosPinLoginCandidates({
+            tenantId: terminal.tenantId,
+            branchId: terminal.branchId,
+          });
+          const matchedUsers: AuthenticatedUser[] = [];
+
+          for (const candidate of candidates) {
+            if (
+              hasValidPinFormat &&
+              (await verifyPassword(input.pin, candidate.pinHash))
+            ) {
+              matchedUsers.push(candidate);
+            }
+          }
+
+          if (matchedUsers.length !== 1) {
+            let error = invalidCredentials();
+            try {
+              await recordFailureForLockKeys(tx, lockKeys, policy);
+            } catch (lockError) {
+              if (!(lockError instanceof AuthError)) throw lockError;
+              error = lockError;
+            }
+
+            await repository.writeAuditLog({
+              tenantId: terminal.tenantId,
+              eventType: "auth.pos_pin_login.failed",
+              success: false,
+              reason:
+                error.code === "ACCOUNT_LOCKED"
+                  ? error.code
+                  : matchedUsers.length > 1
+                    ? "pin_ambiguous"
+                    : "invalid_credentials",
+              meta,
+              metadata: auditMetadata,
+            });
+            return { ok: false as const, error };
+          }
+
+          const user = matchedUsers[0]!;
+          await repository.lockPosTerminalById({
+            tenantId: terminal.tenantId,
+            terminalId: terminal.id,
+          });
+
+          let signingTerminal: PosTerminalLoginContext;
+          try {
+            signingTerminal = requireUnchangedPosTerminal(
+              await repository.findPosTerminalById(terminal.id),
+              terminal,
+              input.terminalCredential,
+            );
+          } catch (error) {
+            if (!(error instanceof AuthError)) throw error;
+            await repository.writeAuditLog({
+              tenantId: terminal.tenantId,
+              actorUserId: user.id,
+              eventType: "auth.pos_pin_login.failed",
+              success: false,
+              reason: error.code,
+              meta,
+              metadata: auditMetadata,
+            });
+            return { ok: false as const, error };
+          }
+
+          try {
+            const result = await this.issuePosAuthResult(repository, user, {
+              eventType: "auth.pos_pin_login.success",
+              meta,
+              terminal: signingTerminal,
+              refreshTokenTtlSeconds,
+              metadata: auditMetadata,
+            });
+            return { ok: true as const, result };
+          } catch (error) {
+            if (!(error instanceof AuthError)) throw error;
+            await repository.writeAuditLog({
+              tenantId: user.tenantId,
+              actorUserId: user.id,
+              eventType: "auth.pos_pin_login.failed",
+              success: false,
+              reason: error.code,
+              meta,
+              metadata: auditMetadata,
+            });
+            return { ok: false as const, error };
+          }
+        },
+      );
+    } catch (error) {
+      if (error instanceof AuthError) {
+        await this.repository.writeAuditLog({
+          tenantId: terminalContext.tenantId,
+          eventType: "auth.pos_pin_login.failed",
+          success: false,
+          reason: error.code,
+          meta,
+          metadata: auditMetadata,
+        });
+      }
+
+      throw error;
+    }
+
+    if (!outcome.ok) {
+      throw outcome.error;
+    }
+
+    return outcome.result;
+  }
+
   async refresh(input: RefreshInput): Promise<RefreshResult> {
     const tokenHash = hashOpaqueToken(input.refreshToken);
-    const storedToken = await this.repository.findRefreshTokenByHash(tokenHash);
+    const tokenHint = await this.repository.findRefreshTokenByHash(tokenHash);
 
-    if (!storedToken) {
+    if (!tokenHint) {
       throw new AuthError("TOKEN_INVALID", "Refresh token is invalid.");
     }
 
-    if (storedToken.revokedAt) {
-      await this.repository.revokeRefreshTokenFamily(storedToken.familyId);
-      await this.repository.writeAuditLog({
-        tenantId: storedToken.tenantId,
-        actorUserId: storedToken.userId,
-        eventType: "auth.refresh.reuse_detected",
-        success: false,
-        reason: "refresh_token_reuse",
-        meta: input,
-      });
-      throw new AuthError(
-        "TOKEN_REUSE_DETECTED",
-        "Refresh token reuse detected.",
-      );
-    }
+    const refreshTokenTtlSeconds = await this.getRefreshTokenTtlSeconds();
+    const outcome = await this.repository.runInTransaction(
+      async (repository) => {
+        // POS terminal lifecycle mutations lock the terminal before revoking
+        // its refresh tokens. Refresh follows the same order so neither path
+        // can insert a live successor after a disable/rebind/revoke commit.
+        if (tokenHint.terminalId) {
+          if (!tokenHint.tenantId) {
+            return {
+              ok: false as const,
+              error: new AuthError(
+                "TOKEN_INVALID",
+                "Refresh token is invalid.",
+              ),
+            };
+          }
+          await repository.lockPosTerminalById({
+            tenantId: tokenHint.tenantId,
+            terminalId: tokenHint.terminalId,
+          });
+        }
 
-    if (storedToken.expiresAt.getTime() <= Date.now()) {
-      await this.repository.revokeRefreshToken({ tokenId: storedToken.id });
-      throw new AuthError("TOKEN_EXPIRED", "Refresh token has expired.");
-    }
+        const storedToken =
+          await repository.findRefreshTokenByHashForUpdate(tokenHash);
 
-    const user = await this.repository.findUserById(storedToken.userId);
+        if (!storedToken || storedToken.terminalId !== tokenHint.terminalId) {
+          return {
+            ok: false as const,
+            error: new AuthError("TOKEN_INVALID", "Refresh token is invalid."),
+          };
+        }
 
-    if (!user) {
-      throw new AuthError("TOKEN_INVALID", "Refresh token user is invalid.");
-    }
+        const now = Date.now();
+        const isConcurrentRotationRetry =
+          Boolean(storedToken.revokedAt) &&
+          Boolean(storedToken.replacedByTokenId) &&
+          now - storedToken.revokedAt!.getTime() >= 0 &&
+          now - storedToken.revokedAt!.getTime() <=
+            REFRESH_TOKEN_ROTATION_GRACE_MS;
 
-    assertActiveUser(user);
+        if (storedToken.revokedAt && !isConcurrentRotationRetry) {
+          await repository.revokeRefreshTokenFamily({
+            tenantId: storedToken.tenantId,
+            familyId: storedToken.familyId,
+          });
+          await repository.writeAuditLog({
+            tenantId: storedToken.tenantId,
+            actorUserId: storedToken.userId,
+            eventType: "auth.refresh.reuse_detected",
+            success: false,
+            reason: "refresh_token_reuse",
+            meta: input,
+          });
+          return {
+            ok: false as const,
+            error: new AuthError(
+              "TOKEN_REUSE_DETECTED",
+              "Refresh token reuse detected.",
+            ),
+          };
+        }
 
-    const access = await this.repository.getUserAccess(user.id);
-    const authContextBase = this.buildAuthContextBase(user, access);
-    const issuedTokens = await this.tokenService.issueTokenPair(authContextBase);
-    const tokens = {
-      ...issuedTokens,
-      refreshTokenFamilyId: storedToken.familyId,
-    };
-    const authContext = this.withAccessTokenExpiresAt(
-      authContextBase,
-      tokens.accessTokenExpiresAt,
+        if (storedToken.expiresAt.getTime() <= now) {
+          await repository.revokeRefreshToken({
+            tenantId: storedToken.tenantId,
+            tokenId: storedToken.id,
+          });
+          return {
+            ok: false as const,
+            error: new AuthError("TOKEN_EXPIRED", "Refresh token has expired."),
+          };
+        }
+
+        const user = await repository.findUserById(storedToken.userId);
+
+        if (!user) {
+          return {
+            ok: false as const,
+            error: new AuthError(
+              "TOKEN_INVALID",
+              "Refresh token user is invalid.",
+            ),
+          };
+        }
+
+        assertActiveUser(user);
+        await this.assertUserIdentityAvailable(user, true, repository);
+
+        if (storedToken.tenantId !== user.tenantId) {
+          await repository.revokeRefreshTokenFamily({
+            tenantId: storedToken.tenantId,
+            familyId: storedToken.familyId,
+          });
+          return {
+            ok: false as const,
+            error: new AuthError(
+              "TOKEN_INVALID",
+              "Refresh token tenant no longer matches the user account.",
+            ),
+          };
+        }
+
+        const terminal = storedToken.terminalId
+          ? ((await repository.findPosTerminalById(storedToken.terminalId)) ??
+            undefined)
+          : undefined;
+        const access = await repository.getUserAccess(
+          user,
+          terminal ? "pos" : "web",
+        );
+
+        if (
+          storedToken.terminalId &&
+          (!terminal ||
+            terminal.tenantId !== storedToken.tenantId ||
+            terminal.deviceId !== storedToken.deviceId)
+        ) {
+          await repository.revokeRefreshTokenFamily({
+            tenantId: storedToken.tenantId,
+            familyId: storedToken.familyId,
+          });
+          return {
+            ok: false as const,
+            error: new AuthError(
+              "POS_TERMINAL_DISABLED",
+              "The POS terminal session is no longer active.",
+            ),
+          };
+        }
+
+        if (terminal) {
+          assertEnrolledTerminalCredential(terminal, input.terminalCredential);
+        }
+
+        const authContextBase = this.buildAuthContextBase(
+          user,
+          access,
+          terminal,
+        );
+        const derivedRefreshToken = deriveRefreshTokenSuccessor(
+          this.refreshTokenRotationSecret,
+          storedToken.tokenHash,
+          storedToken.familyId,
+        );
+        const issuedTokens = await this.tokenService.issueTokenPair(
+          authContextBase,
+          {
+            refreshTokenTtlSeconds,
+          },
+        );
+
+        let refreshTokenExpiresAt = issuedTokens.refreshTokenExpiresAt;
+
+        if (isConcurrentRotationRetry) {
+          const successor = await repository.findRefreshTokenByIdForUpdate(
+            storedToken.replacedByTokenId!,
+          );
+          const successorMatches =
+            successor &&
+            successor.userId === storedToken.userId &&
+            successor.tenantId === storedToken.tenantId &&
+            successor.deviceId === storedToken.deviceId &&
+            successor.terminalId === storedToken.terminalId &&
+            successor.familyId === storedToken.familyId &&
+            successor.tokenHash === hashOpaqueToken(derivedRefreshToken);
+
+          if (!successorMatches || successor.revokedAt) {
+            await repository.revokeRefreshTokenFamily({
+              tenantId: storedToken.tenantId,
+              familyId: storedToken.familyId,
+            });
+            return {
+              ok: false as const,
+              error: new AuthError(
+                "TOKEN_REUSE_DETECTED",
+                "Refresh token reuse detected.",
+              ),
+            };
+          }
+
+          if (successor.expiresAt.getTime() <= now) {
+            await repository.revokeRefreshToken({
+              tenantId: successor.tenantId,
+              tokenId: successor.id,
+            });
+            return {
+              ok: false as const,
+              error: new AuthError(
+                "TOKEN_EXPIRED",
+                "Refresh token has expired.",
+              ),
+            };
+          }
+
+          refreshTokenExpiresAt = successor.expiresAt;
+        }
+
+        const tokens = {
+          ...issuedTokens,
+          refreshToken: derivedRefreshToken,
+          refreshTokenExpiresAt,
+          refreshTokenFamilyId: storedToken.familyId,
+        };
+        const authContext = this.withAccessTokenExpiresAt(
+          authContextBase,
+          tokens.accessTokenExpiresAt,
+        );
+
+        if (!isConcurrentRotationRetry) {
+          const newRefreshTokenId = await repository.createRefreshToken({
+            userId: user.id,
+            tenantId: user.tenantId,
+            tokenHash: hashOpaqueToken(tokens.refreshToken),
+            familyId: storedToken.familyId,
+            expiresAt: tokens.refreshTokenExpiresAt,
+            terminalId: terminal?.id,
+            meta: terminal
+              ? { ...input, deviceId: terminal.deviceId }
+              : {
+                  ...input,
+                  deviceId: storedToken.deviceId ?? input.deviceId,
+                },
+          });
+
+          if (!newRefreshTokenId) {
+            throw new AuthError(
+              "TOKEN_INVALID",
+              "Failed to rotate refresh token.",
+            );
+          }
+
+          await repository.revokeRefreshToken({
+            tenantId: storedToken.tenantId,
+            tokenId: storedToken.id,
+            replacedByTokenId: newRefreshTokenId,
+          });
+        }
+
+        return {
+          ok: true as const,
+          result: {
+            authContext,
+            tokens,
+            setCookieHeaders: createAuthCookieHeaders(tokens, {
+              secure: this.cookieSecure,
+            }),
+          },
+        };
+      },
     );
-    const newRefreshTokenId = await this.repository.createRefreshToken({
-      userId: user.id,
-      tenantId: user.tenantId,
-      tokenHash: hashOpaqueToken(tokens.refreshToken),
-      familyId: storedToken.familyId,
-      expiresAt: tokens.refreshTokenExpiresAt,
-      meta: input,
-    });
 
-    await this.repository.revokeRefreshToken({
-      tokenId: storedToken.id,
-      replacedByTokenId: newRefreshTokenId,
-    });
+    if (!outcome.ok) {
+      throw outcome.error;
+    }
 
-    return {
-      authContext,
-      tokens,
-      setCookieHeaders: createAuthCookieHeaders(tokens, {
-        secure: this.cookieSecure,
-      }),
-    };
+    return outcome.result;
   }
 
   async logout(input: LogoutInput): Promise<string[]> {
     if (input.refreshToken) {
       const tokenHash = hashOpaqueToken(input.refreshToken);
-      const storedToken = await this.repository.findRefreshTokenByHash(tokenHash);
+      const tokenHint = await this.repository.findRefreshTokenByHash(tokenHash);
 
-      await this.repository.revokeRefreshTokenByRawHash(tokenHash);
+      if (tokenHint) {
+        await this.repository.runInTransaction(async (repository) => {
+          if (tokenHint.terminalId) {
+            if (!tokenHint.tenantId) return;
+            await repository.lockPosTerminalById({
+              tenantId: tokenHint.tenantId,
+              terminalId: tokenHint.terminalId,
+            });
+          }
 
-      await this.repository.writeAuditLog({
-        tenantId: storedToken?.tenantId,
-        actorUserId: storedToken?.userId,
-        eventType: "auth.logout",
-        success: true,
-        meta: input,
-      });
+          const storedToken =
+            await repository.findRefreshTokenByHashForUpdate(tokenHash);
+          if (!storedToken) return;
+
+          await repository.revokeRefreshTokenFamily({
+            tenantId: storedToken.tenantId,
+            familyId: storedToken.familyId,
+          });
+          await repository.writeAuditLog({
+            tenantId: storedToken.tenantId,
+            actorUserId: storedToken.userId,
+            eventType: "auth.logout",
+            success: true,
+            meta: input,
+          });
+        });
+      }
     }
 
     return createClearAuthCookieHeaders({ secure: this.cookieSecure });
@@ -257,26 +1084,137 @@ export class AuthService {
     }
 
     assertActiveUser(user);
+    await this.assertUserIdentityAvailable(user, true);
 
-    const access = await this.repository.getUserAccess(user.id);
+    if (claims.tenantId !== user.tenantId) {
+      throw new AuthError(
+        "TOKEN_INVALID",
+        "Access token tenant no longer matches the user account.",
+      );
+    }
+
+    const terminal = claims.terminalId
+      ? ((await this.repository.findPosTerminalById(claims.terminalId)) ??
+        undefined)
+      : undefined;
+    const access = await this.repository.getUserAccess(
+      user,
+      terminal ? "pos" : "web",
+    );
+
+    if (
+      claims.terminalId &&
+      (!terminal ||
+        terminal.status !== "active" ||
+        !terminal.credentialDigest ||
+        terminal.tenantId !== user.tenantId ||
+        terminal.branchId !== claims.terminalBranchId ||
+        terminal.deviceId !== claims.terminalDeviceId)
+    ) {
+      throw new AuthError(
+        "POS_TERMINAL_DISABLED",
+        "The POS terminal session is no longer active.",
+      );
+    }
+
+    if (
+      terminal &&
+      terminal.credentialVersion !== claims.terminalCredentialVersion
+    ) {
+      throw new AuthError(
+        "POS_TERMINAL_CREDENTIAL_INVALID",
+        "The POS terminal credential changed. Sign in with a staff PIN again.",
+      );
+    }
+
     return this.withAccessTokenExpiresAt(
-      this.buildAuthContextBase(user, access),
+      this.buildAuthContextBase(user, access, terminal),
       claims.expiresAt,
     );
   }
 
   private buildAuthContextBase(
     user: AuthenticatedUser,
-    access: UserAccess,
+    access: ValidatedUserAccess,
+    terminal?: PosTerminalLoginContext,
   ): Omit<AuthContext, "accessTokenExpiresAt"> {
-    return {
+    if (!access.identityConsistent) {
+      throw invalidCredentials();
+    }
+
+    const role = resolveSessionPrimaryRole(
+      user,
+      access.roles,
+      terminal ? "pos" : "web",
+    );
+
+    if (!role) {
+      throw invalidCredentials();
+    }
+
+    if (!terminal && !isWebRoleBranchScopeValid(role, access.branchIds)) {
+      throw invalidCredentials();
+    }
+
+    if (
+      terminal &&
+      role !== "owner" &&
+      !access.branchIds.includes(terminal.branchId)
+    ) {
+      throw new AuthError(
+        "FORBIDDEN",
+        "The staff member is not assigned to the terminal branch.",
+      );
+    }
+
+    const context: Omit<AuthContext, "accessTokenExpiresAt"> = {
       userId: user.id,
+      displayName: access.displayName,
       tenantId: user.tenantId,
-      branchIds: access.branchIds,
-      role: resolvePrimaryRole(user, access),
+      branchIds: terminal ? [terminal.branchId] : access.branchIds,
+      role,
       roles: access.roles,
       permissions: access.permissions,
+      language: resolveTenantLanguage(access.language),
+      timezone: resolveTimeZone(access.timezone),
     };
+
+    if (terminal) {
+      context.terminalId = terminal.id;
+      context.terminalBranchId = terminal.branchId;
+      context.terminalDeviceId = terminal.deviceId;
+      context.terminalCredentialVersion = terminal.credentialVersion;
+    }
+
+    return context;
+  }
+
+  private async assertUserIdentityAvailable(
+    user: AuthenticatedUser,
+    tokenSession: boolean,
+    repository: AuthRepository = this.repository,
+  ): Promise<void> {
+    const invalidIdentity = () => {
+      if (tokenSession) {
+        return new AuthError(
+          "TOKEN_INVALID",
+          "Authenticated user identity is no longer available.",
+        );
+      }
+
+      return invalidCredentials();
+    };
+
+    if (!isUserIdentityShapeValid(user)) {
+      throw invalidIdentity();
+    }
+
+    if (
+      user.userType === "tenant" &&
+      (!user.tenantId || !(await repository.isTenantActive(user.tenantId)))
+    ) {
+      throw invalidIdentity();
+    }
   }
 
   private withAccessTokenExpiresAt(

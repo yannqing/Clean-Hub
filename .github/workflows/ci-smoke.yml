@@ -1,0 +1,277 @@
+name: CI Smoke Test
+
+on:
+  pull_request:
+    branches: [main, master, dev]
+  push:
+    branches: [main, master, dev]
+
+concurrency:
+  group: ci-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Build and startup smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: cleanhub
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cleanhub"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --health-start-period 10s
+
+    env:
+      NODE_ENV: production
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/cleanhub
+      AUTH_TOKEN_SECRET: ci-smoke-test-secret-with-at-least-32-chars
+      PAYMENT_MOCK_SECRET: ci-smoke-payment-webhook-secret
+      AUTH_ACCESS_TOKEN_TTL_SECONDS: "900"
+      AUTH_REFRESH_TOKEN_TTL_SECONDS: "2592000"
+      AUTH_COOKIE_SECURE: "false"
+      LOG_LEVEL: warn
+      SERVICE_NAME: cleanhub-ci
+      NEXT_PUBLIC_APP_ENV: ci
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:4000
+      CLEANHUB_API_BASE_URL: http://localhost:4000
+      DATABASE_REQUIRE_RLS: "false"
+      PORT: "4000"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare environment file
+        run: cp .env.example .env
+
+      - name: Run database migrations
+        run: pnpm db:migrate
+
+      - name: Seed integration fixtures
+        env:
+          NODE_ENV: development
+        run: pnpm db:seed
+
+      - name: Verify tenant RLS policies
+        run: pnpm test:integration:tenant-rls
+
+      - name: Run tenant order integration test
+        run: pnpm test:integration:tenant-orders
+
+      - name: Run per-item tax integration test
+        run: pnpm --filter @cleanhub/api test:integration:tax
+
+      - name: Typecheck core apps
+        run: |
+          pnpm --filter @cleanhub/api-client typecheck
+          pnpm --filter @cleanhub/api typecheck
+          pnpm --filter @cleanhub/web-admin typecheck
+          pnpm --filter @cleanhub/pos-web typecheck
+          pnpm --filter @cleanhub/desktop typecheck
+
+      - name: Run power-loss resilience smoke tests
+        run: |
+          sh -n deploy/postgres/backup-loop.sh deploy/postgres/cloud-backup-loop.sh deploy/postgres/cloud-object-storage-loop.sh deploy/postgres/restore-drill.sh
+          node --check scripts/build-release.mjs
+          pnpm --filter @cleanhub/offline smoke
+          pnpm --filter @cleanhub/storage smoke
+          pnpm --filter @cleanhub/desktop smoke
+          pnpm --filter @cleanhub/domain smoke:money
+          pnpm --filter @cleanhub/domain smoke:currency
+          pnpm --filter @cleanhub/api smoke:cron-schedule
+          pnpm --filter @cleanhub/api smoke:payment
+          pnpm --filter @cleanhub/api smoke:payment-config
+          pnpm --filter @cleanhub/api smoke:pos-carts
+          pnpm --filter @cleanhub/api smoke:pos-orders
+          pnpm --filter @cleanhub/api smoke:pos-financial
+          pnpm --filter @cleanhub/domain smoke:tax
+          pnpm --filter @cleanhub/api smoke:pos-service-tickets
+          pnpm --filter @cleanhub/api smoke:temporary-password
+          pnpm --filter @cleanhub/api smoke:customer-password-gate
+          pnpm --filter @cleanhub/api smoke:email-capability
+          pnpm --filter @cleanhub/api smoke:email-retry
+          pnpm --filter @cleanhub/api smoke:locale
+          pnpm --filter @cleanhub/api smoke:error-messages
+          pnpm check:native-pos-parity
+          pnpm --filter @cleanhub/pos-web smoke:cart
+          pnpm --filter @cleanhub/pos-web smoke:local-pricing
+          pnpm --filter @cleanhub/pos-web smoke:offline-operations
+          pnpm --filter @cleanhub/pos-web smoke:cash-drawer
+          pnpm --filter @cleanhub/web-admin smoke:proxy
+          pnpm --filter @cleanhub/web-admin smoke:tax-rate-percent
+          pnpm --filter @cleanhub/mobile smoke:release-validation
+          pnpm --filter @cleanhub/pos-mobile smoke:native-release-validation
+
+      - name: Run realtime smoke tests
+        run: |
+          pnpm --filter @cleanhub/api-client smoke:realtime-url
+          pnpm --filter @cleanhub/api smoke:pos-realtime
+
+      - name: Build API and web apps
+        run: |
+          pnpm --filter @cleanhub/api build
+          pnpm --filter @cleanhub/web-admin build
+          pnpm --filter @cleanhub/pos-web build
+
+      - name: Start API and verify /health
+        run: |
+          set -euo pipefail
+          # The production API is bundled by release:build. The plain tsc
+          # output still resolves workspace packages to TypeScript sources.
+          pnpm --filter @cleanhub/api exec tsx src/index.ts > /tmp/cleanhub-api.log 2>&1 &
+          echo $! > /tmp/cleanhub-api.pid
+
+          for attempt in $(seq 1 30); do
+            if curl -sf http://localhost:4000/health | grep -q '"status":"ok"'; then
+              echo "API health check passed on attempt ${attempt}"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "API failed to become healthy within 60s"
+          cat /tmp/cleanhub-api.log || true
+          exit 1
+
+      - name: Verify realtime through the production API prefix
+        run: pnpm test:integration:pos-realtime-proxy
+
+      - name: Start web-admin and verify login page
+        run: |
+          set -euo pipefail
+          pnpm --filter @cleanhub/web-admin start > /tmp/cleanhub-web-admin.log 2>&1 &
+          echo $! > /tmp/cleanhub-web-admin.pid
+
+          for attempt in $(seq 1 30); do
+            status="$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/login || true)"
+            if [ "$status" = "200" ]; then
+              echo "web-admin login page responded 200 on attempt ${attempt}"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "web-admin failed to serve /login within 60s"
+          cat /tmp/cleanhub-web-admin.log || true
+          exit 1
+
+      - name: Start pos-web and verify login page
+        run: |
+          set -euo pipefail
+          pnpm --filter @cleanhub/pos-web start > /tmp/cleanhub-pos-web.log 2>&1 &
+          echo $! > /tmp/cleanhub-pos-web.pid
+
+          for attempt in $(seq 1 30); do
+            status="$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/login || true)"
+            if [ "$status" = "200" ]; then
+              echo "pos-web login page responded 200 on attempt ${attempt}"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "pos-web failed to serve /login within 60s"
+          cat /tmp/cleanhub-pos-web.log || true
+          exit 1
+
+      - name: Stop background processes
+        if: always()
+        run: |
+          for pid_file in /tmp/cleanhub-api.pid /tmp/cleanhub-web-admin.pid /tmp/cleanhub-pos-web.pid; do
+            if [ -f "$pid_file" ]; then
+              kill "$(cat "$pid_file")" 2>/dev/null || true
+            fi
+          done
+
+  android:
+    name: Native Android POS tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/pos-mobile/android/**/*.gradle', 'apps/pos-mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Synchronize Android Capacitor plugins
+        run: pnpm --filter @cleanhub/pos-mobile cap:sync:android
+
+      - name: Run Android unit tests
+        working-directory: apps/pos-mobile/android
+        # The POS duplicates server business rules in Kotlin -- ticket state
+        # machines, offline pricing, currency minor units, replay bounds. These
+        # tests are what notices when the two drift apart, and until now they
+        # only ran at release time, long after the change that broke them.
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
+
+      - name: Compile the release variant
+        working-directory: apps/pos-mobile/android
+        # Release differs from debug in more than signing: it applies ProGuard
+        # rules and merges its own manifest. Compiling it here keeps a
+        # release-only break from first surfacing during a version tag.
+        env:
+          CLEANHUB_POS_API_BASE_URL: https://ci.invalid
+        run: ./gradlew :app:compileReleaseKotlin --no-daemon
+
+      - name: Publish test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-results
+          path: apps/pos-mobile/android/app/build/test-results/testDebugUnitTest/*.xml
+          retention-days: 14
+          if-no-files-found: warn

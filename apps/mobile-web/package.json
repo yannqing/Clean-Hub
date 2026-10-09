@@ -1,0 +1,36 @@
+{
+  "name": "@cleanhub/mobile-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack --port 3002",
+    "build": "next build",
+    "lint": "eslint",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@capacitor/preferences": "^8.0.1",
+    "@cleanhub/api-client": "workspace:*",
+    "@cleanhub/hardware": "workspace:*",
+    "@cleanhub/i18n": "workspace:*",
+    "@cleanhub/mobile": "workspace:*",
+    "@cleanhub/offline": "workspace:*",
+    "@cleanhub/ui": "workspace:*",
+    "lucide-react": "^1.14.0",
+    "next": "16.2.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

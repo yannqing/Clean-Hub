@@ -1,4 +1,4 @@
-import { PagePlaceholder } from "@/components/app-shell";
+import { TenantDetailView } from "@/features/saas/tenants/components";
 
 type TenantDetailPageProps = {
   params: Promise<{
@@ -11,11 +11,5 @@ export default async function TenantDetailPage({
 }: TenantDetailPageProps) {
   const { tenantId } = await params;
 
-  return (
-    <PagePlaceholder
-      description={`Tenant detail placeholder for tenant ${tenantId}.`}
-      items={["Overview", "Branches", "Users", "Status", "Audit"]}
-      title="Tenant Detail"
-    />
-  );
+  return <TenantDetailView tenantId={tenantId} />;
 }

@@ -1,0 +1,30 @@
+export type SaasTenantsErrorCode =
+  | "SAAS_TENANT_NOT_FOUND"
+  | "SAAS_TENANT_UPDATE_EMPTY"
+  | "SAAS_TENANT_STATUS_UNCHANGED"
+  | "SAAS_TENANT_SETTINGS_UPDATE_EMPTY"
+  | "SAAS_TENANT_FEATURE_FLAGS_UPDATE_EMPTY"
+  | "SAAS_TENANT_PRESSING_CODE_CONFLICT"
+  | "SAAS_TENANT_CODE_GENERATION_FAILED"
+  | "SAAS_TENANT_ALREADY_OFFBOARDED"
+  | "SAAS_TENANT_NOT_OFFBOARDED"
+  | "SAAS_TENANT_RETENTION_ELAPSED"
+  | "SAAS_TENANT_USER_NOT_FOUND"
+  | "OWNER_ALREADY_EXISTS"
+  | "TENANT_USER_EMAIL_CONFLICT"
+  | "SAAS_TENANT_TAX_TEMPLATE_REQUIRED"
+  | "SAAS_TENANT_TAX_TEMPLATE_CONFLICT"
+  | "SAAS_TENANT_SETTINGS_NOT_FOUND"
+  | "SAAS_TENANT_CURRENCY_MISMATCH"
+  | "SAAS_TENANT_CURRENCY_IN_USE";
+
+export class SaasTenantsError extends Error {
+  constructor(
+    public readonly code: SaasTenantsErrorCode,
+    message: string,
+    public readonly status: 404 | 409 | 422,
+  ) {
+    super(message);
+    this.name = "SaasTenantsError";
+  }
+}
