@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
 
 import "../../../config/env.js";
-import { auditLogs, authRefreshTokens, closeDbConnection, getDb, roles, runWithSystemDatabaseContext, tenants, userProfiles, userRoles, users } from "@cleanhub/db";
+import { auditLogs, authRefreshTokens, closeDbConnection, getDb, roles, runWithSystemDatabaseContext, securitySettings, tenants, userProfiles, userRoles, users } from "@cleanhub/db";
+import { RESET_USER_PASSWORD, RESET_USER_PIN } from "@cleanhub/domain/initial-owner-credentials";
 import { createId } from "@cleanhub/id";
 import { and, eq, inArray } from "drizzle-orm";
 
 import type { AuthContext } from "../../auth/auth.types.js";
 import { findSaasUserDirectory } from "./saas-users.repository.js";
-import { getSaasUserDetail, listSaasUserDirectory } from "./saas-users.service.js";
+import { getSaasUserDetail, listSaasUserDirectory, resetSaasUserPassword } from "./saas-users.service.js";
 import { getSaasUserDirectoryDetail, resetDirectoryUserPassword, resetDirectoryUserPin } from "./user-directory.service.js";
+import { resetSaasTenantUserPassword } from "../tenants/tenants.service.js";
 import { hashPassword, hashPin, verifyPassword } from "../../auth/password.service.js";
 import { resetSaasUserPasswordBodySchema } from "./saas-users.validation.js";
 
@@ -19,6 +21,13 @@ async function run() {
     await runWithSystemDatabaseContext(async () => {
       try {
         await getDb().transaction(async (tx) => {
+          await tx.insert(securitySettings).values({
+            id: createId(), settingKey: "default", passwordMinLength: 12,
+            passwordRequiresNumber: true, passwordRequiresSymbol: true,
+          }).onConflictDoUpdate({
+            target: securitySettings.settingKey,
+            set: { passwordMinLength: 12, passwordRequiresNumber: true, passwordRequiresSymbol: true },
+          });
           const prefix = `Directory-${createId()}`;
           const tenantId = createId();
           const otherTenantId = createId();
@@ -166,6 +175,8 @@ async function run() {
             otherTenantUserId,
             otherTenantId,
           );
+          await tx.update(users).set({ pinHash: await hashPin(RESET_USER_PIN) })
+            .where(eq(users.id, otherTenantUserId));
           const otherHashBefore = (
             await tx
               .select({
@@ -191,6 +202,7 @@ async function run() {
               resetInput,
               tx,
             );
+            assert.equal(passwordResult.temporaryPassword, "123456", "administrator reset uses the agreed password even with a stricter password policy");
             const [passwordRecord] = await tx
               .select({
                 passwordHash: users.passwordHash,
@@ -230,7 +242,7 @@ async function run() {
 
             const pinSessionId = await createSession(targetId, scopedTenantId);
             const pinResult = await resetDirectoryUserPin(resetInput, tx);
-            assert.match(pinResult.temporaryPin, /^\d{6}$/);
+            assert.equal(pinResult.temporaryPin, "666666", "administrator reset uses the agreed PIN");
             const [pinRecord] = await tx
               .select({
                 passwordHash: users.passwordHash,
@@ -264,7 +276,7 @@ async function run() {
             assert.equal(
               await verifyPassword(pinResult.temporaryPin, pinHash),
               false,
-              "generated PIN differs from another employee's PIN",
+              "default PIN differs from another employee's current PIN",
             );
 
             const audits = await tx
@@ -296,6 +308,36 @@ async function run() {
               assert.equal(audit.after, null);
             }
           }
+
+          for (const targetId of [ownerId, platformTargetId]) {
+            const sessionId = await createSession(targetId, targetId === ownerId ? tenantId : null);
+            const [before] = await tx.select({ pinHash: users.pinHash }).from(users).where(eq(users.id, targetId));
+            const input = { authContext: auth, userId: targetId, reason: "Legacy credential recovery" };
+            const result = targetId === ownerId
+              ? await resetSaasTenantUserPassword({ ...input, tenantId }, tx)
+              : await resetSaasUserPassword(input, tx);
+            assert.equal(result.temporaryPassword, "123456", "all SaaS password reset endpoints use the same default");
+            const [after] = await tx.select({ passwordHash: users.passwordHash, pinHash: users.pinHash }).from(users).where(eq(users.id, targetId));
+            assert.ok(after && await verifyPassword(RESET_USER_PASSWORD, after.passwordHash));
+            assert.equal(after.pinHash, before?.pinHash, "legacy password reset preserves PIN");
+            assert.ok((await tx.select().from(authRefreshTokens).where(eq(authRefreshTokens.id, sessionId)))[0]?.revokedAt);
+            assert.equal((await tx.select().from(auditLogs).where(and(eq(auditLogs.entityId, targetId), eq(auditLogs.reason, input.reason)))).length, 1);
+          }
+
+          assert.equal((await resetDirectoryUserPin({ authContext: auth, userId: ownerId, reason: "Repeat PIN recovery" }, tx)).temporaryPin,
+            RESET_USER_PIN, "an account's own default PIN is not a conflict");
+          await tx.update(users).set({ pinHash: await hashPin(RESET_USER_PIN) }).where(eq(users.id, cashierId));
+          const conflictSessionId = await createSession(ownerId, tenantId);
+          const [beforeConflict] = await tx.select({ passwordHash: users.passwordHash, pinHash: users.pinHash, version: users.version }).from(users).where(eq(users.id, ownerId));
+          await assert.rejects(resetDirectoryUserPin({ authContext: auth, userId: ownerId, reason: "Conflicting PIN recovery" }, tx),
+            (error: unknown) => error instanceof Error && "code" in error && error.code === "SAAS_USER_PIN_CONFLICT",
+            "a duplicate default PIN is rejected instead of generating a different PIN");
+          const [afterConflict] = await tx.select({ passwordHash: users.passwordHash, pinHash: users.pinHash, version: users.version }).from(users).where(eq(users.id, ownerId));
+          assert.deepEqual(afterConflict, beforeConflict, "a failed PIN reset preserves the target credentials and version");
+          assert.equal((await tx.select().from(authRefreshTokens).where(eq(authRefreshTokens.id, conflictSessionId)))[0]?.revokedAt,
+            null, "a failed PIN reset does not revoke sessions");
+          assert.equal((await tx.select().from(auditLogs).where(and(eq(auditLogs.entityId, ownerId), eq(auditLogs.reason, "Conflicting PIN recovery")))).length, 0);
+
           for (const reset of [
             resetDirectoryUserPassword,
             resetDirectoryUserPin,

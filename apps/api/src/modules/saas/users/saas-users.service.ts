@@ -1,7 +1,7 @@
 import { getDb, type Database } from "@cleanhub/db";
+import { RESET_USER_PASSWORD } from "@cleanhub/domain/initial-owner-credentials";
 import type { AuthContext } from "../../auth/auth.types.js";
 
-import { generateTemporaryPassword } from "../../auth/temporary-password.helper.js";
 import { assertPasswordMeetsPolicy } from "../../auth/password-policy.helper.js";
 import { hashPassword, hashPin } from "../../auth/password.service.js";
 import { resolveEffectiveSecurityPolicy } from "../security/security-policy.js";
@@ -445,13 +445,7 @@ export async function resetSaasUserPassword(
       );
     }
 
-    const securityPolicy = await resolveEffectiveSecurityPolicy(tx);
-    const temporaryPassword = generateTemporaryPassword();
-
-    // The generated password is built to satisfy the policy, but assert it so a
-    // future policy change (e.g. disallowed symbols) fails loudly instead of
-    // silently producing an unusable credential.
-    assertPasswordMeetsPolicy(temporaryPassword, securityPolicy);
+    const temporaryPassword = RESET_USER_PASSWORD;
 
     const passwordHash = await hashPassword(temporaryPassword);
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { RESET_USER_PASSWORD, RESET_USER_PIN } from "@cleanhub/domain/initial-owner-credentials";
 import {
   Button,
   Dialog,
@@ -14,6 +15,7 @@ import {
 } from "@cleanhub/ui";
 import { useId, useState } from "react";
 import { useSaasI18n } from "@/i18n";
+import { interpolate } from "@/i18n/messages/saas";
 import { resetUserCredentialAction } from "../actions/reset-user-credential.action";
 
 export type UserCredentialResetTarget = {
@@ -37,6 +39,7 @@ export function UserCredentialResetDialog({
   const [value, setValue] = useState<string | null>(null);
   const copy =
     target.credential === "pin" ? m.users.resetPin : m.users.resetPassword;
+  const defaultValue = target.credential === "pin" ? RESET_USER_PIN : RESET_USER_PASSWORD;
 
   async function handleReset() {
     if (submitting) return;
@@ -53,7 +56,11 @@ export function UserCredentialResetDialog({
         reason,
       );
       if (!result.ok) {
-        setError(result.error);
+        setError(
+          "code" in result && result.code === "SAAS_USER_PIN_CONFLICT"
+            ? interpolate(m.users.resetPin.conflict, { value: RESET_USER_PIN })
+            : result.error,
+        );
         return;
       }
       setValue(result.value);
@@ -85,7 +92,9 @@ export function UserCredentialResetDialog({
             {value === null ? copy.title : copy.resultTitle}
           </DialogTitle>
           <DialogDescription>
-            {value === null ? copy.description : copy.resultWarning}
+            {interpolate(value === null ? copy.description : copy.resultWarning, {
+              value: defaultValue,
+            })}
           </DialogDescription>
         </DialogHeader>
         <p className="break-words text-sm font-medium">{target.displayName}</p>

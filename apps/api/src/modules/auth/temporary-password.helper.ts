@@ -7,8 +7,8 @@ import { randomBytes } from "node:crypto";
 // policy where those flags are required. 24 chars comfortably exceeds the
 // longest plausible minimum length.
 //
-// Shared by every operator-initiated password reset -- SaaS users and tenant
-// users alike -- so one review of this generator covers them all.
+// SaaS administrator recovery uses the shared fixed defaults instead. Keep this
+// generator for workflows that explicitly require a policy-compliant password.
 const TEMP_PASSWORD_LOWER = "abcdefghijkmnpqrstuvwxyz";
 const TEMP_PASSWORD_UPPER = "ABCDEFGHJKMNPQRSTUVWXYZ";
 const TEMP_PASSWORD_DIGITS = "23456789";

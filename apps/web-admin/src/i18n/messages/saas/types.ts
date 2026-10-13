@@ -397,6 +397,7 @@ export type SaasMessages = {
     resetPin: {
       title: string;
       description: string;
+      conflict: string;
       reason: string;
       reasonRequired: string;
       submit: string;

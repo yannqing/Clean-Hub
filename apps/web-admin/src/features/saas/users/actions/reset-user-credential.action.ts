@@ -1,3 +1,4 @@
+import { isApiHttpError } from "@cleanhub/api-client";
 import { webAdminApi } from "@/lib/api-client";
 
 export async function resetUserCredentialAction(
@@ -31,6 +32,7 @@ export async function resetUserCredentialAction(
   } catch (error) {
     return {
       ok: false as const,
+      code: isApiHttpError(error) ? error.code : undefined,
       error:
         error instanceof Error
           ? error.message

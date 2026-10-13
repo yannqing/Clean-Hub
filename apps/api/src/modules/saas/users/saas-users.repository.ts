@@ -1218,6 +1218,7 @@ export async function findDirectoryPinCandidates(
             eq(users.tenantId, target.tenantId),
             eq(users.userType, "tenant"),
             isNull(users.deletedAt),
+            ne(users.id, target.id),
           )
         : directoryUserIdentity(target),
     );

@@ -1,16 +1,13 @@
-import { randomInt } from "node:crypto";
 import { getDb, type Database } from "@cleanhub/db";
+import { RESET_USER_PASSWORD, RESET_USER_PIN } from "@cleanhub/domain/initial-owner-credentials";
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
-import { assertPasswordMeetsPolicy } from "../../auth/password-policy.helper.js";
 import {
   hashPassword,
   hashPin,
   verifyPassword,
 } from "../../auth/password.service.js";
-import { generateTemporaryPassword } from "../../auth/temporary-password.helper.js";
 import { lockTenantPinAssignments } from "../../tenant/users/tenant-users.repository.js";
-import { resolveEffectiveSecurityPolicy } from "../security/security-policy.js";
 import { requireSaasUsersAccess } from "./saas-users-access.js";
 import { SaasUsersError } from "./saas-users.errors.js";
 import {
@@ -49,27 +46,21 @@ export async function getSaasUserDirectoryDetail(
   return requireDirectoryTarget(db, input.userId);
 }
 
-async function generateAvailablePin(
+async function assertResetPinAvailable(
   db: Database,
   target: SaasUserDirectoryDetail,
-): Promise<string> {
+): Promise<void> {
+  if (!target.tenantId) return;
   const candidates = await findDirectoryPinCandidates(db, target);
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const pin = randomInt(1_000_000).toString().padStart(6, "0");
-    let conflict = false;
-    for (const candidate of candidates) {
-      if (await verifyPassword(pin, candidate.pinHash)) {
-        conflict = true;
-        break;
-      }
+  for (const candidate of candidates) {
+    if (await verifyPassword(RESET_USER_PIN, candidate.pinHash)) {
+      throw new SaasUsersError(
+        "SAAS_USER_PIN_CONFLICT",
+        `The default PIN ${RESET_USER_PIN} is already used by another user in this tenant. Change that user's PIN before resetting this user.`,
+        409,
+      );
     }
-    if (!conflict) return pin;
   }
-  throw new SaasUsersError(
-    "SAAS_USER_PIN_GENERATION_FAILED",
-    "Could not generate an available PIN. Please try again.",
-    503,
-  );
 }
 
 async function resetDirectoryCredential(
@@ -103,16 +94,10 @@ async function resetDirectoryCredential(
     }
     await lockDirectoryUserCredentials(tx, initialTarget);
     const target = await requireDirectoryTarget(tx, input.userId);
-    const value =
-      credential === "pin"
-        ? await generateAvailablePin(tx, target)
-        : generateTemporaryPassword();
-    if (credential === "password") {
-      assertPasswordMeetsPolicy(
-        value,
-        await resolveEffectiveSecurityPolicy(tx),
-      );
-    }
+    const value = credential === "pin" ? RESET_USER_PIN : RESET_USER_PASSWORD;
+    if (credential === "pin") await assertResetPinAvailable(tx, target);
+    // Administrator recovery uses the agreed defaults. Password policy still
+    // applies when a user chooses a password in the normal profile flow.
     const hash =
       credential === "pin" ? await hashPin(value) : await hashPassword(value);
     if (

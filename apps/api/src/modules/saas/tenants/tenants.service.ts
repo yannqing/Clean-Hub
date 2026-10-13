@@ -1,4 +1,5 @@
 import { getDb, posChannelSettings, type Database } from "@cleanhub/db";
+import { RESET_USER_PASSWORD } from "@cleanhub/domain/initial-owner-credentials";
 import { eq } from "drizzle-orm";
 import { isReadyTaxTemplate } from "../../tax/tax-template-readiness.js";
 import { ApplyTaxTemplateError, syncTaxTemplateForTenant } from "../../tenant/tax-rates/tax-template.service.js";
@@ -17,14 +18,11 @@ import {
   securityForceClosePosTerminalRegisterSessions,
   securityForceClosePosTerminalShifts,
 } from "../../pos/terminal-lifecycle/terminal-lifecycle.repository.js";
-import { assertPasswordMeetsPolicy } from "../../auth/password-policy.helper.js";
 import { hashPassword } from "../../auth/password.service.js";
-import { generateTemporaryPassword } from "../../auth/temporary-password.helper.js";
 import {
   revokeTenantUserRefreshTokens,
   updateTenantUserPasswordRecord,
 } from "../../tenant/users/tenant-users.repository.js";
-import { resolveEffectiveSecurityPolicy } from "../security/security-policy.js";
 import {
   createTenantOwnerUser,
   TenantOwnerUserHelperError,
@@ -1008,7 +1006,7 @@ export async function listSaasTenantUsers(
  * This is the platform's way back in, and it is restricted to super admins:
  * it hands out a credential for somebody else's business.
  *
- * Mirrors resetSaasUserPassword -- generate, assert against policy, hash,
+ * Mirrors resetSaasUserPassword -- restore the agreed default, hash,
  * revoke the target's sessions, and audit with a mandatory reason -- so both
  * reset paths behave the same way.
  */
@@ -1044,13 +1042,7 @@ export async function resetSaasTenantUserPassword(
       );
     }
 
-    const securityPolicy = await resolveEffectiveSecurityPolicy(tx);
-    const temporaryPassword = generateTemporaryPassword();
-
-    // The generated password is built to satisfy the policy, but assert it so a
-    // future policy change fails loudly instead of silently producing an
-    // unusable credential.
-    assertPasswordMeetsPolicy(temporaryPassword, securityPolicy);
+    const temporaryPassword = RESET_USER_PASSWORD;
 
     const passwordHash = await hashPassword(temporaryPassword);
 
