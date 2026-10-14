@@ -1021,6 +1021,10 @@ async function main() {
     { recursive: true },
   );
   await cp(
+    join(rootDir, "docs", "06-delivery", "rollout", "cleanhub-phase1-country-tax-templates.json"),
+    join(artifactDir, "db", "seeds", "demo-tax-templates.json"),
+  );
+  await cp(
     join(rootDir, "deploy", "env", "production.env.example"),
     join(artifactDir, "env", "production.env.example"),
   );

@@ -18,15 +18,16 @@
 --   tenant.admin2@cleanhub.local / tenantCode: CLEAN-002
 --   tenant.admin3@cleanhub.local / tenantCode: CLEAN-003
 
-INSERT INTO tenants (id, name, pressing_code)
+INSERT INTO tenants (id, name, pressing_code, country)
 VALUES
-  ('01KRERJN800000000000000001', 'CleanHub Demo Tenant 1', 'CLEAN-001'),
-  ('01KRERJN810000000000000002', 'CleanHub Demo Tenant 2', 'CLEAN-002'),
-  ('01KRERJN820000000000000003', 'CleanHub Demo Tenant 3', 'CLEAN-003')
+  ('01KRERJN800000000000000001', 'CleanHub Demo Tenant 1', 'CLEAN-001', 'SN'),
+  ('01KRERJN810000000000000002', 'CleanHub Demo Tenant 2', 'CLEAN-002', 'CI'),
+  ('01KRERJN820000000000000003', 'CleanHub Demo Tenant 3', 'CLEAN-003', 'ML')
 ON CONFLICT (id) DO UPDATE
 SET
   name = EXCLUDED.name,
-  pressing_code = EXCLUDED.pressing_code;
+  pressing_code = EXCLUDED.pressing_code,
+  country = coalesce(nullif(trim(tenants.country),''),EXCLUDED.country);
 
 INSERT INTO roles (id, tenant_id, scope, code, name, description, status, is_system)
 VALUES
