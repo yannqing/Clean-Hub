@@ -84,6 +84,9 @@ jobs:
       - name: Run per-item tax integration test
         run: pnpm --filter @cleanhub/api test:integration:tax
 
+      - name: Verify checkout readiness with a restricted database role
+        run: pnpm --filter @cleanhub/api test:integration:tax-readiness-rls
+
       - name: Typecheck core apps
         run: |
           pnpm --filter @cleanhub/api-client typecheck
