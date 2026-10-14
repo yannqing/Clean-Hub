@@ -16,6 +16,7 @@
     "test:integration:tenant-edit": "tsx src/modules/saas/tenants/tenant-edit.integration.ts",
     "test:integration:saas-language": "tsx src/modules/saas/platform-settings/saas-language.integration.ts",
     "test:integration:saas-user-directory": "tsx src/modules/saas/users/saas-users.directory.integration.ts",
+    "repair:demo-tax-readiness": "tsx src/scripts/repair-demo-tax-readiness.ts",
     "check:tax-readiness": "tsx src/scripts/check-tax-readiness.ts",
     "smoke:auth-concurrency": "tsx src/modules/auth/auth.concurrency.repository.smoke.ts",
     "smoke:email-retry": "tsx src/modules/notifications/email-retry.smoke.ts",

@@ -46,10 +46,10 @@ const POS_ERROR_MESSAGES: Readonly<
     fr: "Les paramètres fiscaux sont incomplets. Demandez au propriétaire ou responsable d'activer la taxe et de saisir le numéro fiscal dans les paramètres POS.",
     "zh-CN": "税务设置不完整。请店主或店长在 POS 设置中启用税务并填写税务登记号。",
   },
-  "The tenant or store currency does not match the country tax template. Ask an administrator to correct the currency before checkout.": {
-    en: "The tenant or store currency does not match the country tax template. Ask an administrator to correct the currency before checkout.",
-    fr: "La devise du locataire ou du magasin ne correspond pas au modèle fiscal. Demandez à l'administrateur de la corriger avant l'encaissement.",
-    "zh-CN": "租户或门店币种与国家税务模板不一致。请管理员核对币种后再结款。",
+  "The tenant or current store currency does not match the country tax template. Ask an administrator to correct the currency before checkout.": {
+    en: "The tenant or current store currency does not match the country tax template. Ask an administrator to correct the currency before checkout.",
+    fr: "La devise du locataire ou du magasin actuel ne correspond pas au modèle fiscal. Demandez à l'administrateur de la corriger avant l'encaissement.",
+    "zh-CN": "租户或当前门店币种与国家税务模板不一致。请管理员核对币种后再结款。",
   },
   "A POS terminal session cannot access back-office resources.": {
     en: "A POS terminal session cannot access back-office resources.",

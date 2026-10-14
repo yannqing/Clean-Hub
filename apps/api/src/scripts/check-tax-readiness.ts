@@ -14,6 +14,7 @@ import {
 import { and, eq, isNull } from "drizzle-orm";
 
 import { findPlatformTaxTemplateForCountry } from "../modules/saas/tenants/tenants.repository.js";
+import { resolveTenantCheckoutReadiness } from "../modules/tax/tenant-checkout-readiness.repository.js";
 import { isReadyTaxTemplate } from "../modules/tax/tax-template-readiness.js";
 
 // Market scope only. The tax values themselves are read from the database.
@@ -45,8 +46,8 @@ async function check(): Promise<string[]> {
           taxEnabled: posChannelSettings.taxEnabled,
           taxRegistrationNumber: posChannelSettings.taxRegistrationNumber,
         }).from(posChannelSettings).where(eq(posChannelSettings.tenantId, tenant.id)).limit(1),
-        db.select({ currency: branches.defaultCurrency }).from(branches)
-          .where(and(eq(branches.tenantId, tenant.id), isNull(branches.deletedAt))),
+        db.select({ id: branches.id, name: branches.name, currency: branches.defaultCurrency }).from(branches)
+          .where(and(eq(branches.tenantId, tenant.id), eq(branches.status, "active"), isNull(branches.deletedAt))),
         db.select({ name: taxRates.name }).from(taxRates).where(and(
           eq(taxRates.tenantId, tenant.id), isNull(taxRates.templateRateKey), isNull(taxRates.deletedAt),
         )),
@@ -67,10 +68,21 @@ async function check(): Promise<string[]> {
       if (!pos[0]?.taxEnabled) {
         errors.push(`${prefix}: tax is disabled`);
       }
-      if (settings[0]?.currency !== countryTemplate.currencyCode ||
-          branchRows.some((branch) => branch.currency !== countryTemplate.currencyCode)) {
-        errors.push(`${prefix}: tenant or branch currency differs from ${countryTemplate.countryCode} template`);
+      if (settings[0]?.currency !== countryTemplate.currencyCode) {
+        errors.push(`${prefix}: tenant currency differs from ${countryTemplate.countryCode} template`);
       }
+      const mismatchedBranches = branchRows.filter((branch) => branch.currency !== countryTemplate.currencyCode);
+      for (const branch of mismatchedBranches) {
+        console.warn(`TAX READINESS NOTICE: ${prefix}, branch ${branch.name} (${branch.id}) uses ${branch.currency}; checkout is blocked for this branch.`);
+      }
+      if (branchRows.length > 0 && mismatchedBranches.length === branchRows.length) {
+        errors.push(`${prefix}: no active branch uses the country template currency`);
+      }
+      const checkout = await resolveTenantCheckoutReadiness(db, tenant.id);
+      if (!checkout.taxReadiness.ready) {
+        for (const issue of checkout.taxReadiness.issues) errors.push(`${prefix}: ${issue.code} — ${issue.message}`);
+      }
+      if (!checkout.ready) console.warn(`STORE READINESS NOTICE: ${prefix}: opening setup is incomplete. See the SaaS tenant detail checklist.`);
       if (legacyRates.length > 0) {
         errors.push(`${prefix}: ${legacyRates.length} tax classes are outside SaaS template control`);
       }

@@ -4,6 +4,7 @@ import "../../../config/env.js";
 import { eq, sql } from "drizzle-orm";
 
 import {
+  branches,
   closeDbConnection,
   getDb,
   platformTaxTemplates,
@@ -193,6 +194,7 @@ async function run(): Promise<void> {
             1,
             "renaming a tax class must retain its ID and product assignments",
           );
+          await tx.insert(branches).values({ id: createId(), tenantId, name: "Legacy branch in another currency", defaultCurrency: "CNY" });
           const [currentTemplate] = await tx.select().from(platformTaxTemplates).where(eq(platformTaxTemplates.countryCode, countryCode));
           assert.ok(currentTemplate);
           const unmanagedId = createId();

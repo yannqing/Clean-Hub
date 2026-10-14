@@ -26,6 +26,7 @@ import { TenantSettingsError } from "../../tenant/settings/settings.errors.js";
 import { verifyPassword } from "../../auth/password.service.js";
 import { changeTenantSelfPin } from "../../tenant/profile/profile.service.js";
 import { updatePosChannelSettingsRecord, findPosChannelSettingsRecord } from "../../tenant/pos-channel/pos-channel.repository.js";
+import { createSaasTenantBodySchema } from "./tenants.validation.js";
 import { SaasTenantsError } from "./tenants.errors.js";
 import { createSaasTenant, listSaasTenantUsers, updateSaasTenant, updateSaasTenantFeatureFlags, updateSaasTenantSettings } from "./tenants.service.js";
 
@@ -78,7 +79,7 @@ async function run(): Promise<void> {
             authContext: saasAuth,
             data: {
               name: "Automatically coded tenant",
-              country: "QX",
+              country: "Test X",
               featureFlags: {
                 laundryEnabled: false,
                 carWashEnabled: true,
@@ -91,6 +92,17 @@ async function run(): Promise<void> {
               initialOwner: { displayName: "Initial owner", email: `owner-${tenantId}@example.test` },
             },
           }, tx);
+          assert.equal(createSaasTenantBodySchema.safeParse({ name: "Missing country" }).success, false);
+          assert.equal(createSaasTenantBodySchema.safeParse({ name: "Blank country", country: " " }).success, false);
+          assert.equal(createdTenant.country, "QX", "new tenants store the canonical template ISO code");
+          assert.equal(createdTenant.readiness.ready, false, "tenant creation is not checkout readiness");
+          assert.equal(createdTenant.readiness.taxReadiness.checks.countrySet, true);
+          assert.equal(createdTenant.readiness.taxReadiness.checks.templateApplied, true);
+          assert.equal(createdTenant.readiness.taxReadiness.checks.taxRegistrationNumberSet, false);
+          await assert.rejects(
+            () => createSaasTenant({ authContext: saasAuth, data: { name: "No country template", country: "QN" } }, tx),
+            (error: unknown) => error instanceof SaasTenantsError && error.code === "SAAS_TENANT_TAX_TEMPLATE_REQUIRED",
+          );
           assert.match(createdTenant.pressingCode, /^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/);
           const [createdRecord] = await tx.select({ pressingCode: tenants.pressingCode })
             .from(tenants).where(eq(tenants.id, createdTenant.id));

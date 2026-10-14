@@ -1,3 +1,4 @@
+import type { TenantCheckoutReadiness } from "../checkout-readiness.types";
 export type TenantOverviewFeatureFlags = {
   laundryEnabled: boolean;
   carWashEnabled: boolean;
@@ -7,6 +8,7 @@ export type TenantOverviewFeatureFlags = {
 };
 
 export type TenantOverview = {
+  checkoutReadiness: TenantCheckoutReadiness;
   tenantId: string;
   tenantName: string;
   tenantStatus: "active" | "suspended" | "disabled";

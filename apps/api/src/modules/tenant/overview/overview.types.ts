@@ -1,3 +1,4 @@
+import type { TenantCheckoutReadiness } from "../../tax/tenant-checkout-readiness.repository.js";
 import type { AuthContext } from "../../auth/auth.types.js";
 
 export type TenantOverviewInput = {
@@ -21,6 +22,7 @@ export type TenantOverviewBase = {
 };
 
 export type TenantOverview = TenantOverviewBase & {
+  checkoutReadiness: TenantCheckoutReadiness;
   todayOrderCount: number;
   todayRevenueAmount: number;
   pendingPickupCount: number;

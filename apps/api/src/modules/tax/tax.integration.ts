@@ -14,6 +14,9 @@ import {
   orderItems,
   posChannelSettings,
   platformTaxTemplates,
+  posTerminalSettings,
+  roles,
+  userRoles,
   prices,
   serviceCategories,
   services,
@@ -28,6 +31,8 @@ import { createId } from "@cleanhub/id";
 
 import type { AuthContext } from "../auth/auth.types.js";
 import { sumOrderTaxComponents } from "./tax-reporting.repository.js";
+import { findPosCatalogServices, findPosCatalogServiceById } from "../pos/catalog/catalog.repository.js";
+import { resolveTenantCheckoutReadiness } from "./tenant-checkout-readiness.repository.js";
 import { resolvePosTaxReadiness } from "./pos-tax-readiness.js";
 import { applyPosOrderFinancialRules } from "../pos/orders/orders.financial.js";
 import { checkoutPosOrder, createPosOrder } from "../pos/orders/orders.service.js";
@@ -224,6 +229,42 @@ async function insertFixtures(db: Database): Promise<void> {
 
 async function runAssertions(db: Database): Promise<void> {
   await insertFixtures(db);
+  assert.equal((await resolvePosTaxReadiness(db, ids.tenantId, ids.branchId)).ready, true);
+  // Another branch must not prevent this branch's valid sales.
+  const otherBranchId = createId();
+  await db.insert(branches).values({ id: otherBranchId, tenantId: ids.tenantId, name: "Other currency", defaultCurrency: "NGN" });
+  assert.equal((await resolvePosTaxReadiness(db, ids.tenantId, ids.branchId)).ready, true);
+  assert.equal((await resolvePosTaxReadiness(db, ids.tenantId, otherBranchId)).code, "POS_TAX_CURRENCY_MISMATCH");
+  assert.equal((await findPosCatalogServices(db, { tenantId: ids.tenantId, branchId: otherBranchId, limit: 1 })).length, 0);
+  assert.equal(await findPosCatalogServiceById(db, { tenantId: ids.tenantId, branchId: otherBranchId, serviceId: ids.standardServiceId }), null);
+  const overview = await resolveTenantCheckoutReadiness(db, ids.tenantId);
+  assert.equal(overview.taxReadiness.ready, true);
+  assert.equal(overview.branches.find((branch) => branch.id === ids.branchId)?.taxReadiness.ready, true);
+  assert.equal(overview.branches.find((branch) => branch.id === otherBranchId)?.taxReadiness.code, "POS_TAX_CURRENCY_MISMATCH");
+  const scopedOverview = await resolveTenantCheckoutReadiness(db, ids.tenantId, [ids.branchId]);
+  assert.deepEqual(scopedOverview.branches.map((branch) => branch.id), [ids.branchId], "manager checklist must not expose other branches");
+  assert.deepEqual((await resolveTenantCheckoutReadiness(db, ids.tenantId, [])).branches, []);
+  const ownerRoleId = createId();
+  await db.insert(roles).values({ id: ownerRoleId, tenantId: ids.tenantId, scope: "tenant", code: "owner", name: "Owner" });
+  await db.insert(userRoles).values({ userId: ids.userId, tenantId: ids.tenantId, roleId: ownerRoleId });
+  const terminalId = createId();
+  await db.insert(posTerminalSettings).values({ id: terminalId, tenantId: ids.tenantId, branchId: otherBranchId,
+    deviceId: `readiness-${terminalId}`, credentialDigest: "test-digest", credentialVersion: 1 });
+  assert.equal((await resolveTenantCheckoutReadiness(db, ids.tenantId)).ready, false,
+    "catalogue in one branch and terminal in another must not combine into checkout readiness");
+  await db.update(posTerminalSettings).set({ branchId: ids.branchId }).where(eq(posTerminalSettings.id, terminalId));
+  assert.equal((await resolveTenantCheckoutReadiness(db, ids.tenantId)).ready, true,
+    "a complete current branch remains ready despite an unrelated branch currency issue");
+  await db.update(tenants).set({ country: null }).where(eq(tenants.id, ids.tenantId));
+  assert.equal((await resolvePosTaxReadiness(db, ids.tenantId, ids.branchId)).code, "POS_TAX_COUNTRY_REQUIRED");
+  await assert.rejects(createPosOrder({ authContext: owner, data: {
+    id: createId(), orderType: "manual", branchId: ids.branchId,
+    items: [{ serviceId: ids.standardServiceId, quantity: "1" }],
+  } }, db), (error: unknown) => error instanceof PosOrderError && error.code === "POS_TAX_COUNTRY_REQUIRED");
+  await db.update(tenants).set({ country: "ZZ" }).where(eq(tenants.id, ids.tenantId));
+  await db.update(posChannelSettings).set({ taxRegistrationNumber: null }).where(eq(posChannelSettings.tenantId, ids.tenantId));
+  assert.equal((await resolvePosTaxReadiness(db, ids.tenantId, ids.branchId)).code, "POS_TAX_CONFIGURATION_INCOMPLETE");
+  await db.update(posChannelSettings).set({ taxRegistrationNumber: "TEST-ID" }).where(eq(posChannelSettings.tenantId, ids.tenantId));
   assert.equal((await resolvePosTaxReadiness(db, ids.tenantId, ids.branchId)).ready, true);
   await db.update(posChannelSettings).set({ taxTemplateVersion: null })
     .where(eq(posChannelSettings.tenantId, ids.tenantId));

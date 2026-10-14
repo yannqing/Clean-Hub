@@ -12,3 +12,5 @@ export * from "./saas-client";
 export * from "./tenant";
 export * from "./tenant-client";
 export * from "./types";
+
+export type { TenantCheckoutReadiness, PosTaxReadiness } from "./tenant/checkout-readiness.types";

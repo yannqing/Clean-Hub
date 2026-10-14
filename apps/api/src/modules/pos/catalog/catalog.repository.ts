@@ -161,6 +161,9 @@ export async function findPosCatalogServices(
     filters.push(eq(services.businessLine, input.businessLine));
   }
   if (input.branchId) {
+    filters.push(sql`exists (select 1 from ${branches} b where b.id = ${input.branchId}
+      and b.tenant_id = ${input.tenantId} and b.deleted_at is null and b.status = 'active'
+      and b.default_currency = ${prices.currency})`);
     filters.push(sql`(
       (${services.allBranches} = true and coalesce(${serviceBranchSettings.isAvailable}, true) = true)
       or (${services.allBranches} = false and ${serviceBranchSettings.isAvailable} = true)
@@ -313,6 +316,9 @@ export async function findPosCatalogServiceById(
     )
     .where(
       and(
+        sql`exists (select 1 from ${branches} b where b.id = ${input.branchId}
+          and b.tenant_id = ${input.tenantId} and b.deleted_at is null and b.status = 'active'
+          and b.default_currency = ${prices.currency})`,
         eq(services.id, input.serviceId),
         eq(services.tenantId, input.tenantId),
         sql`(

@@ -1,3 +1,4 @@
+import type { TenantCheckoutReadiness } from "../../tax/tenant-checkout-readiness.repository.js";
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 
 export type SaasTenantStatus = "active" | "suspended" | "disabled";
@@ -174,15 +175,7 @@ export type SaasTenantDetail = SaasTenantListItem & {
   contactPhone: string | null;
   contactEmail: string | null;
   userCount: number;
-  readiness: {
-    activeOwnerCount: number;
-    activeBranchCount: number;
-    activeCatalogItemCount: number;
-    enrolledTerminalCount: number;
-    taxEnabled: boolean;
-    taxTemplateApplied: boolean;
-    taxRegistrationNumberSet: boolean;
-  };
+  readiness: TenantCheckoutReadiness;
   /** Null while the tenant is active. */
   offboarding: SaasTenantOffboarding | null;
 };

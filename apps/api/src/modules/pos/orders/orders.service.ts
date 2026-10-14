@@ -679,6 +679,25 @@ export async function getPosOrder(
   return order;
 }
 
+async function requireOrderTaxReadiness(
+  db: Database, tenantId: string, authContext: AuthContext,
+  data: CreatePosOrderRequest, existingBranchId?: string,
+): Promise<void> {
+  let branchId = existingBranchId;
+  if (!branchId) {
+    if (data.orderType === "ticket") {
+      const ticket = await findServiceTicketForOrder(db, { tenantId, ticketId: data.ticketId });
+      if (!ticket) throw new PosOrderError("SERVICE_TICKET_NOT_FOUND", "Service ticket was not found.", 404);
+      branchId = ticket.branchId;
+    } else {
+      branchId = data.branchId;
+    }
+  }
+  requirePosBranchAccess(authContext, branchId);
+  const readiness = await resolvePosTaxReadiness(db, tenantId, branchId);
+  if (!readiness.ready) throw new PosOrderError(readiness.code, readiness.message, 409);
+}
+
 export async function createPosOrder(
   input: CreatePosOrderInput,
   db: Database = getDb(),
@@ -696,12 +715,8 @@ export async function createPosOrder(
     }
   }
 
-  const taxReadiness = await resolvePosTaxReadiness(db, tenantId);
-  if (!taxReadiness.ready) {
-    throw new PosOrderError(taxReadiness.code, taxReadiness.message, 409);
-  }
-
   return db.transaction(async (tx) => {
+    await requireOrderTaxReadiness(tx, tenantId, input.authContext, input.data);
     if (input.data.orderType === "ticket") {
       return createTicketOrder(tx, tenantId, {
         ...input,
@@ -1809,10 +1824,7 @@ export async function checkoutPosOrder(
     });
     // A draft created before tax setup (or while a template was current) must
     // not bypass the sale gate merely because its stable order id exists.
-    const checkoutTaxReadiness = await resolvePosTaxReadiness(tx, tenantId);
-    if (!checkoutTaxReadiness.ready) {
-      throw new PosOrderError(checkoutTaxReadiness.code, checkoutTaxReadiness.message, 409);
-    }
+    await requireOrderTaxReadiness(tx, tenantId, authContext, data.order, existedBefore?.branchId);
     let order = await createPosOrder(
       { authContext, data: data.order, requestMeta },
       tx,

@@ -1,3 +1,4 @@
+import type { TenantCheckoutReadiness } from "../../tenant/checkout-readiness.types";
 export type TenantStatus = "active" | "suspended" | "disabled";
 export type TenantLanguage = "en" | "fr" | "zh-CN";
 
@@ -69,15 +70,7 @@ export type TenantDetail = TenantSummary & {
   contactPhone: string | null;
   contactEmail: string | null;
   userCount: number;
-  readiness: {
-    activeOwnerCount: number;
-    activeBranchCount: number;
-    activeCatalogItemCount: number;
-    enrolledTerminalCount: number;
-    taxEnabled: boolean;
-    taxTemplateApplied: boolean;
-    taxRegistrationNumberSet: boolean;
-  };
+  readiness: TenantCheckoutReadiness;
   /** Null while the tenant is active. */
   offboarding: TenantOffboarding | null;
 };

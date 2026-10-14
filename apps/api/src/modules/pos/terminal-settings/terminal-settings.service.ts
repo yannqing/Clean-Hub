@@ -47,7 +47,7 @@ async function withTenantFinancialDefaults(
         tenantId: settings.tenantId,
         branchId: settings.branchId,
       }),
-      resolvePosTaxReadiness(db, settings.tenantId),
+      resolvePosTaxReadiness(db, settings.tenantId, settings.branchId),
     ]);
   // Two conditions, both required: the platform must have SMTP at all (it is a
   // single global configuration), and this tenant must be entitled to use it.

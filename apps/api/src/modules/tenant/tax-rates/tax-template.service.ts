@@ -1,6 +1,5 @@
 import {
   getDb,
-  branches,
   platformTaxTemplates,
   posChannelSettings,
   products,
@@ -95,13 +94,12 @@ export async function syncTaxTemplateForTenant(
   // then POS settings, then tax classes. Manual tax edits lock POS settings.
   await tx.select({ id: posChannelSettings.id }).from(posChannelSettings)
     .where(eq(posChannelSettings.tenantId, tenantId)).limit(1).for("update");
-  const branchCurrencies = await tx.select({ currency: branches.defaultCurrency })
-    .from(branches).where(and(eq(branches.tenantId, tenantId), isNull(branches.deletedAt)));
-  if (tenantCurrency?.currency !== template.currencyCode ||
-      branchCurrencies.some((branch) => branch.currency !== template.currencyCode)) {
+  // Tenant tax policy is shared; each terminal independently verifies its own
+  // branch currency. A legacy branch must not block configuring another store.
+  if (tenantCurrency?.currency !== template.currencyCode) {
     throw new ApplyTaxTemplateError(
       "TAX_TEMPLATE_CURRENCY_MISMATCH",
-      "The tenant and all branches must use the template currency before applying it.",
+      "The tenant currency must match the country tax template before applying it.",
       409,
     );
   }

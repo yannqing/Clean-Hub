@@ -252,6 +252,7 @@ export async function createSaasTenant(
         );
         const tenant = await createSaasTenantRecord(tx, {
           ...input.data,
+          country: taxTemplate.countryCode,
           actorUserId: input.authContext.userId,
           pressingCode,
           defaultLanguage,

@@ -37,11 +37,7 @@ import {
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import { templateTaxRateKey } from "../../tax/tax.template-key.js";
-import { isReadyTaxTemplate } from "../../tax/tax-template-readiness.js";
-import {
-  findPosCatalogProducts,
-  findPosCatalogServices,
-} from "../../pos/catalog/catalog.repository.js";
+import { resolveTenantCheckoutReadiness } from "../../tax/tenant-checkout-readiness.repository.js";
 import type {
   CreateSaasTenantRequest,
   ListSaasTenantsQuery,
@@ -71,24 +67,7 @@ export type CreateSaasTenantRecordInput = Omit<CreateSaasTenantRequest, "default
   taxTemplate?: typeof platformTaxTemplates.$inferSelect | null;
 };
 
-function normalizedCountry(value: string): string {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase().replace(/[^a-z]/g, "");
-}
-
-export async function findPlatformTaxTemplateForCountry(
-  db: Database,
-  country: string,
-): Promise<typeof platformTaxTemplates.$inferSelect | null> {
-  const normalized = normalizedCountry(country);
-  const templates = await db.select().from(platformTaxTemplates);
-  return templates.find((template) =>
-    normalizedCountry(template.countryCode) === normalized ||
-    normalizedCountry(template.name) === normalized ||
-    normalizedCountry(template.name.split(/\s[-–—]\s/, 1)[0] ?? "") === normalized ||
-    (template.countryCode === "CI" && normalized === "ivorycoast")
-  ) ?? null;
-}
+export { findPlatformTaxTemplateForCountry } from "../../tax/platform-tax-template.repository.js";
 
 /** Existing amounts must never be silently reinterpreted in another currency. */
 export async function hasTenantMonetaryData(
@@ -477,52 +456,7 @@ export async function findSaasTenantDetailById(
     .from(users)
     .where(and(eq(users.tenantId, tenantId), isNull(users.deletedAt)));
 
-  const [ownerRows, branchRows, terminalRows, taxRows] = await Promise.all([
-    db.select({ value: count() }).from(users)
-      .innerJoin(userRoles, and(eq(userRoles.userId, users.id), eq(userRoles.tenantId, tenantId), isNull(userRoles.revokedAt)))
-      .innerJoin(roles, and(eq(roles.id, userRoles.roleId), eq(roles.code, "owner"), eq(roles.status, "active"), isNull(roles.deletedAt)))
-      .where(and(eq(users.tenantId, tenantId), eq(users.status, "active"), isNull(users.deletedAt))),
-    db.select({ id: branches.id }).from(branches).where(and(
-      eq(branches.tenantId, tenantId), eq(branches.status, "active"), isNull(branches.deletedAt),
-    )),
-    db.select({ branchId: posTerminalSettings.branchId }).from(posTerminalSettings)
-      .innerJoin(branches, and(
-        eq(branches.id, posTerminalSettings.branchId),
-        eq(branches.tenantId, tenantId),
-        eq(branches.status, "active"),
-        isNull(branches.deletedAt),
-      )).where(and(
-      eq(posTerminalSettings.tenantId, tenantId), eq(posTerminalSettings.status, "active"),
-      sql`${posTerminalSettings.credentialDigest} is not null`,
-    )),
-    db.select({
-      taxEnabled: posChannelSettings.taxEnabled,
-      taxRegistrationNumber: posChannelSettings.taxRegistrationNumber,
-      taxTemplateCountryCode: posChannelSettings.taxTemplateCountryCode,
-      taxTemplateVersion: posChannelSettings.taxTemplateVersion,
-    }).from(posChannelSettings).where(eq(posChannelSettings.tenantId, tenantId)).limit(1),
-  ]);
-  const countryTemplate = tenant.country
-    ? await findPlatformTaxTemplateForCountry(db, tenant.country)
-    : null;
-  const taxTemplateApplied = Boolean(countryTemplate && isReadyTaxTemplate(countryTemplate) &&
-    taxRows[0]?.taxTemplateCountryCode === countryTemplate.countryCode &&
-    taxRows[0]?.taxTemplateVersion === countryTemplate.version);
-  const enrolledBranchIds = new Set(terminalRows.map((row) => row.branchId));
-  const candidateBranches = enrolledBranchIds.size
-    ? branchRows.filter((branch) => enrolledBranchIds.has(branch.id))
-    : branchRows;
-  let hasSellableCatalogItem = false;
-  for (const branch of candidateBranches) {
-    const [sellableServices, sellableProducts] = await Promise.all([
-      findPosCatalogServices(db, { tenantId, branchId: branch.id, limit: 1 }),
-      findPosCatalogProducts(db, { tenantId, branchId: branch.id, limit: 1 }),
-    ]);
-    if (sellableServices.length || sellableProducts.length) {
-      hasSellableCatalogItem = true;
-      break;
-    }
-  }
+  const readiness = await resolveTenantCheckoutReadiness(db, tenantId);
 
   return {
     ...toTenantSummary(tenant),
@@ -532,15 +466,7 @@ export async function findSaasTenantDetailById(
     contactPhone: tenant.contactPhone,
     contactEmail: tenant.contactEmail,
     userCount: userCountRows[0]?.value ?? 0,
-    readiness: {
-      activeOwnerCount: ownerRows[0]?.value ?? 0,
-      activeBranchCount: branchRows.length,
-      activeCatalogItemCount: hasSellableCatalogItem ? 1 : 0,
-      enrolledTerminalCount: terminalRows.length,
-      taxEnabled: taxRows[0]?.taxEnabled ?? false,
-      taxTemplateApplied,
-      taxRegistrationNumberSet: Boolean(taxRows[0]?.taxRegistrationNumber?.trim()),
-    },
+    readiness,
     // The CHECK constraint keeps these three either all set or all null, so a
     // single guard is enough to decide whether the tenant is offboarded.
     offboarding:

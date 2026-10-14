@@ -1,3 +1,5 @@
+import { resolveAllowedBranchIds } from "../../auth/branch-scope.helper.js";
+import { resolveTenantCheckoutReadiness } from "../../tax/tenant-checkout-readiness.repository.js";
 import { getDb, type Database } from "@cleanhub/db";
 
 import {
@@ -32,11 +34,14 @@ export async function getTenantOverview(
     );
   }
 
+  const allowedBranchIds = await resolveAllowedBranchIds(input.authContext, db);
+
   const [
     todayOrderMetrics,
     inProgressOrderCount,
     pendingPickupCount,
     pendingTasksCount,
+    checkoutReadiness,
   ] = await Promise.all([
     findTenantTodayOrderMetrics(
       db,
@@ -46,10 +51,12 @@ export async function getTenantOverview(
     findTenantInProgressOrderCount(db, tenantId),
     findTenantPendingPickupCount(db, tenantId),
     findTenantPendingTasksCount(db, tenantId),
+    resolveTenantCheckoutReadiness(db, tenantId, allowedBranchIds),
   ]);
 
   return {
     ...overview,
+    checkoutReadiness,
     todayOrderCount: todayOrderMetrics.orderCount,
     todayRevenueAmount: todayOrderMetrics.revenueAmount,
     pendingPickupCount,

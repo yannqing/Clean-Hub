@@ -1,3 +1,4 @@
+import { evaluatePosTaxReadiness } from "../../tax/pos-tax-readiness.js";
 import { and, eq, sql } from "drizzle-orm";
 
 import {
@@ -53,7 +54,8 @@ function toSummary(
     taxRegistrationNumber: null,
     taxLabel: null,
     taxComponents: null,
-    taxReadiness: { ready: false, code: "POS_TAX_TEMPLATE_REQUIRED", message: "The country tax template is unavailable or incomplete. Ask a SaaS administrator to complete its form or import the tax template file, then ask the owner to apply it." },
+    taxReadiness: evaluatePosTaxReadiness({ countrySet: false, templateAvailable: false, templateApplied: false,
+      taxEnabled: false, taxRegistrationNumberSet: false, taxLabelSet: false, currencyMatches: false }),
     // Safe placeholder: withTenantFinancialDefaults resolves the real value
     // from the platform SMTP configuration and the tenant's feature flag.
     // Defaulting to false means a path that somehow skips the overlay hides
