@@ -751,6 +751,9 @@ fun NativePosApp(applicationContext: Context) {
                 val result = withContext(Dispatchers.IO) { NativePosSyncEngine(applicationContext).synchronize() }
                 NativePosSyncWorker.schedule(applicationContext)
                 reload()
+                if (snapshot?.catalogIsFresh != true) {
+                    throw NativePosValidationException(copy.localDataExpired)
+                }
                 message = when {
                     result.failedSales > 0 -> copy.failedSalesNeedManager.format(result.failedSales)
                     result.replayedSales > 0 -> copy.replayedSales.format(result.replayedSales)
@@ -2257,7 +2260,7 @@ fun NativePosApp(applicationContext: Context) {
                 onUnlockOffline = { pin -> unlockWithOfflinePin(current.terminal.userId, pin) },
                 onOnlineLogin = ::loginWithStaffPin,
             )
-            current.products.isEmpty() -> CachedDataExpiredView(copy, busy, message, ::synchronize)
+            !current.catalogIsFresh -> CachedDataExpiredView(copy, busy, message, ::synchronize)
             else -> NativePosShell(copy,
         current = current,
         activeTab = activeTab,

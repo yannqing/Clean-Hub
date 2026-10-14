@@ -258,6 +258,8 @@ data class NativePosSnapshot(
     val tickets: List<NativeServiceTicket>,
     val pendingSales: Int,
     val failedSales: Int,
+    /** A fresh catalogue may legitimately contain no retail products. */
+    val catalogIsFresh: Boolean,
 )
 
 data class NativeCheckoutResult(

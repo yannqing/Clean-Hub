@@ -222,15 +222,17 @@ class NativePosDatabase(
     fun snapshot(now: Long = System.currentTimeMillis()): NativePosSnapshot {
         val terminal = readTerminal()?.takeIf { now - it.lastSyncedAt in 0..MAX_RUNTIME_AGE_MS }
         val cashState = readCashState()?.takeIf { now - it.updatedAt in 0..MAX_CASH_STATE_AGE_MS }
+        val catalogIsFresh = terminal != null && hasFreshCatalog(now)
         return NativePosSnapshot(
             terminal = terminal,
             cashState = cashState,
-            products = if (terminal == null || !hasFreshCatalog(now)) emptyList() else readProducts(),
-            services = if (terminal == null || !hasFreshCatalog(now)) emptyList() else readServices(),
+            products = if (catalogIsFresh) readProducts() else emptyList(),
+            services = if (catalogIsFresh) readServices() else emptyList(),
             customers = if (terminal == null) emptyList() else readCustomers(),
             tickets = if (terminal == null) emptyList() else readTickets(),
             pendingSales = countPendingSales(),
             failedSales = countFailedSales(),
+            catalogIsFresh = catalogIsFresh,
         )
     }
 
