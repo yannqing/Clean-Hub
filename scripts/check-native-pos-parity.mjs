@@ -104,6 +104,13 @@ compare(
   ktTransitions(stateMachineKt, "TICKET_ITEM_STATUS_TRANSITIONS"),
 );
 
+// Terminal print preferences must accept exactly the same limits as the API.
+compare(
+  "Terminal print-copy limit (@cleanhub/hardware vs NativePosSettingsUi.kt)",
+  [read("packages/hardware/src/index.ts").match(/MAX_POS_PRINT_COPIES\s*=\s*(\d+)/)?.[1] ?? "missing TS limit"],
+  [read("apps/pos-mobile/android/app/src/main/kotlin/com/cleanhub/pos/nativepos/NativePosSettingsUi.kt").match(/NATIVE_TERMINAL_MAX_PRINT_COPIES\s*=\s*(\d+)/)?.[1] ?? "missing Kotlin limit"],
+);
+
 // --- report -----------------------------------------------------------------
 
 if (failures.length > 0) {

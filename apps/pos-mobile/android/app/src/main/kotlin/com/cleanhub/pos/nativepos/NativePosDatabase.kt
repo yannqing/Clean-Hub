@@ -397,8 +397,12 @@ class NativePosDatabase(
      * death during that call becomes a failed job, never an automatic retry
      * that could create a duplicate paper receipt.
      */
-    fun claimReceiptPrint(jobId: String? = null, includeFailed: Boolean = false): NativePendingReceiptPrint? {
-        val acceptedStatuses = if (includeFailed) "('pending', 'failed')" else "('pending')"
+    fun claimReceiptPrint(jobId: String? = null, includeFailed: Boolean = false, failedOnly: Boolean = false): NativePendingReceiptPrint? {
+        val acceptedStatuses = when {
+            failedOnly -> "('failed')"
+            includeFailed -> "('pending', 'failed')"
+            else -> "('pending')"
+        }
         val jobSelection = if (jobId == null) {
             "status IN $acceptedStatuses"
         } else {

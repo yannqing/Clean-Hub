@@ -35,6 +35,72 @@ internal class NativePosCopy(
     /** Keys every language must define; the test reads this. */
     internal fun keys(): Set<String> = values.keys
 
+    val branchName: String get() = get("branchName")
+    val cardPayment: String get() = get("cardPayment")
+    val cashPayment: String get() = get("cashPayment")
+    val mobilePayment: String get() = get("mobilePayment")
+    val testPrinter: String get() = get("testPrinter")
+    val navigationCatalogue: String get() = get("navigationCatalogue")
+    val settingsRefreshRequired: String get() = get("settingsRefreshRequired")
+    val settingsDeviceMismatch: String get() = get("settingsDeviceMismatch")
+    val ticketsPickupLabel: String get() = get("ticketsPickupLabel")
+
+    val settingsRetryPrint: String get() = get("settingsRetryPrint")
+    val settingsRetryPrintHint: String get() = get("settingsRetryPrintHint")
+    val settingsRetryPrintConfirm: String get() = get("settingsRetryPrintConfirm")
+    val settingsRetryPrintCancel: String get() = get("settingsRetryPrintCancel")
+
+    val settingsSearchHint: String get() = get("settingsSearchHint")
+    val settingsNoResults: String get() = get("settingsNoResults")
+    val settingsTerminalTitle: String get() = get("settingsTerminalTitle")
+    val settingsTerminalHint: String get() = get("settingsTerminalHint")
+    val settingsCheckoutTitle: String get() = get("settingsCheckoutTitle")
+    val settingsPrintingTitle: String get() = get("settingsPrintingTitle")
+    val settingsPrintingHint: String get() = get("settingsPrintingHint")
+    val settingsSecurityTitle: String get() = get("settingsSecurityTitle")
+    val settingsSecurityHint: String get() = get("settingsSecurityHint")
+    val settingsStoreTitle: String get() = get("settingsStoreTitle")
+    val settingsStoreManaged: String get() = get("settingsStoreManaged")
+    val settingsSyncTitle: String get() = get("settingsSyncTitle")
+    val settingsSyncHint: String get() = get("settingsSyncHint")
+    val settingsIntro: String get() = get("settingsIntro")
+    val settingsCachedHint: String get() = get("settingsCachedHint")
+    val settingsLanguageHint: String get() = get("settingsLanguageHint")
+    val settingsTerminalId: String get() = get("settingsTerminalId")
+    val settingsVersion: String get() = get("settingsVersion")
+    val settingsCurrency: String get() = get("settingsCurrency")
+    val settingsDefaultPayment: String get() = get("settingsDefaultPayment")
+    val settingsPriceMode: String get() = get("settingsPriceMode")
+    val settingsTaxNumber: String get() = get("settingsTaxNumber")
+    val settingsTaxNotReady: String get() = get("settingsTaxNotReady")
+    val settingsRoundingNoEffect: String get() = get("settingsRoundingNoEffect")
+    val settingsLockMinutes: String get() = get("settingsLockMinutes")
+    val settingsLockSeconds: String get() = get("settingsLockSeconds")
+    val settingsPhone: String get() = get("settingsPhone")
+    val settingsAddress: String get() = get("settingsAddress")
+    val settingsTimeZone: String get() = get("settingsTimeZone")
+    val settingsReceiptHeader: String get() = get("settingsReceiptHeader")
+    val settingsReceiptThanks: String get() = get("settingsReceiptThanks")
+    val settingsNetwork: String get() = get("settingsNetwork")
+    val settingsOnline: String get() = get("settingsOnline")
+    val settingsOffline: String get() = get("settingsOffline")
+    val settingsLastSync: String get() = get("settingsLastSync")
+    val settingsCatalogueCounts: String get() = get("settingsCatalogueCounts")
+    val settingsCatalogueSummary: String get() = get("settingsCatalogueSummary")
+    val settingsSaleQueue: String get() = get("settingsSaleQueue")
+    val settingsPrintQueue: String get() = get("settingsPrintQueue")
+    val settingsQueueSummary: String get() = get("settingsQueueSummary")
+    val ticketsAll: String get() = get("ticketsAll")
+    val ticketsOverdue: String get() = get("ticketsOverdue")
+    val ticketsPriority: String get() = get("ticketsPriority")
+    val ticketsStatus: String get() = get("ticketsStatus")
+    val ticketsCachedSummary: String get() = get("ticketsCachedSummary")
+    val ticketsResultsSummary: String get() = get("ticketsResultsSummary")
+    val ticketsSearchHint: String get() = get("ticketsSearchHint")
+    val ticketsClear: String get() = get("ticketsClear")
+    val ticketsNoResults: String get() = get("ticketsNoResults")
+    val ticketException: String get() = get("ticketException")
+
     val authBrandName: String get() = get("authBrandName")
     val authBrandSuffix: String get() = get("authBrandSuffix")
     val authWelcomeTitle: String get() = get("authWelcomeTitle")
@@ -835,6 +901,69 @@ internal class NativePosCopy(
 }
 
 private val COPY_ZH_VALUES: Map<String, String> = mapOf(
+    "settingsRetryPrint" to "重试失败的收据",
+    "settingsRetryPrintHint" to "请先确认纸质收据未打印成功。如果之前已出纸，重试可能重复打印。",
+    "settingsRetryPrintConfirm" to "确认重试",
+    "settingsRetryPrintCancel" to "取消",
+    "navigationCatalogue" to "商品与服务",
+    "settingsRefreshRequired" to "请先刷新终端设置。配置加载成功后才可以保存；已同步的信息仍可查看。",
+    "settingsDeviceMismatch" to "当前设备标识与已登记终端不一致，请重新登录并完成终端登记。",
+    "ticketsPickupLabel" to "预计取件",
+    "settingsSearchHint" to "搜索设置",
+    "settingsNoResults" to "没有匹配的设置，请调整搜索内容。",
+    "branchName" to "门店名称",
+    "cardPayment" to "银行卡",
+    "cashPayment" to "现金",
+    "mobilePayment" to "移动支付",
+    "testPrinter" to "打印测试页",
+    "settingsTerminalTitle" to "终端信息",
+    "settingsTerminalHint" to "为这台设备设置名称，并查看设备标识与应用版本。",
+    "settingsCheckoutTitle" to "收银偏好",
+    "settingsPrintingTitle" to "收据与打印",
+    "settingsPrintingHint" to "配置自动打印、打印联数，查看队列并测试打印机。",
+    "settingsSecurityTitle" to "锁屏与安全",
+    "settingsSecurityHint" to "设置闲置自动锁屏时间，也可以立即锁定终端。",
+    "settingsStoreTitle" to "门店信息",
+    "settingsStoreManaged" to "门店资料、支付与税务规则由后台统一管理，终端同步后使用。",
+    "settingsSyncTitle" to "同步与状态",
+    "settingsSyncHint" to "查看最近同步、目录与待上传订单；联网后可手动同步。",
+    "settingsIntro" to "管理这台终端的收银、打印、安全和设备设置。",
+    "settingsCachedHint" to "当前离线：可查看已同步信息、切换语言或锁屏。修改终端配置需要联网。",
+    "settingsLanguageHint" to "语言选择保存在这台设备上，重新打开应用后仍会保留。",
+    "settingsTerminalId" to "终端标识（用于设备管理）",
+    "settingsVersion" to "应用版本",
+    "settingsCurrency" to "结算货币",
+    "settingsDefaultPayment" to "默认支付方式",
+    "settingsPriceMode" to "价格与税额",
+    "settingsTaxNumber" to "税务登记号",
+    "settingsTaxNotReady" to "税务配置尚未就绪，请联系管理员完成配置后再收银。",
+    "settingsRoundingNoEffect" to "当前币种已按最小可支付单位取整，抹零选项不会改变应收金额。",
+    "settingsLockMinutes" to "%d 分钟",
+    "settingsLockSeconds" to "%d 秒",
+    "settingsPhone" to "门店电话",
+    "settingsAddress" to "门店地址",
+    "settingsTimeZone" to "营业时区",
+    "settingsReceiptHeader" to "收据抬头",
+    "settingsReceiptThanks" to "收据结束语",
+    "settingsNetwork" to "网络状态",
+    "settingsOnline" to "在线",
+    "settingsOffline" to "离线",
+    "settingsLastSync" to "最近同步",
+    "settingsCatalogueCounts" to "本机目录",
+    "settingsCatalogueSummary" to "%d 个服务 · %d 个零售商品",
+    "settingsSaleQueue" to "订单上传队列",
+    "settingsPrintQueue" to "收据打印队列",
+    "settingsQueueSummary" to "%d 待处理 · %d 失败",
+    "ticketsAll" to "全部",
+    "ticketsOverdue" to "已逾期",
+    "ticketsPriority" to "优先级",
+    "ticketsStatus" to "状态",
+    "ticketsCachedSummary" to "本机已同步 %d 个工单",
+    "ticketsResultsSummary" to "显示 %d / %d 个已同步工单",
+    "ticketsSearchHint" to "搜索工单号、客户姓名或手机号",
+    "ticketsClear" to "清除筛选",
+    "ticketsNoResults" to "没有匹配的工单，请调整搜索或筛选条件。",
+    "ticketException" to "异常",
     "authBrandName" to "CleanHub",
     "authBrandSuffix" to "门店收银工作台",
     "authWelcomeTitle" to "欢迎使用 CleanHub",
@@ -1167,7 +1296,7 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
     "ticketNotCached" to "该工单尚未缓存，请恢复网络后打开。",
     "customerNotCached" to "该客户尚未缓存，请恢复网络后打开。",
     "settingsNeedNetwork" to "设备离线时不能修改终端设置。",
-    "settingsOutOfRange" to "自动锁定时间应为 30–86400 秒，打印份数应为 1–3。",
+    "settingsOutOfRange" to "终端名称最多 64 个字符，自动锁定时间应为 30–86400 秒，打印份数应为 1–5。",
     "settingsSaved" to "终端设置已保存。",
     "shiftNeedsNetwork" to "班次操作需要联网提交。",
     "breakStarted" to "已开始休息。",
@@ -1632,6 +1761,69 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_EN_VALUES: Map<String, String> = mapOf(
+    "settingsRetryPrint" to "Retry failed receipt",
+    "settingsRetryPrintHint" to "Check whether the receipt already printed. Retrying a job that printed before the failure may create a duplicate.",
+    "settingsRetryPrintConfirm" to "Retry printing",
+    "settingsRetryPrintCancel" to "Cancel",
+    "navigationCatalogue" to "Catalogue",
+    "settingsRefreshRequired" to "Refresh terminal settings before saving. Cached information remains available.",
+    "settingsDeviceMismatch" to "This device does not match the registered terminal. Sign in and enroll the terminal again.",
+    "ticketsPickupLabel" to "Expected pickup",
+    "settingsSearchHint" to "Search settings",
+    "settingsNoResults" to "No matching settings. Try another search.",
+    "branchName" to "Branch name",
+    "cardPayment" to "Card",
+    "cashPayment" to "Cash",
+    "mobilePayment" to "Mobile money",
+    "testPrinter" to "Print test page",
+    "settingsTerminalTitle" to "Terminal",
+    "settingsTerminalHint" to "Name this device and review its identifier and app version.",
+    "settingsCheckoutTitle" to "Checkout",
+    "settingsPrintingTitle" to "Receipts & printing",
+    "settingsPrintingHint" to "Set automatic printing and receipt copies, review the queue and test the printer.",
+    "settingsSecurityTitle" to "Lock & security",
+    "settingsSecurityHint" to "Choose the idle lock timeout or lock the terminal now.",
+    "settingsStoreTitle" to "Store information",
+    "settingsStoreManaged" to "Store details, payment and tax rules are managed in the back office and synchronized to this terminal.",
+    "settingsSyncTitle" to "Sync & status",
+    "settingsSyncHint" to "Review the last sync, catalogue and queued orders. Sync manually while online.",
+    "settingsIntro" to "Manage checkout, printing, security and hardware for this terminal.",
+    "settingsCachedHint" to "Offline: view cached settings, change language or lock. Connect to edit terminal settings.",
+    "settingsLanguageHint" to "Your language choice is saved on this device and retained when the app reopens.",
+    "settingsTerminalId" to "Terminal ID (for device management)",
+    "settingsVersion" to "App version",
+    "settingsCurrency" to "Settlement currency",
+    "settingsDefaultPayment" to "Default payment method",
+    "settingsPriceMode" to "Price & tax",
+    "settingsTaxNumber" to "Tax registration number",
+    "settingsTaxNotReady" to "Tax configuration is not ready. Ask an administrator to complete it before checkout.",
+    "settingsRoundingNoEffect" to "This currency already rounds to its smallest payable unit; these rounding options do not change the total.",
+    "settingsLockMinutes" to "%d minutes",
+    "settingsLockSeconds" to "%d seconds",
+    "settingsPhone" to "Store phone",
+    "settingsAddress" to "Store address",
+    "settingsTimeZone" to "Business time zone",
+    "settingsReceiptHeader" to "Receipt header",
+    "settingsReceiptThanks" to "Receipt footer",
+    "settingsNetwork" to "Network status",
+    "settingsOnline" to "Online",
+    "settingsOffline" to "Offline",
+    "settingsLastSync" to "Last synchronization",
+    "settingsCatalogueCounts" to "Local catalogue",
+    "settingsCatalogueSummary" to "%d services · %d retail products",
+    "settingsSaleQueue" to "Order upload queue",
+    "settingsPrintQueue" to "Receipt print queue",
+    "settingsQueueSummary" to "%d pending · %d failed",
+    "ticketsAll" to "All",
+    "ticketsOverdue" to "Overdue",
+    "ticketsPriority" to "Priority",
+    "ticketsStatus" to "Status",
+    "ticketsCachedSummary" to "%d tickets synchronized on this terminal",
+    "ticketsResultsSummary" to "Showing %d of %d synchronized tickets",
+    "ticketsSearchHint" to "Search ticket number, customer or phone",
+    "ticketsClear" to "Clear filters",
+    "ticketsNoResults" to "No matching tickets. Adjust your search or filters.",
+    "ticketException" to "Exception",
     "authBrandName" to "CleanHub",
     "authBrandSuffix" to "IN-STORE POS",
     "authWelcomeTitle" to "Welcome to CleanHub",
@@ -1964,7 +2156,7 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
     "ticketNotCached" to "This ticket is not cached. Open it once the network is back.",
     "customerNotCached" to "This customer is not cached. Open them once the network is back.",
     "settingsNeedNetwork" to "Terminal settings cannot be changed while offline.",
-    "settingsOutOfRange" to "Auto-lock must be 30–86400 seconds and copies must be 1–3.",
+    "settingsOutOfRange" to "Use up to 64 characters for the name, 30–86400 seconds for auto-lock and 1–5 copies.",
     "settingsSaved" to "Terminal settings saved.",
     "shiftNeedsNetwork" to "Shift actions need a connection.",
     "breakStarted" to "Break started.",
@@ -2429,6 +2621,69 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_FR_VALUES: Map<String, String> = mapOf(
+    "settingsRetryPrint" to "Réessayer un reçu en échec",
+    "settingsRetryPrintHint" to "Vérifiez si le reçu a déjà été imprimé. Une nouvelle tentative peut créer un doublon.",
+    "settingsRetryPrintConfirm" to "Réessayer",
+    "settingsRetryPrintCancel" to "Annuler",
+    "navigationCatalogue" to "Catalogue",
+    "settingsRefreshRequired" to "Actualisez les réglages avant d’enregistrer. Les informations synchronisées restent consultables.",
+    "settingsDeviceMismatch" to "Cet appareil ne correspond pas au terminal enregistré. Reconnectez-vous et enregistrez le terminal.",
+    "ticketsPickupLabel" to "Retrait prévu",
+    "settingsSearchHint" to "Rechercher un réglage",
+    "settingsNoResults" to "Aucun réglage correspondant. Modifiez la recherche.",
+    "branchName" to "Nom du magasin",
+    "cardPayment" to "Carte",
+    "cashPayment" to "Espèces",
+    "mobilePayment" to "Paiement mobile",
+    "testPrinter" to "Imprimer une page de test",
+    "settingsTerminalTitle" to "Terminal",
+    "settingsTerminalHint" to "Nommez cet appareil et consultez son identifiant et sa version.",
+    "settingsCheckoutTitle" to "Encaissement",
+    "settingsPrintingTitle" to "Reçus et impression",
+    "settingsPrintingHint" to "Configurez les reçus, consultez la file et testez l’imprimante.",
+    "settingsSecurityTitle" to "Verrouillage et sécurité",
+    "settingsSecurityHint" to "Choisissez le délai de verrouillage ou verrouillez le terminal maintenant.",
+    "settingsStoreTitle" to "Informations du magasin",
+    "settingsStoreManaged" to "Les informations, paiements et taxes sont gérés dans l’administration et synchronisés ici.",
+    "settingsSyncTitle" to "Synchronisation et état",
+    "settingsSyncHint" to "Consultez la dernière synchronisation, le catalogue et les commandes en attente.",
+    "settingsIntro" to "Gérez l’encaissement, l’impression, la sécurité et les équipements.",
+    "settingsCachedHint" to "Hors ligne : consultez les données, changez la langue ou verrouillez. Connectez-vous pour modifier la configuration.",
+    "settingsLanguageHint" to "La langue choisie est enregistrée sur cet appareil et conservée à la réouverture.",
+    "settingsTerminalId" to "Identifiant du terminal",
+    "settingsVersion" to "Version de l’application",
+    "settingsCurrency" to "Devise de règlement",
+    "settingsDefaultPayment" to "Mode de paiement par défaut",
+    "settingsPriceMode" to "Prix et taxes",
+    "settingsTaxNumber" to "Numéro fiscal",
+    "settingsTaxNotReady" to "La configuration fiscale n’est pas prête. Contactez un administrateur avant l’encaissement.",
+    "settingsRoundingNoEffect" to "Cette devise est déjà arrondie à son unité minimale ; ces options ne changent pas le total.",
+    "settingsLockMinutes" to "%d minutes",
+    "settingsLockSeconds" to "%d secondes",
+    "settingsPhone" to "Téléphone du magasin",
+    "settingsAddress" to "Adresse du magasin",
+    "settingsTimeZone" to "Fuseau horaire",
+    "settingsReceiptHeader" to "En-tête du reçu",
+    "settingsReceiptThanks" to "Pied du reçu",
+    "settingsNetwork" to "État du réseau",
+    "settingsOnline" to "En ligne",
+    "settingsOffline" to "Hors ligne",
+    "settingsLastSync" to "Dernière synchronisation",
+    "settingsCatalogueCounts" to "Catalogue local",
+    "settingsCatalogueSummary" to "%d services · %d produits",
+    "settingsSaleQueue" to "File des commandes",
+    "settingsPrintQueue" to "File d’impression",
+    "settingsQueueSummary" to "%d en attente · %d en échec",
+    "ticketsAll" to "Tous",
+    "ticketsOverdue" to "En retard",
+    "ticketsPriority" to "Priorité",
+    "ticketsStatus" to "État",
+    "ticketsCachedSummary" to "%d bons synchronisés sur ce terminal",
+    "ticketsResultsSummary" to "%d bons affichés sur %d synchronisés",
+    "ticketsSearchHint" to "Rechercher un numéro, un client ou un téléphone",
+    "ticketsClear" to "Effacer les filtres",
+    "ticketsNoResults" to "Aucun bon correspondant. Modifiez la recherche ou les filtres.",
+    "ticketException" to "Anomalie",
     "authBrandName" to "CleanHub",
     "authBrandSuffix" to "CAISSE MAGASIN",
     "authWelcomeTitle" to "Bienvenue sur CleanHub",
@@ -2761,7 +3016,7 @@ private val COPY_FR_VALUES: Map<String, String> = mapOf(
     "ticketNotCached" to "Ce bon n'est pas en cache. Ouvrez-le au retour du réseau.",
     "customerNotCached" to "Ce client n'est pas en cache. Ouvrez sa fiche au retour du réseau.",
     "settingsNeedNetwork" to "Les réglages de la caisse ne peuvent pas être modifiés hors ligne.",
-    "settingsOutOfRange" to "Le verrouillage auto doit être entre 30 et 86400 secondes, et les copies entre 1 et 3.",
+    "settingsOutOfRange" to "Le nom est limité à 64 caractères, le verrouillage à 30–86400 secondes et les copies à 1–5.",
     "settingsSaved" to "Réglages de la caisse enregistrés.",
     "shiftNeedsNetwork" to "Les actions de service demandent une connexion.",
     "breakStarted" to "Pause commencée.",

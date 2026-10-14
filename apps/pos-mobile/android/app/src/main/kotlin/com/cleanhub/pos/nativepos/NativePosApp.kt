@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -42,12 +43,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -63,6 +61,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -91,7 +90,7 @@ internal data class NativeSetupBranch(val id: String, val name: String)
 private data class NativeAdministrator(val branches: List<NativeSetupBranch>, val requiresReenrollment: Boolean = false)
 private data class NativePosBootstrapIdentity(val tenantName: String, val branchName: String?)
 private data class NativeOfflinePinResult(val verified: Boolean, val lockedForSeconds: Long? = null)
-private enum class NativeMoreDestination {
+internal enum class NativeMoreDestination {
     Menu,
     Customers,
     Catalog,
@@ -194,7 +193,7 @@ private data class NativeMoreNotification(
     val relatedType: String?,
     val relatedId: String?,
 )
-private data class NativeTerminalSettingsSummary(
+internal data class NativeTerminalSettingsSummary(
     val label: String?,
     val cashHandlingMode: String,
     val roundingRule: String,
@@ -203,6 +202,8 @@ private data class NativeTerminalSettingsSummary(
     val printCopies: Int,
     val syncStatus: String,
     val lastSyncError: String?,
+    val branchAddress: String? = null,
+    val branchPhone: String? = null,
 )
 private data class NativeHardwareDevice(
     val id: String,
@@ -277,7 +278,7 @@ private data class NativeMoreZReport(
 private data class NativeMoreZPayment(val method: String, val provider: String?, val netAmount: String)
 private data class NativeMoreZTaxComponent(val name: String, val rate: String, val taxAmount: String)
 
-private enum class NativePosTab(val symbol: String) {
+internal enum class NativePosTab(val symbol: String) {
     Workspace("⌂"),
     Sale("▣"),
     Intake("＋"),
@@ -321,11 +322,6 @@ internal enum class NativePinLanguage(val code: String, val label: String) {
 }
 
 private const val BLUETOOTH_PERMISSION_REQUEST_CODE = 3_208
-private val POS_PAGE_BACKGROUND = Color(0xFFF8F7FB)
-private val POS_PANEL_BACKGROUND = Color(0xFFFFFFFF)
-private val POS_ACCENT = Color(0xFF6546A3)
-private val POS_INK = Color(0xFF211D29)
-private val POS_MUTED = Color(0xFF716A7D)
 /**
  * Ticket and customer work is server-owned: unlike a cash sale there is no
  * local queue to replay it from, so the app refuses it up front rather than
@@ -394,12 +390,15 @@ fun NativePosApp(applicationContext: Context) {
     var moreStatistics by remember { mutableStateOf<NativeMoreStatistics?>(null) }
     var moreStatisticsPeriod by remember { mutableStateOf("today") }
     var moreNotifications by remember { mutableStateOf<List<NativeMoreNotification>>(emptyList()) }
+    var terminalSettingsReady by remember { mutableStateOf(false) }
+    var terminalSettingsScope by remember { mutableStateOf<String?>(null) }
     var terminalSettings by remember { mutableStateOf<NativeTerminalSettingsSummary?>(null) }
     val hardware = remember(applicationContext) { NativePosHardware(applicationContext) { session.pinLanguageCode() } }
     var hardwareStatus by remember { mutableStateOf<NativeHardwareStatus?>(null) }
     var hardwareDevices by remember { mutableStateOf<List<NativeHardwareDevice>>(emptyList()) }
     var bluetoothPrinters by remember { mutableStateOf<List<NativeBluetoothPrinter>>(emptyList()) }
     var lastHardwareScan by remember { mutableStateOf<NativeHardwareScan?>(null) }
+    var receiptPrintPreferences by remember { mutableStateOf(NativeReceiptPrintSettings(true, 1)) }
     var receiptPrintQueue by remember { mutableStateOf(NativeReceiptPrintQueueState(0, 0)) }
     var checkoutSettings by remember { mutableStateOf(NativeCheckoutSettings()) }
     var receiptPrinterConfigured by remember { mutableStateOf(false) }
@@ -590,10 +589,11 @@ fun NativePosApp(applicationContext: Context) {
         cart = refreshed.second
         receiptPrintQueue = refreshed.third
         val checkoutState = withContext(Dispatchers.IO) {
-            database.checkoutSettings() to (database.receiptPrinterId() != null)
+            Triple(database.checkoutSettings(), database.receiptPrinterId() != null, database.receiptPrintSettings())
         }
         checkoutSettings = checkoutState.first
         receiptPrinterConfigured = checkoutState.second
+        receiptPrintPreferences = checkoutState.third
     }
 
     /**
@@ -636,11 +636,12 @@ fun NativePosApp(applicationContext: Context) {
     suspend fun executeReceiptPrint(
         jobId: String? = null,
         includeFailed: Boolean = false,
+        failedOnly: Boolean = false,
     ): String? = withContext(Dispatchers.IO) {
         val printerId = database.receiptPrinterId()
         val readiness = hardware.printerReadiness(printerId)
         if (!readiness.success) return@withContext readiness.message
-        val printJob = database.claimReceiptPrint(jobId, includeFailed) ?: return@withContext null
+        val printJob = database.claimReceiptPrint(jobId, includeFailed, failedOnly) ?: return@withContext null
         val result = hardware.printReceipt(printJob.content, printJob.copies, printerId)
         if (result.success) {
             database.markReceiptPrintCompleted(printJob.jobId)
@@ -673,11 +674,11 @@ fun NativePosApp(applicationContext: Context) {
         result.message
     }
 
-    fun printNextReceipt() {
+    fun printReceiptQueue(includeFailed: Boolean) {
         scope.launch {
             busy = true
             try {
-                message = executeReceiptPrint() ?: copy.noReceiptToPrint
+                message = executeReceiptPrint(includeFailed = includeFailed, failedOnly = includeFailed) ?: copy.noReceiptToPrint
                 receiptPrintQueue = withContext(Dispatchers.IO) { database.receiptPrintQueueState() }
             } catch (error: Exception) {
                 message = error.userMessage(copy)
@@ -686,6 +687,9 @@ fun NativePosApp(applicationContext: Context) {
             }
         }
     }
+
+    fun printNextReceipt() = printReceiptQueue(includeFailed = false)
+    fun retryFailedReceipt() = printReceiptQueue(includeFailed = true)
 
     /**
      * Keep UI changes responsive while serialising SQLite writes with checkout.
@@ -900,6 +904,7 @@ fun NativePosApp(applicationContext: Context) {
                             "",
                         ).joinToString("\n"),
                         copies = 1,
+                        printerId = database.receiptPrinterId(),
                     )
                 }
                 hardwareStatus = withContext(Dispatchers.IO) { hardware.status() }
@@ -992,7 +997,16 @@ fun NativePosApp(applicationContext: Context) {
     }
 
     fun openMoreDestination(destination: NativeMoreDestination) {
+        if (busy) return
         moreDestination = destination
+        if (destination == NativeMoreDestination.Settings) {
+            val terminalId = snapshot?.terminal?.terminalId
+            if (terminalSettingsScope != terminalId) {
+                terminalSettings = null
+                terminalSettingsScope = terminalId
+            }
+            terminalSettingsReady = false
+        }
         if (destination == NativeMoreDestination.Hardware) {
             refreshHardware()
             return
@@ -1036,9 +1050,10 @@ fun NativePosApp(applicationContext: Context) {
                     }
                     NativeMoreDestination.Settings -> {
                         terminalSettings = withContext(Dispatchers.IO) {
-                            NativePosSyncEngine(applicationContext).refreshCheckoutSettings()
-                                .toNativeTerminalSettingsSummary()
+                            val (branch, settings) = NativePosSyncEngine(applicationContext).refreshTerminalConfiguration()
+                            settings.toNativeTerminalSettingsSummary(branch)
                         }
+                        terminalSettingsReady = true
                         reload()
                     }
                     NativeMoreDestination.Shift -> {
@@ -1169,52 +1184,36 @@ fun NativePosApp(applicationContext: Context) {
         }
     }
 
-    fun saveTerminalSettings(
-        label: String,
-        lockTimeoutSeconds: String,
-        autoPrintReceipt: Boolean,
-        printCopies: String,
-        roundingRule: String,
-    ) {
-        if (!internetAvailable) {
-            message = copy.settingsNeedNetwork
-            return
-        }
-        val timeout = lockTimeoutSeconds.toIntOrNull()
-        val copies = printCopies.toIntOrNull()
-        if (timeout == null || timeout !in 30..86400 || copies == null || copies !in 1..3) {
-            message = copy.settingsOutOfRange
-            return
-        }
+    fun saveTerminalSettings(patch: NativeTerminalSettingsPatch) {
+        if (!internetAvailable) { message = copy.settingsNeedNetwork; return }
+        if (!terminalSettingsReady || terminalSettings == null || !patch.isValid()) { message = copy.settingsOutOfRange; return }
         scope.launch {
             busy = true
             try {
+                val previous = terminalSettings
                 terminalSettings = withContext(Dispatchers.IO) {
                     api.patch("/pos/terminal-settings", JSONObject().apply {
-                        put("label", label.trim())
-                        put("lockTimeoutSeconds", timeout)
-                        put("autoPrintReceipt", autoPrintReceipt)
-                        put("printCopies", copies)
-                        put("roundingRule", roundingRule)
-                    }).toNativeTerminalSettingsSummary().also {
-                        database.replaceReceiptPrintSettings(
-                            autoPrintReceipt = it.autoPrintReceipt,
-                            printCopies = it.printCopies,
-                        )
+                        patch.label?.let { put("label", it.trim()) }
+                        patch.roundingRule?.let { put("roundingRule", it) }
+                        patch.autoPrintReceipt?.let { put("autoPrintReceipt", it) }
+                        patch.printCopies?.let { put("printCopies", it) }
+                        patch.lockTimeoutSeconds?.let { put("lockTimeoutSeconds", it) }
+                    }).also { result ->
+                        requireNativeTerminalDevice(result.optString("deviceId"), session.deviceId(), copy)
+                    }.toNativeTerminalSettingsSummary().copy(
+                        branchAddress = previous?.branchAddress, branchPhone = previous?.branchPhone,
+                    ).also {
+                        database.replaceReceiptPrintSettings(it.autoPrintReceipt, it.printCopies)
                         database.replaceCheckoutSettings(database.checkoutSettings().copy(
-                            roundingRule = it.roundingRule,
-                            autoPrintReceipt = it.autoPrintReceipt,
+                            roundingRule = it.roundingRule, autoPrintReceipt = it.autoPrintReceipt,
                             lockTimeoutSeconds = it.lockTimeoutSeconds,
                         ))
                     }
                 }
                 reload()
                 message = copy.settingsSaved
-            } catch (error: Exception) {
-                message = error.userMessage(copy)
-            } finally {
-                busy = false
-            }
+            } catch (error: Exception) { message = error.userMessage(copy) }
+            finally { busy = false }
         }
     }
 
@@ -2102,481 +2101,495 @@ fun NativePosApp(applicationContext: Context) {
     }
 
     val current = snapshot
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(if (current == null || current.terminal == null || !session.hasTerminalCredential() || !unlocked)
-                NATIVE_ENTRY_BACKGROUND else MaterialTheme.colorScheme.surface)
-            .systemBarsPadding(),
-    ) {
-        when {
-            current == null -> LoadingView(copy)
-    current.terminal == null && session.hasTerminalCredential() && setupAdministrator == null -> StaffPinGate(
-        language = pinLanguage,
-        onLanguageSelected = ::selectLanguage,
-        tenantName = bootstrapIdentity?.tenantName,
-        branchName = bootstrapIdentity?.branchName,
-        offlineAvailable = false,
-        internetAvailable = internetAvailable,
-        busy = busy,
-                message = message,
-                onPinEdited = { message = null },
-                onUnlockOffline = { },
-                onOnlineLogin = ::loginWithStaffPin,
-            )
-            current.terminal == null -> {
-                if (setupAdministrator == null) {
-                    FirstLaunchView(copy,
-                        language = pinLanguage,
-                        onLanguageSelected = ::selectLanguage,
-                        apiConfigured = api.configured(),
-                        busy = busy,
-                        message = message,
-                        onStart = { setupAdministrator = NativeAdministrator(emptyList()); message = null },
-                    )
-                } else if (setupAdministrator!!.branches.isEmpty()) {
-                    AdministratorLoginView(copy,
-                        language = pinLanguage,
-                        onLanguageSelected = ::selectLanguage,
-                        internetAvailable = internetAvailable,
-                        busy = busy,
-                        message = message,
-                        onSubmit = { identifier, password ->
-                            scope.launch {
-                                busy = true
-                                try {
-                                    val admin = withContext(Dispatchers.IO) {
-                                        val auth = api.login(identifier, password).getJSONObject("authContext")
-                                        val role = auth.optString("role")
-                                        if (role != "owner" && role != "manager") {
-                                            session.clearAdministratorSession()
-                                            throw NativePosValidationException(copy.managerOnlyEnroll)
-                                        }
-                                        session.saveTenantDefaultLanguageCode(auth.optString("language"))
-                                        val profile = api.get("/tenant/profile")
-                                        val branches = profile.optJSONArray("accessibleBranches").toSetupBranches()
-                                        if (branches.isEmpty()) throw NativePosValidationException(copy.noBranchesAvailable)
-                                        val bootstrap = api.bootstrap()
-                                        NativeAdministrator(
-                                            branches = branches,
-                                            requiresReenrollment = bootstrap.optString("status") == "credential_lost",
-                                        )
-                                    }
-                                    setupAdministrator = admin
-                                    pinLanguage = NativePinLanguage.fromCode(session.pinLanguageCode())
-                                    message = null
-                                } catch (error: Exception) {
-                                    message = error.administratorLoginMessage(copy)
-                                } finally {
-                                    busy = false
-                                }
-                            }
-                        },
-                    )
-                } else {
-                    TerminalEnrollmentView(copy,
-                        language = pinLanguage,
-                        onLanguageSelected = ::selectLanguage,
-                        branches = setupAdministrator!!.branches,
-                        requiresReenrollment = setupAdministrator!!.requiresReenrollment,
-                        busy = busy,
-                        message = message,
-                        onEnroll = { branchId, label ->
-                            scope.launch {
-                                busy = true
-                                try {
-                                    withContext(Dispatchers.IO) {
-                                        if (setupAdministrator!!.requiresReenrollment) {
-                                            api.post(
-                                                "/pos/auth/devices/${session.deviceId()}/revocation",
-                                                JSONObject().put("reason", "Administrator reinitialized this native POS terminal to select a branch"),
-                                            )
-                                        }
-                                        api.post("/pos/auth/devices", JSONObject().apply {
-                                            put("deviceId", session.deviceId())
-                                            put("label", label.trim())
-                                            put("branchId", branchId)
-                                            put("deviceType", "tablet")
-                                            put("platform", "android")
-                                            put("platformVersion", android.os.Build.VERSION.RELEASE)
-                                            put("appVersion", BuildConfig.VERSION_NAME)
-                                        })
-                                        session.clearAdministratorSession()
-                                    }
-                                    message = copy.terminalEnrolled
-                                    setupAdministrator = null
-                                    reload()
-                                } catch (error: Exception) {
-                                    message = error.userMessage(copy)
-                                } finally {
-                                    busy = false
-                                }
-                            }
-                        },
-                    )
-                }
-            }
-            !session.hasTerminalCredential() -> TerminalCredentialRecoveryView(copy,
-                language = pinLanguage,
-                onLanguageSelected = ::selectLanguage,
-                internetAvailable = internetAvailable,
-                busy = busy,
-                message = message,
-                onRecover = { identifier, password ->
-                    scope.launch {
-                        busy = true
-                        try {
-                            withContext(Dispatchers.IO) {
-                                val auth = api.login(identifier, password).getJSONObject("authContext")
-                                val role = auth.optString("role")
-                                if (role != "owner" && role != "manager") {
-                                    session.clearAdministratorSession()
-                                    throw NativePosValidationException(copy.managerOnlyRecover)
-                                }
-                                session.saveTenantDefaultLanguageCode(auth.optString("language"))
-                                api.post("/pos/auth/devices/${session.deviceId()}/credential-rotation", JSONObject().put("reason", "Move this POS installation to the native Android app"))
-                                session.clearAdministratorSession()
-                            }
-                            pinLanguage = NativePinLanguage.fromCode(session.pinLanguageCode())
-                            message = nativePosCopy(pinLanguage.code).terminalRecovered
-                        } catch (error: Exception) {
-                            message = error.administratorLoginMessage(copy)
-                        } finally {
-                            busy = false
-                        }
-                    }
-                },
-            )
-            !unlocked -> StaffPinGate(
-                language = pinLanguage,
-                onLanguageSelected = ::selectLanguage,
-                tenantName = current.terminal.merchantName,
-                branchName = current.terminal.branchName,
-                offlineAvailable = session.canUnlockOffline(current.terminal.userId),
-                internetAvailable = internetAvailable,
-                busy = busy,
-                message = message,
-                onPinEdited = { message = null },
-                onUnlockOffline = { pin -> unlockWithOfflinePin(current.terminal.userId, pin) },
-                onOnlineLogin = ::loginWithStaffPin,
-            )
-            !current.catalogIsFresh -> CachedDataExpiredView(copy, busy, message, ::synchronize)
-            else -> NativePosShell(copy,
-        current = current,
-        activeTab = activeTab,
-        internetAvailable = internetAvailable,
-        offlineModeEnabled = offlineModeEnabled,
-        busy = busy,
-                message = message,
-                onSelectTab = { tab ->
-                    activeTab = tab
-                    if (tab == NativePosTab.More) moreDestination = NativeMoreDestination.Menu
-                },
-                onToggleOfflineMode = ::toggleOfflineMode,
-                onLock = { unlocked = false },
-                onSynchronize = ::synchronize,
-                onCreateCustomer = ::createCustomer,
-                onCreateServiceTicket = ::createServiceTicket,
-                intakeCustomer = intakeCustomer,
-                onChangeTicketStatus = ::changeTicketStatus,
-                selectedTicketDetail = selectedTicketDetail,
-                onOpenTicket = ::openTicket,
-                onCloseTicket = { selectedTicketDetail = null },
-                onAddServiceTicketItem = ::addServiceTicketItem,
-                onUpdateServiceTicketItem = ::updateServiceTicketItem,
-                onDeleteServiceTicketItem = ::deleteServiceTicketItem,
-                onChangeTicketItemStatus = ::changeTicketItemStatus,
-                onAddTicketItemsToCart = ::addTicketItemsToCart,
-                saleContent = {
-                    if (!internetAvailable && current.cashState?.isOfflineCashReady() != true) {
-                        CashOperationsView(copy,
-                            cashState = current.cashState,
-                            internetAvailable = false,
+    MaterialTheme(colorScheme = nativePosColors) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(if (current == null || current.terminal == null || !session.hasTerminalCredential() || !unlocked)
+                    NATIVE_ENTRY_BACKGROUND else MaterialTheme.colorScheme.surface)
+                .systemBarsPadding()
+                .imePadding(),
+        ) {
+            when {
+                current == null -> LoadingView(copy)
+        current.terminal == null && session.hasTerminalCredential() && setupAdministrator == null -> StaffPinGate(
+            language = pinLanguage,
+            onLanguageSelected = ::selectLanguage,
+            tenantName = bootstrapIdentity?.tenantName,
+            branchName = bootstrapIdentity?.branchName,
+            offlineAvailable = false,
+            internetAvailable = internetAvailable,
+            busy = busy,
+                    message = message,
+                    onPinEdited = { message = null },
+                    onUnlockOffline = { },
+                    onOnlineLogin = ::loginWithStaffPin,
+                )
+                current.terminal == null -> {
+                    if (setupAdministrator == null) {
+                        FirstLaunchView(copy,
+                            language = pinLanguage,
+                            onLanguageSelected = ::selectLanguage,
+                            apiConfigured = api.configured(),
                             busy = busy,
                             message = message,
-                            onStartShift = ::startShift,
-                            onOpenRegister = ::openRegister,
+                            onStart = { setupAdministrator = NativeAdministrator(emptyList()); message = null },
                         )
-                    } else {
-                        NativeSaleView(
-                            current = current,
-                            cart = cart,
-                            copy = copy,
+                    } else if (setupAdministrator!!.branches.isEmpty()) {
+                        AdministratorLoginView(copy,
+                            language = pinLanguage,
+                            onLanguageSelected = ::selectLanguage,
                             internetAvailable = internetAvailable,
                             busy = busy,
                             message = message,
-                            checkoutSettings = checkoutSettings,
-                            receiptPrinterConfigured = receiptPrinterConfigured,
-                            onRefreshPricing = { checkoutCart, discountCode, taxExemptionReason ->
-                                withContext(Dispatchers.IO) {
-                                    if (internetAvailable) {
-                                        previewNativeCartPricing(
-                                            api = api,
-                                            cart = checkoutCart,
-                                            branchId = current.terminal.branchId,
-                                            discountCode = discountCode,
-                                            taxExemptionReason = taxExemptionReason,
-                                        )
-                                    } else {
-                                        calculateNativeLocalPricing(checkoutCart, checkoutSettings, taxExemptionReason)
-                                    }
-                                }
-                            },
-                            onAdd = { product ->
-                                val nextQuantity = (cart.products.firstOrNull { it.skuId == product.skuId }?.quantity ?: 0) + 1
-                                if (!internetAvailable && !canAddOffline(product, nextQuantity)) {
-                                    message = copy.offlineStockShort.format(product.name)
-                                } else if (internetAvailable && !canAddOnline(product, nextQuantity)) {
-                                    message = copy.stockShort.format(product.name)
-                                }
-                                else updateCart(cart.copy(products = cart.products.upsert(product, nextQuantity)))
-                            },
-                            onRemove = { product ->
-                                val existing = cart.products.firstOrNull { it.skuId == product.skuId } ?: return@NativeSaleView
-                                updateCart(
-                                    cart.copy(products = if (existing.quantity == 1L) {
-                                        cart.products.filterNot { it.skuId == product.skuId }
-                                    } else {
-                                        cart.products.upsert(product, existing.quantity - 1)
-                                    }),
-                                )
-                            },
-                            onClearProduct = { skuId ->
-                                updateCart(cart.copy(products = cart.products.filterNot { it.skuId == skuId }))
-                            },
-                            onRemoveTicketItem = { ticketItemId ->
-                                updateCart(cart.copy(ticketItems = cart.ticketItems.filterNot { it.ticketItemId == ticketItemId }))
-                            },
-                            onCheckout = { checkoutRequest ->
-                                val cartAtCheckout = cart
-                                val terminalAtCheckout = current.terminal
-                                if (!checkoutSettings.taxReady) {
-                                    checkoutFailure = copy.taxReadinessMessage(checkoutSettings.taxReadinessCode)
-                                    message = checkoutFailure
-                                    return@NativeSaleView
-                                }
-                                if (checkoutRequest.paymentMethod == "cash" && checkoutRequest.tenderedMinor < checkoutRequest.expectedTotalMinor) {
-                                    checkoutFailure = copy.tenderBelowTotal
-                                    message = checkoutFailure
-                                    return@NativeSaleView
-                                }
-                                if (checkoutRequest.paymentMethod != "cash" && !internetAvailable) {
-                                    checkoutFailure = copy.requiresNetwork
-                                    message = checkoutFailure
-                                    return@NativeSaleView
-                                }
-                                val checkoutGeneration = cartWriteGeneration.incrementAndGet()
+                            onSubmit = { identifier, password ->
                                 scope.launch {
                                     busy = true
                                     try {
-                                        val checkoutAndStatus = withContext(Dispatchers.IO) {
-                                            if (internetAvailable) {
-                                                runCatching { NativePosSyncEngine(applicationContext).synchronize() }
-                                                    .getOrElse { error ->
-                                                        if (database.snapshot().cashState?.isOfflineCashReady() != true) throw error
-                                                    }
+                                        val admin = withContext(Dispatchers.IO) {
+                                            val auth = api.login(identifier, password).getJSONObject("authContext")
+                                            val role = auth.optString("role")
+                                            if (role != "owner" && role != "manager") {
+                                                session.clearAdministratorSession()
+                                                throw NativePosValidationException(copy.managerOnlyEnroll)
                                             }
-                                            val printSettings = database.receiptPrintSettings()
-                                            val freshPricing = if (internetAvailable) {
-                                                previewNativeCartPricing(
-                                                    api = api,
-                                                    cart = cartAtCheckout,
-                                                    branchId = terminalAtCheckout.branchId,
-                                                    discountCode = checkoutRequest.discountCode,
-                                                    taxExemptionReason = checkoutRequest.taxExemptionReason,
-                                                )
-                                            } else {
-                                                calculateNativeLocalPricing(
-                                                    cartAtCheckout,
-                                                    database.checkoutSettings(),
-                                                    checkoutRequest.taxExemptionReason,
-                                                )
-                                            }
-                                            val freshExpectedTotal = if (checkoutRequest.paymentMethod == "cash") {
-                                                applyNativeCashRounding(freshPricing.totalMinor, checkoutRequest.cashRoundingStep)
-                                            } else freshPricing.totalMinor
-                                            if (freshExpectedTotal != checkoutRequest.expectedTotalMinor) {
-                                                throw NativePosValidationException(copy.priceChanged)
-                                            }
-                                            val checkout = cartWriteMutex.withLock {
-                                                database.enqueueCheckout(
-                                                    cart = cartAtCheckout,
-                                                    checkoutRequest = checkoutRequest,
-                                                    reserveOfflineStock = !internetAvailable,
-                                                    receiptPrintDraft = if (checkoutRequest.receiptDelivery == NativeReceiptDelivery.Print) {
-                                                        buildNativeReceiptDraft(copy,
-                                                            terminal = terminalAtCheckout,
-                                                            cart = cartAtCheckout,
-                                                            pricing = freshPricing,
-                                                            amountDueMinor = checkoutRequest.expectedTotalMinor,
-                                                            tenderedMinor = checkoutRequest.tenderedMinor,
-                                                            paymentMethod = checkoutRequest.paymentMethod,
-                                                            externalReference = checkoutRequest.externalReference,
-                                                            balanceDueAt = checkoutRequest.balanceDueAt,
-                                                            taxExemptionReason = checkoutRequest.taxExemptionReason,
-                                                            printSettings = printSettings,
-                                                            receiptProfile = database.checkoutSettings().receiptProfile,
-                                                        )
-                                                    } else null,
-                                                )
-                                            }
-                                            // A live network should not wait for WorkManager's next
-                                            // window. The persisted command still covers an abrupt
-                                            // response loss and replays with the same order id.
-                                            if (internetAvailable) {
-                                                runCatching { NativePosSyncEngine(applicationContext).synchronize() }
-                                            }
-                                            checkout to database.checkoutStatus(checkout.operationId)
+                                            session.saveTenantDefaultLanguageCode(auth.optString("language"))
+                                            val profile = api.get("/tenant/profile")
+                                            val branches = profile.optJSONArray("accessibleBranches").toSetupBranches()
+                                            if (branches.isEmpty()) throw NativePosValidationException(copy.noBranchesAvailable)
+                                            val bootstrap = api.bootstrap()
+                                            NativeAdministrator(
+                                                branches = branches,
+                                                requiresReenrollment = bootstrap.optString("status") == "credential_lost",
+                                            )
                                         }
-                                        val (checkout, checkoutStatus) = checkoutAndStatus
-                                        val checkoutHardwareStatus = withContext(Dispatchers.IO) { hardware.status() }
-                                        hardwareStatus = checkoutHardwareStatus
-                                        val drawerMessage = if (checkoutRequest.paymentMethod == "cash" && checkoutHardwareStatus.cashDrawerConnected) {
-                                            withContext(Dispatchers.IO) {
-                                                hardware.openCashDrawer().takeUnless { it.success }?.message
-                                            }
-                                        } else null
-                                        val autoPrintMessage = if (
-                                            checkoutStatus != "failed" &&
-                                            checkoutRequest.receiptDelivery == NativeReceiptDelivery.Print &&
-                                                checkout.printJobId != null
-                                        ) {
-                                            executeReceiptPrint(checkout.printJobId)
-                                        } else {
-                                            null
-                                        }
-                                        if (internetAvailable && checkoutStatus == null) {
-                                            runCatching {
-                                                withContext(Dispatchers.IO) {
-                                                    api.post(
-                                                        "/pos/orders/${checkout.orderId}/receipt-deliveries",
-                                                        JSONObject().apply {
-                                                            put("channel", checkoutRequest.receiptDelivery.wireValue)
-                                                            put("idempotencyKey", "receipt:${checkout.orderId}:${checkoutRequest.receiptDelivery.wireValue}:initial")
-                                                            if (checkoutRequest.receiptDelivery == NativeReceiptDelivery.Print) {
-                                                                val printed = checkout.printJobId?.let(database::receiptPrintStatus) == "printed"
-                                                                put("printStatus", if (printed) "sent" else "failed")
-                                                                if (!printed) put("failureReason", "The native receipt print job is queued or failed.")
-                                                            }
-                                                        },
-                                                    )
-                                                }
-                                            }
-                                        }
-                                        NativePosSyncWorker.schedule(applicationContext)
-                                        if (cartWriteGeneration.get() == checkoutGeneration) {
-                                            cart = NativePosCart.empty(cartAtCheckout.currency)
-                                        }
-                                        reload()
-                                        val saleMessage = when {
-                                            checkoutStatus == "failed" -> copy.saleNeedsReview
-                                            checkoutStatus == "pending" -> copy.saleQueuedOffline
-                                            checkoutRequest.paymentMethod == "later" -> copy.salePayLaterRecorded
-                                            checkoutRequest.paymentMethod != "cash" -> copy.saleAwaitingConfirmation
-                                            else -> copy.saleSubmittedOnline
-                                        }
-                                        message = when {
-                                            drawerMessage != null -> "$saleMessage $drawerMessage"
-                                            autoPrintMessage != null -> "$saleMessage $autoPrintMessage"
-                                            checkout.printJobId != null && checkoutStatus != "failed" -> "$saleMessage ${copy.receiptQueued}"
-                                            else -> saleMessage
-                                        }
+                                        setupAdministrator = admin
+                                        pinLanguage = NativePinLanguage.fromCode(session.pinLanguageCode())
+                                        message = null
                                     } catch (error: Exception) {
-                                        val failure = error.userMessage(copy)
-                                        message = failure
-                                        checkoutFailure = failure
+                                        message = error.administratorLoginMessage(copy)
                                     } finally {
                                         busy = false
                                     }
                                 }
                             },
-                            onSynchronize = ::synchronize,
+                        )
+                    } else {
+                        TerminalEnrollmentView(copy,
+                            language = pinLanguage,
+                            onLanguageSelected = ::selectLanguage,
+                            branches = setupAdministrator!!.branches,
+                            requiresReenrollment = setupAdministrator!!.requiresReenrollment,
+                            busy = busy,
+                            message = message,
+                            onEnroll = { branchId, label ->
+                                scope.launch {
+                                    busy = true
+                                    try {
+                                        withContext(Dispatchers.IO) {
+                                            if (setupAdministrator!!.requiresReenrollment) {
+                                                api.post(
+                                                    "/pos/auth/devices/${session.deviceId()}/revocation",
+                                                    JSONObject().put("reason", "Administrator reinitialized this native POS terminal to select a branch"),
+                                                )
+                                            }
+                                            api.post("/pos/auth/devices", JSONObject().apply {
+                                                put("deviceId", session.deviceId())
+                                                put("label", label.trim())
+                                                put("branchId", branchId)
+                                                put("deviceType", "tablet")
+                                                put("platform", "android")
+                                                put("platformVersion", android.os.Build.VERSION.RELEASE)
+                                                put("appVersion", BuildConfig.VERSION_NAME)
+                                            })
+                                            session.clearAdministratorSession()
+                                        }
+                                        message = copy.terminalEnrolled
+                                        setupAdministrator = null
+                                        reload()
+                                    } catch (error: Exception) {
+                                        message = error.userMessage(copy)
+                                    } finally {
+                                        busy = false
+                                    }
+                                }
+                            },
                         )
                     }
-                },
-                moreContent = {
-                    NativeMoreView(
-                        copy,
-                        current = current,
-                        destination = moreDestination,
-                        orders = moreOrders,
-                        statistics = moreStatistics,
-                        notifications = moreNotifications,
-                        terminalSettings = terminalSettings,
-                        checkoutSettings = checkoutSettings,
-                        hardwareStatus = hardwareStatus,
-                        hardwareDevices = hardwareDevices,
-                        bluetoothPrinters = bluetoothPrinters,
-                        lastHardwareScan = lastHardwareScan,
-                        receiptPrintQueue = receiptPrintQueue,
-                        canManageSensitiveHardware = current.terminal.role == "owner" || current.terminal.role == "manager",
-                        internetAvailable = internetAvailable,
-                        busy = busy,
-                        message = message,
-                        onNavigate = ::openMoreDestination,
-                        onStartIntake = { activeTab = NativePosTab.Intake },
-                        onStartIntakeForCustomer = { customer ->
-                            intakeCustomer = customer
-                            activeTab = NativePosTab.Intake
-                        },
-                        onStartSale = { activeTab = NativePosTab.Sale },
-                        onAddProduct = ::addProductToSale,
-                        onCreateCustomer = ::createCustomer,
-                        onOpenTicket = { ticket ->
-                            activeTab = NativePosTab.Tickets
-                            openTicket(ticket)
-                        },
-                        searchResults = moreSearchResults,
-                        onSearch = ::searchMore,
-                        onOpenSearchResult = ::openMoreSearchResult,
-                        onOpenOrder = ::openMoreOrder,
-                        orderDetail = moreOrderDetail,
-                        onRecordOrderCash = ::recordMoreOrderCash,
-                        onResolveManualPayment = ::resolveMoreManualPayment,
-                        onCreateRefund = ::createMoreRefund,
-                        onResolveRefund = ::resolveMoreRefund,
-                        onChangeOrderStatus = ::changeMoreOrderStatus,
-                        onMarkNotificationRead = ::markNotificationRead,
-                        onMarkAllNotificationsRead = ::markAllNotificationsRead,
-                        onArchiveNotification = ::archiveNotification,
-                        onSynchronize = ::synchronize,
-                        onPerformShiftAction = ::performShiftAction,
-                        onOpenRegister = ::openRegister,
-                        shiftData = moreShiftData,
-                        onCreateCashMovement = ::createCashMovement,
-                        onCloseRegister = ::closeRegister,
-                        onClockOut = ::clockOut,
-                        onSaveTerminalSettings = ::saveTerminalSettings,
-                        onRefreshHardware = ::refreshHardware,
-                        onTestHardwarePrinter = ::testHardwarePrinter,
-                        onTriggerHardwareScanner = ::triggerHardwareScanner,
-                        onConnectBuiltInHardware = ::connectBuiltInHardware,
-                        onRequestBluetoothPermissions = ::requestBluetoothPermissions,
-                        onRefreshBluetoothPrinters = ::refreshBluetoothPrinters,
-                        onBindBluetoothPrinter = ::bindBluetoothPrinter,
-                        onOpenDrawerFromHardwareSettings = ::openDrawerFromHardwareSettings,
-                        onPrintNextReceipt = ::printNextReceipt,
-                        statisticsPeriod = moreStatisticsPeriod,
-                        onStatisticsPeriodChange = { period ->
-                            moreStatisticsPeriod = period
-                            openMoreDestination(NativeMoreDestination.Statistics)
-                        },
-                    )
-                },
-            )
-        }
-        scannerSession?.let { currentSession ->
-            NativeHardwareScannerSessionView(copy,
-                session = currentSession,
-                busy = busy,
-                onClose = ::closeHardwareScannerSession,
-            )
-        }
-        checkoutFailure?.let { failure ->
-            NativeCashCheckoutFailureDialog(copy,
-                message = failure,
-                onDismiss = { checkoutFailure = null },
-            )
+                }
+                !session.hasTerminalCredential() -> TerminalCredentialRecoveryView(copy,
+                    language = pinLanguage,
+                    onLanguageSelected = ::selectLanguage,
+                    internetAvailable = internetAvailable,
+                    busy = busy,
+                    message = message,
+                    onRecover = { identifier, password ->
+                        scope.launch {
+                            busy = true
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    val auth = api.login(identifier, password).getJSONObject("authContext")
+                                    val role = auth.optString("role")
+                                    if (role != "owner" && role != "manager") {
+                                        session.clearAdministratorSession()
+                                        throw NativePosValidationException(copy.managerOnlyRecover)
+                                    }
+                                    session.saveTenantDefaultLanguageCode(auth.optString("language"))
+                                    api.post("/pos/auth/devices/${session.deviceId()}/credential-rotation", JSONObject().put("reason", "Move this POS installation to the native Android app"))
+                                    session.clearAdministratorSession()
+                                }
+                                pinLanguage = NativePinLanguage.fromCode(session.pinLanguageCode())
+                                message = nativePosCopy(pinLanguage.code).terminalRecovered
+                            } catch (error: Exception) {
+                                message = error.administratorLoginMessage(copy)
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    },
+                )
+                !unlocked -> StaffPinGate(
+                    language = pinLanguage,
+                    onLanguageSelected = ::selectLanguage,
+                    tenantName = current.terminal.merchantName,
+                    branchName = current.terminal.branchName,
+                    offlineAvailable = session.canUnlockOffline(current.terminal.userId),
+                    internetAvailable = internetAvailable,
+                    busy = busy,
+                    message = message,
+                    onPinEdited = { message = null },
+                    onUnlockOffline = { pin -> unlockWithOfflinePin(current.terminal.userId, pin) },
+                    onOnlineLogin = ::loginWithStaffPin,
+                )
+                !current.catalogIsFresh -> CachedDataExpiredView(copy, busy, message, ::synchronize)
+                else -> NativePosShell(copy,
+                    activeMoreDestination = moreDestination,
+                    onNavigateMore = ::openMoreDestination,
+                    languageCode = pinLanguage.code,
+            current = current,
+            activeTab = activeTab,
+            internetAvailable = internetAvailable,
+            offlineModeEnabled = offlineModeEnabled,
+            busy = busy,
+                    message = message,
+                    onSelectTab = { tab ->
+                        activeTab = tab
+                        if (tab == NativePosTab.More) moreDestination = NativeMoreDestination.Menu
+                    },
+                    onToggleOfflineMode = ::toggleOfflineMode,
+                    onLock = { unlocked = false },
+                    onSynchronize = ::synchronize,
+                    onCreateCustomer = ::createCustomer,
+                    onCreateServiceTicket = ::createServiceTicket,
+                    intakeCustomer = intakeCustomer,
+                    onChangeTicketStatus = ::changeTicketStatus,
+                    selectedTicketDetail = selectedTicketDetail,
+                    onOpenTicket = ::openTicket,
+                    onCloseTicket = { selectedTicketDetail = null },
+                    onAddServiceTicketItem = ::addServiceTicketItem,
+                    onUpdateServiceTicketItem = ::updateServiceTicketItem,
+                    onDeleteServiceTicketItem = ::deleteServiceTicketItem,
+                    onChangeTicketItemStatus = ::changeTicketItemStatus,
+                    onAddTicketItemsToCart = ::addTicketItemsToCart,
+                    saleContent = {
+                        if (!internetAvailable && current.cashState?.isOfflineCashReady() != true) {
+                            CashOperationsView(copy,
+                                cashState = current.cashState,
+                                internetAvailable = false,
+                                busy = busy,
+                                message = message,
+                                onStartShift = ::startShift,
+                                onOpenRegister = ::openRegister,
+                            )
+                        } else {
+                            NativeSaleView(
+                                current = current,
+                                cart = cart,
+                                copy = copy,
+                                internetAvailable = internetAvailable,
+                                busy = busy,
+                                message = message,
+                                checkoutSettings = checkoutSettings,
+                                receiptPrinterConfigured = receiptPrinterConfigured,
+                                onRefreshPricing = { checkoutCart, discountCode, taxExemptionReason ->
+                                    withContext(Dispatchers.IO) {
+                                        if (internetAvailable) {
+                                            previewNativeCartPricing(
+                                                api = api,
+                                                cart = checkoutCart,
+                                                branchId = current.terminal.branchId,
+                                                discountCode = discountCode,
+                                                taxExemptionReason = taxExemptionReason,
+                                            )
+                                        } else {
+                                            calculateNativeLocalPricing(checkoutCart, checkoutSettings, taxExemptionReason)
+                                        }
+                                    }
+                                },
+                                onAdd = { product ->
+                                    val nextQuantity = (cart.products.firstOrNull { it.skuId == product.skuId }?.quantity ?: 0) + 1
+                                    if (!internetAvailable && !canAddOffline(product, nextQuantity)) {
+                                        message = copy.offlineStockShort.format(product.name)
+                                    } else if (internetAvailable && !canAddOnline(product, nextQuantity)) {
+                                        message = copy.stockShort.format(product.name)
+                                    }
+                                    else updateCart(cart.copy(products = cart.products.upsert(product, nextQuantity)))
+                                },
+                                onRemove = { product ->
+                                    val existing = cart.products.firstOrNull { it.skuId == product.skuId } ?: return@NativeSaleView
+                                    updateCart(
+                                        cart.copy(products = if (existing.quantity == 1L) {
+                                            cart.products.filterNot { it.skuId == product.skuId }
+                                        } else {
+                                            cart.products.upsert(product, existing.quantity - 1)
+                                        }),
+                                    )
+                                },
+                                onClearProduct = { skuId ->
+                                    updateCart(cart.copy(products = cart.products.filterNot { it.skuId == skuId }))
+                                },
+                                onRemoveTicketItem = { ticketItemId ->
+                                    updateCart(cart.copy(ticketItems = cart.ticketItems.filterNot { it.ticketItemId == ticketItemId }))
+                                },
+                                onCheckout = { checkoutRequest ->
+                                    val cartAtCheckout = cart
+                                    val terminalAtCheckout = current.terminal
+                                    if (!checkoutSettings.taxReady) {
+                                        checkoutFailure = copy.taxReadinessMessage(checkoutSettings.taxReadinessCode)
+                                        message = checkoutFailure
+                                        return@NativeSaleView
+                                    }
+                                    if (checkoutRequest.paymentMethod == "cash" && checkoutRequest.tenderedMinor < checkoutRequest.expectedTotalMinor) {
+                                        checkoutFailure = copy.tenderBelowTotal
+                                        message = checkoutFailure
+                                        return@NativeSaleView
+                                    }
+                                    if (checkoutRequest.paymentMethod != "cash" && !internetAvailable) {
+                                        checkoutFailure = copy.requiresNetwork
+                                        message = checkoutFailure
+                                        return@NativeSaleView
+                                    }
+                                    val checkoutGeneration = cartWriteGeneration.incrementAndGet()
+                                    scope.launch {
+                                        busy = true
+                                        try {
+                                            val checkoutAndStatus = withContext(Dispatchers.IO) {
+                                                if (internetAvailable) {
+                                                    runCatching { NativePosSyncEngine(applicationContext).synchronize() }
+                                                        .getOrElse { error ->
+                                                            if (database.snapshot().cashState?.isOfflineCashReady() != true) throw error
+                                                        }
+                                                }
+                                                val printSettings = database.receiptPrintSettings()
+                                                val freshPricing = if (internetAvailable) {
+                                                    previewNativeCartPricing(
+                                                        api = api,
+                                                        cart = cartAtCheckout,
+                                                        branchId = terminalAtCheckout.branchId,
+                                                        discountCode = checkoutRequest.discountCode,
+                                                        taxExemptionReason = checkoutRequest.taxExemptionReason,
+                                                    )
+                                                } else {
+                                                    calculateNativeLocalPricing(
+                                                        cartAtCheckout,
+                                                        database.checkoutSettings(),
+                                                        checkoutRequest.taxExemptionReason,
+                                                    )
+                                                }
+                                                val freshExpectedTotal = if (checkoutRequest.paymentMethod == "cash") {
+                                                    applyNativeCashRounding(freshPricing.totalMinor, checkoutRequest.cashRoundingStep)
+                                                } else freshPricing.totalMinor
+                                                if (freshExpectedTotal != checkoutRequest.expectedTotalMinor) {
+                                                    throw NativePosValidationException(copy.priceChanged)
+                                                }
+                                                val checkout = cartWriteMutex.withLock {
+                                                    database.enqueueCheckout(
+                                                        cart = cartAtCheckout,
+                                                        checkoutRequest = checkoutRequest,
+                                                        reserveOfflineStock = !internetAvailable,
+                                                        receiptPrintDraft = if (checkoutRequest.receiptDelivery == NativeReceiptDelivery.Print) {
+                                                            buildNativeReceiptDraft(copy,
+                                                                terminal = terminalAtCheckout,
+                                                                cart = cartAtCheckout,
+                                                                pricing = freshPricing,
+                                                                amountDueMinor = checkoutRequest.expectedTotalMinor,
+                                                                tenderedMinor = checkoutRequest.tenderedMinor,
+                                                                paymentMethod = checkoutRequest.paymentMethod,
+                                                                externalReference = checkoutRequest.externalReference,
+                                                                balanceDueAt = checkoutRequest.balanceDueAt,
+                                                                taxExemptionReason = checkoutRequest.taxExemptionReason,
+                                                                printSettings = printSettings,
+                                                                receiptProfile = database.checkoutSettings().receiptProfile,
+                                                            )
+                                                        } else null,
+                                                    )
+                                                }
+                                                // A live network should not wait for WorkManager's next
+                                                // window. The persisted command still covers an abrupt
+                                                // response loss and replays with the same order id.
+                                                if (internetAvailable) {
+                                                    runCatching { NativePosSyncEngine(applicationContext).synchronize() }
+                                                }
+                                                checkout to database.checkoutStatus(checkout.operationId)
+                                            }
+                                            val (checkout, checkoutStatus) = checkoutAndStatus
+                                            val checkoutHardwareStatus = withContext(Dispatchers.IO) { hardware.status() }
+                                            hardwareStatus = checkoutHardwareStatus
+                                            val drawerMessage = if (checkoutRequest.paymentMethod == "cash" && checkoutHardwareStatus.cashDrawerConnected) {
+                                                withContext(Dispatchers.IO) {
+                                                    hardware.openCashDrawer().takeUnless { it.success }?.message
+                                                }
+                                            } else null
+                                            val autoPrintMessage = if (
+                                                checkoutStatus != "failed" &&
+                                                checkoutRequest.receiptDelivery == NativeReceiptDelivery.Print &&
+                                                    checkout.printJobId != null
+                                            ) {
+                                                executeReceiptPrint(checkout.printJobId)
+                                            } else {
+                                                null
+                                            }
+                                            if (internetAvailable && checkoutStatus == null) {
+                                                runCatching {
+                                                    withContext(Dispatchers.IO) {
+                                                        api.post(
+                                                            "/pos/orders/${checkout.orderId}/receipt-deliveries",
+                                                            JSONObject().apply {
+                                                                put("channel", checkoutRequest.receiptDelivery.wireValue)
+                                                                put("idempotencyKey", "receipt:${checkout.orderId}:${checkoutRequest.receiptDelivery.wireValue}:initial")
+                                                                if (checkoutRequest.receiptDelivery == NativeReceiptDelivery.Print) {
+                                                                    val printed = checkout.printJobId?.let(database::receiptPrintStatus) == "printed"
+                                                                    put("printStatus", if (printed) "sent" else "failed")
+                                                                    if (!printed) put("failureReason", "The native receipt print job is queued or failed.")
+                                                                }
+                                                            },
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            NativePosSyncWorker.schedule(applicationContext)
+                                            if (cartWriteGeneration.get() == checkoutGeneration) {
+                                                cart = NativePosCart.empty(cartAtCheckout.currency)
+                                            }
+                                            reload()
+                                            val saleMessage = when {
+                                                checkoutStatus == "failed" -> copy.saleNeedsReview
+                                                checkoutStatus == "pending" -> copy.saleQueuedOffline
+                                                checkoutRequest.paymentMethod == "later" -> copy.salePayLaterRecorded
+                                                checkoutRequest.paymentMethod != "cash" -> copy.saleAwaitingConfirmation
+                                                else -> copy.saleSubmittedOnline
+                                            }
+                                            message = when {
+                                                drawerMessage != null -> "$saleMessage $drawerMessage"
+                                                autoPrintMessage != null -> "$saleMessage $autoPrintMessage"
+                                                checkout.printJobId != null && checkoutStatus != "failed" -> "$saleMessage ${copy.receiptQueued}"
+                                                else -> saleMessage
+                                            }
+                                        } catch (error: Exception) {
+                                            val failure = error.userMessage(copy)
+                                            message = failure
+                                            checkoutFailure = failure
+                                        } finally {
+                                            busy = false
+                                        }
+                                    }
+                                },
+                                onSynchronize = ::synchronize,
+                            )
+                        }
+                    },
+                    moreContent = { overflowDestinations, onNavigateDestination ->
+                        NativeMoreView(
+                            copy,
+                            current = current,
+                            destination = moreDestination,
+                            overflowDestinations = overflowDestinations,
+                            onNavigateDestination = onNavigateDestination,
+                            language = pinLanguage,
+                            onSelectLanguage = ::selectLanguage,
+                            onLock = { unlocked = false },
+                            orders = moreOrders,
+                            statistics = moreStatistics,
+                            notifications = moreNotifications,
+                            terminalSettings = terminalSettings,
+                            terminalSettingsReady = terminalSettingsReady,
+                            checkoutSettings = checkoutSettings,
+                            hardwareStatus = hardwareStatus,
+                            hardwareDevices = hardwareDevices,
+                            bluetoothPrinters = bluetoothPrinters,
+                            lastHardwareScan = lastHardwareScan,
+                            receiptPrintQueue = receiptPrintQueue,
+                            receiptPrintPreferences = receiptPrintPreferences,
+                            canManageSensitiveHardware = current.terminal.role == "owner" || current.terminal.role == "manager",
+                            internetAvailable = internetAvailable,
+                            busy = busy,
+                            message = message,
+                            onNavigate = ::openMoreDestination,
+                            onStartIntake = { activeTab = NativePosTab.Intake },
+                            onStartIntakeForCustomer = { customer ->
+                                intakeCustomer = customer
+                                activeTab = NativePosTab.Intake
+                            },
+                            onStartSale = { activeTab = NativePosTab.Sale },
+                            onAddProduct = ::addProductToSale,
+                            onCreateCustomer = ::createCustomer,
+                            onOpenTicket = { ticket ->
+                                activeTab = NativePosTab.Tickets
+                                openTicket(ticket)
+                            },
+                            searchResults = moreSearchResults,
+                            onSearch = ::searchMore,
+                            onOpenSearchResult = ::openMoreSearchResult,
+                            onOpenOrder = ::openMoreOrder,
+                            orderDetail = moreOrderDetail,
+                            onRecordOrderCash = ::recordMoreOrderCash,
+                            onResolveManualPayment = ::resolveMoreManualPayment,
+                            onCreateRefund = ::createMoreRefund,
+                            onResolveRefund = ::resolveMoreRefund,
+                            onChangeOrderStatus = ::changeMoreOrderStatus,
+                            onMarkNotificationRead = ::markNotificationRead,
+                            onMarkAllNotificationsRead = ::markAllNotificationsRead,
+                            onArchiveNotification = ::archiveNotification,
+                            onSynchronize = ::synchronize,
+                            onPerformShiftAction = ::performShiftAction,
+                            onOpenRegister = ::openRegister,
+                            shiftData = moreShiftData,
+                            onCreateCashMovement = ::createCashMovement,
+                            onCloseRegister = ::closeRegister,
+                            onClockOut = ::clockOut,
+                            onSaveTerminalSettings = ::saveTerminalSettings,
+                            onRefreshHardware = ::refreshHardware,
+                            onTestHardwarePrinter = ::testHardwarePrinter,
+                            onTriggerHardwareScanner = ::triggerHardwareScanner,
+                            onConnectBuiltInHardware = ::connectBuiltInHardware,
+                            onRequestBluetoothPermissions = ::requestBluetoothPermissions,
+                            onRefreshBluetoothPrinters = ::refreshBluetoothPrinters,
+                            onBindBluetoothPrinter = ::bindBluetoothPrinter,
+                            onOpenDrawerFromHardwareSettings = ::openDrawerFromHardwareSettings,
+                            onPrintNextReceipt = ::printNextReceipt,
+                            onRetryFailedReceipt = ::retryFailedReceipt,
+                            statisticsPeriod = moreStatisticsPeriod,
+                            onStatisticsPeriodChange = { period ->
+                                moreStatisticsPeriod = period
+                                openMoreDestination(NativeMoreDestination.Statistics)
+                            },
+                        )
+                    },
+                )
+            }
+            scannerSession?.let { currentSession ->
+                NativeHardwareScannerSessionView(copy,
+                    session = currentSession,
+                    busy = busy,
+                    onClose = ::closeHardwareScannerSession,
+                )
+            }
+            checkoutFailure?.let { failure ->
+                NativeCashCheckoutFailureDialog(copy,
+                    message = failure,
+                    onDismiss = { checkoutFailure = null },
+                )
+            }
         }
     }
 }
@@ -2754,10 +2767,13 @@ private fun NativeHardwareScannerSessionView(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NativePosShell(
+internal fun NativePosShell(
     copy: NativePosCopy,
     current: NativePosSnapshot,
     activeTab: NativePosTab,
+    activeMoreDestination: NativeMoreDestination,
+    onNavigateMore: (NativeMoreDestination) -> Unit,
+    languageCode: String,
     internetAvailable: Boolean,
     offlineModeEnabled: Boolean,
     busy: Boolean,
@@ -2779,108 +2795,123 @@ private fun NativePosShell(
     onChangeTicketItemStatus: (NativeServiceTicket, NativeTicketItem, String) -> Unit,
     onAddTicketItemsToCart: (NativeServiceTicket, List<NativeTicketItem>) -> Unit,
     saleContent: @Composable () -> Unit,
-    moreContent: @Composable () -> Unit,
+    moreContent: @Composable (List<NativeNavigationDestination>, (NativeNavigationDestination) -> Unit) -> Unit,
 ) {
     val terminal = current.terminal ?: return
     val canManageSensitiveOperations = terminal.role == "owner" || terminal.role == "manager"
-    val screenClass = nativePosScreenClass()
-    val showNavigationRail = screenClass != NativePosScreenClass.Compact
-
-    Row(Modifier.fillMaxSize().background(POS_PAGE_BACKGROUND)) {
-        if (showNavigationRail) {
-            NativePosNavigationRail(copy, activeTab = activeTab, onSelectTab = onSelectTab)
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val expanded = maxWidth >= 840.dp
+        val showNavigationRail = maxWidth >= 600.dp
+        val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+        val itemHeight = (if (expanded) 56f else 64f) + (if (expanded) 20f else 32f) * (fontScale - 1f)
+        val navigation = nativeNavigationLayout(
+            if (showNavigationRail) maxHeight.value else maxWidth.value,
+            if (showNavigationRail) itemHeight else 76f * fontScale,
+            if (showNavigationRail) 80f else 0f,
+        )
+        LaunchedEffect(navigation.overflow.isEmpty(), activeTab, activeMoreDestination, busy) {
+            if (navigation.overflow.isEmpty() && activeTab == NativePosTab.More && activeMoreDestination == NativeMoreDestination.Menu && !busy) {
+                onSelectTab(NativePosTab.Workspace)
+            }
         }
-        Column(Modifier.weight(1f).fillMaxHeight()) {
-            TopAppBar(
-                title = {
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text(terminal.merchantName, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(terminal.branchName, color = POS_MUTED, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        val selectedNavigation = when (activeTab) {
+            NativePosTab.Workspace -> NativeNavigationDestination.Workspace
+            NativePosTab.Sale -> NativeNavigationDestination.Sale
+            NativePosTab.Intake -> NativeNavigationDestination.Intake
+            NativePosTab.Tickets -> NativeNavigationDestination.Tickets
+            NativePosTab.More -> when (activeMoreDestination) {
+                NativeMoreDestination.OrderDetail -> NativeNavigationDestination.Orders
+                NativeMoreDestination.Hardware -> NativeNavigationDestination.Settings
+                NativeMoreDestination.Menu -> NativeNavigationDestination.More
+                else -> NativeNavigationDestination.valueOf(activeMoreDestination.name)
+            }
+        }
+        fun navigate(item: NativeNavigationDestination) {
+            if (busy) return
+            when (item) {
+                NativeNavigationDestination.Workspace -> onSelectTab(NativePosTab.Workspace)
+                NativeNavigationDestination.Sale -> onSelectTab(NativePosTab.Sale)
+                NativeNavigationDestination.Intake -> onSelectTab(NativePosTab.Intake)
+                NativeNavigationDestination.Tickets -> onSelectTab(NativePosTab.Tickets)
+                NativeNavigationDestination.More -> onSelectTab(NativePosTab.More)
+                else -> { onSelectTab(NativePosTab.More); onNavigateMore(NativeMoreDestination.valueOf(item.name)) }
+            }
+        }
+        Row(Modifier.fillMaxSize().background(POS_PAGE_BACKGROUND)) {
+            if (showNavigationRail && !(activeTab == NativePosTab.More && activeMoreDestination in listOf(NativeMoreDestination.Settings, NativeMoreDestination.Hardware))) {
+                NativeAdaptiveNavigation(copy, navigation, selectedNavigation, true, expanded, itemHeight, ::navigate)
+            }
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+                TopAppBar(
+                    title = {
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(terminal.merchantName, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(terminal.branchName, color = POS_MUTED, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    },
+                    actions = {
+                        OutlinedButton(
+                            onClick = onToggleOfflineMode,
+                            enabled = !busy,
+                            modifier = Modifier.padding(end = 4.dp),
+                        ) { Text(if (offlineModeEnabled) copy.restoreOnline else copy.offlineDrill) }
+                        OutlinedButton(onClick = onLock, modifier = Modifier.padding(end = 8.dp)) { Text(copy.lock) }
+                    },
+                )
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    when (activeTab) {
+                        NativePosTab.Workspace -> NativeWorkspaceView(copy,
+                            current = current,
+                            internetAvailable = internetAvailable,
+                            busy = busy,
+                            message = message,
+                            onStartSale = { onSelectTab(NativePosTab.Sale) },
+                            onSynchronize = onSynchronize,
+                        )
+                        NativePosTab.Sale -> saleContent()
+                        NativePosTab.Intake -> NativeIntakeView(copy,
+                            customers = current.customers,
+                            tickets = current.tickets,
+                            preselectedCustomer = intakeCustomer,
+                            internetAvailable = internetAvailable,
+                            busy = busy,
+                            message = message,
+                            onCreateCustomer = onCreateCustomer,
+                            onCreateTicket = onCreateServiceTicket,
+                            onOpenTicket = { ticket ->
+                                onSelectTab(NativePosTab.Tickets)
+                                onOpenTicket(ticket)
+                            },
+                        )
+                        NativePosTab.Tickets -> NativeTicketsView(copy,
+                            customers = current.customers,
+                            timeZone = terminal.timeZone,
+                            language = languageCode,
+                            onCreate = { onSelectTab(NativePosTab.Intake) },
+                            onRefresh = onSynchronize,
+                            tickets = current.tickets,
+                            services = current.services,
+                            selectedDetail = selectedTicketDetail,
+                            internetAvailable = internetAvailable,
+                            busy = busy,
+                            message = message,
+                            onOpenTicket = onOpenTicket,
+                            onCloseTicket = onCloseTicket,
+                            onChangeTicketStatus = onChangeTicketStatus,
+                            onAddService = onAddServiceTicketItem,
+                            onUpdateItem = onUpdateServiceTicketItem,
+                            onDeleteItem = onDeleteServiceTicketItem,
+                            canManageSensitiveOperations = canManageSensitiveOperations,
+                            onChangeItemStatus = onChangeTicketItemStatus,
+                            onAddTicketItemsToCart = onAddTicketItemsToCart,
+                        )
+                        NativePosTab.More -> moreContent(navigation.overflow, ::navigate)
                     }
-                },
-                actions = {
-                    OutlinedButton(
-                        onClick = onToggleOfflineMode,
-                        enabled = !busy,
-                        modifier = Modifier.padding(end = 4.dp),
-                    ) { Text(if (offlineModeEnabled) copy.restoreOnline else copy.offlineDrill) }
-                    OutlinedButton(onClick = onLock, modifier = Modifier.padding(end = 8.dp)) { Text(copy.lock) }
-                },
-            )
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                when (activeTab) {
-                    NativePosTab.Workspace -> NativeWorkspaceView(copy,
-                        current = current,
-                        internetAvailable = internetAvailable,
-                        busy = busy,
-                        message = message,
-                        onStartSale = { onSelectTab(NativePosTab.Sale) },
-                        onSynchronize = onSynchronize,
-                    )
-                    NativePosTab.Sale -> saleContent()
-                    NativePosTab.Intake -> NativeIntakeView(copy,
-                        customers = current.customers,
-                        tickets = current.tickets,
-                        preselectedCustomer = intakeCustomer,
-                        internetAvailable = internetAvailable,
-                        busy = busy,
-                        message = message,
-                        onCreateCustomer = onCreateCustomer,
-                        onCreateTicket = onCreateServiceTicket,
-                        onOpenTicket = { ticket ->
-                            onSelectTab(NativePosTab.Tickets)
-                            onOpenTicket(ticket)
-                        },
-                    )
-                    NativePosTab.Tickets -> NativeTicketsView(copy,
-                        tickets = current.tickets,
-                        services = current.services,
-                        selectedDetail = selectedTicketDetail,
-                        internetAvailable = internetAvailable,
-                        busy = busy,
-                        message = message,
-                        onOpenTicket = onOpenTicket,
-                        onCloseTicket = onCloseTicket,
-                        onChangeTicketStatus = onChangeTicketStatus,
-                        onAddService = onAddServiceTicketItem,
-                        onUpdateItem = onUpdateServiceTicketItem,
-                        onDeleteItem = onDeleteServiceTicketItem,
-                        canManageSensitiveOperations = canManageSensitiveOperations,
-                        onChangeItemStatus = onChangeTicketItemStatus,
-                        onAddTicketItemsToCart = onAddTicketItemsToCart,
-                    )
-                    NativePosTab.More -> moreContent()
+                }
+                if (!showNavigationRail) {
+                    NativeAdaptiveNavigation(copy, navigation, selectedNavigation, false, false, itemHeight, ::navigate)
                 }
             }
-            if (!showNavigationRail) {
-                NativeBottomNavigation(copy, activeTab = activeTab, onSelectTab = onSelectTab)
-            }
-        }
-    }
-}
-
-@Composable
-private fun NativePosNavigationRail(copy: NativePosCopy, activeTab: NativePosTab, onSelectTab: (NativePosTab) -> Unit) {
-    NavigationRail(
-        modifier = Modifier.fillMaxHeight(),
-        containerColor = POS_PANEL_BACKGROUND,
-    ) {
-        Spacer(Modifier.height(12.dp))
-        NativePosTab.entries.forEach { tab ->
-            NavigationRailItem(
-                selected = activeTab == tab,
-                onClick = { onSelectTab(tab) },
-                icon = {
-                    Text(
-                        tab.symbol,
-                        color = if (activeTab == tab) POS_ACCENT else POS_MUTED,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                },
-                label = { Text(tab.label(copy)) },
-                alwaysShowLabel = true,
-            )
         }
     }
 }
@@ -3032,7 +3063,7 @@ private fun NativeIntakeView(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextField(
+                    NativePosInput(
                         value = draftQuery,
                         onValueChange = { draftQuery = it },
                         label = { Text(copy.lookupLabel) },
@@ -3309,8 +3340,8 @@ private fun NativeCreateCustomerDialog(
                 ) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(copy.customerInfo, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        TextField(value = name, onValueChange = { name = it }, label = { Text(copy.customerName) }, placeholder = { Text(copy.customerNamePlaceholder) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        TextField(value = phone, onValueChange = { phone = it }, label = { Text(copy.phoneNumber) }, placeholder = { Text(copy.phonePlaceholder) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = name, onValueChange = { name = it }, label = { Text(copy.customerName) }, placeholder = { Text(copy.customerNamePlaceholder) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = phone, onValueChange = { phone = it }, label = { Text(copy.phoneNumber) }, placeholder = { Text(copy.phonePlaceholder) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     }
                 }
                 Button(
@@ -3388,8 +3419,8 @@ private fun NativeCreateTicketDialog(
                     colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
                 ) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TextField(value = expectedPickupText, onValueChange = { expectedPickupText = it }, label = { Text(copy.expectedPickupField) }, placeholder = { Text("YYYY-MM-DD HH:mm") }, singleLine = true, enabled = !busy && internetAvailable, modifier = Modifier.fillMaxWidth())
-                        TextField(value = remark, onValueChange = { remark = it }, label = { Text(copy.remarkOptional) }, placeholder = { Text(copy.remarkPlaceholder) }, enabled = !busy && internetAvailable, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = expectedPickupText, onValueChange = { expectedPickupText = it }, label = { Text(copy.expectedPickupField) }, placeholder = { Text("YYYY-MM-DD HH:mm") }, singleLine = true, enabled = !busy && internetAvailable, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = remark, onValueChange = { remark = it }, label = { Text(copy.remarkOptional) }, placeholder = { Text(copy.remarkPlaceholder) }, enabled = !busy && internetAvailable, modifier = Modifier.fillMaxWidth())
                     }
                 }
                 if (!internetAvailable) Text(copy.ticketNeedsNetwork, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
@@ -3462,6 +3493,11 @@ private fun SelectedReferenceCard(copy: NativePosCopy, label: String, primary: S
 private fun NativeTicketsView(
     copy: NativePosCopy,
     tickets: List<NativeServiceTicket>,
+    customers: List<NativeCustomer>,
+    timeZone: String,
+    language: String,
+    onCreate: () -> Unit,
+    onRefresh: () -> Unit,
     services: List<NativeService>,
     selectedDetail: NativeTicketDetail?,
     internetAvailable: Boolean,
@@ -3495,38 +3531,7 @@ private fun NativeTicketsView(
         )
         return
     }
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(copy.ticketsTitle, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        if (tickets.isEmpty()) {
-            Text(copy.ticketsEmpty, color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
-        }
-        tickets.forEach { ticket ->
-            TicketCard(copy, ticket = ticket, busy = busy, onOpen = { onOpenTicket(ticket) })
-        }
-        message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
-    }
-}
-
-@Composable
-private fun TicketCard(copy: NativePosCopy, ticket: NativeServiceTicket, busy: Boolean, onOpen: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(ticket.ticketNo ?: copy.serviceTicket, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(ticketStatusLabel(ticket.ticketStatus, copy), color = POS_ACCENT, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-            }
-            Text(ticket.customerName, color = POS_INK, style = MaterialTheme.typography.bodyMedium)
-            Text("${copy.itemsCountSuffix.format(ticket.itemCount)} · ${formatMoney(ticket.totalMinor, ticket.currency)} · ${ticket.priorityLabel(copy)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-            OutlinedButton(onClick = onOpen, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.openTicket) }
-        }
-    }
+    NativeTicketList(copy, tickets, customers, timeZone, language, busy, internetAvailable, message, onOpenTicket, onCreate, onRefresh)
 }
 
 @Composable
@@ -3605,7 +3610,7 @@ private fun NativeTicketDetailView(
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(copy.ticketFlow, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     if ("cancelled" in targets) {
-                        TextField(
+                        NativePosInput(
                             value = cancelReason,
                             onValueChange = { cancelReason = it },
                             label = { Text(copy.cancelReasonRequired) },
@@ -3701,14 +3706,14 @@ private fun NativeTicketDetailView(
                             appendItemType = ""
                         }) { Text(copy.changeItemType) }
                         if (appendService.pricingUnit == "per_kg") {
-                            TextField(
+                            NativePosInput(
                                 value = appendWeightText,
                                 onValueChange = { appendWeightText = it.filter { char -> char.isDigit() || char == '.' } },
                                 label = { Text(copy.weightKg) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
-                            TextField(
+                            NativePosInput(
                                 value = appendBagCountText,
                                 onValueChange = { appendBagCountText = it.filter(Char::isDigit) },
                                 label = { Text(copy.bagCount) },
@@ -3716,7 +3721,7 @@ private fun NativeTicketDetailView(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         } else {
-                            TextField(
+                            NativePosInput(
                                 value = appendQuantityText,
                                 onValueChange = { appendQuantityText = it.filter(Char::isDigit) },
                                 label = { Text(copy.quantityPieces) },
@@ -3724,13 +3729,13 @@ private fun NativeTicketDetailView(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
-                        TextField(value = appendCategory, onValueChange = { appendCategory = it }, label = { Text(copy.categoryOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        TextField(value = appendColor, onValueChange = { appendColor = it }, label = { Text(copy.colorOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        TextField(value = appendBrand, onValueChange = { appendBrand = it }, label = { Text(copy.brandOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        TextField(value = appendMaterial, onValueChange = { appendMaterial = it }, label = { Text(copy.materialOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        TextField(value = appendDefectNotes, onValueChange = { appendDefectNotes = it }, label = { Text(copy.defectsOptional) }, modifier = Modifier.fillMaxWidth())
-                        TextField(value = appendSpecialRequest, onValueChange = { appendSpecialRequest = it }, label = { Text(copy.specialRequestOptional) }, modifier = Modifier.fillMaxWidth())
-                        TextField(value = appendRemark, onValueChange = { appendRemark = it }, label = { Text(copy.itemNoteOptional) }, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = appendCategory, onValueChange = { appendCategory = it }, label = { Text(copy.categoryOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = appendColor, onValueChange = { appendColor = it }, label = { Text(copy.colorOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = appendBrand, onValueChange = { appendBrand = it }, label = { Text(copy.brandOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = appendMaterial, onValueChange = { appendMaterial = it }, label = { Text(copy.materialOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = appendDefectNotes, onValueChange = { appendDefectNotes = it }, label = { Text(copy.defectsOptional) }, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = appendSpecialRequest, onValueChange = { appendSpecialRequest = it }, label = { Text(copy.specialRequestOptional) }, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = appendRemark, onValueChange = { appendRemark = it }, label = { Text(copy.itemNoteOptional) }, modifier = Modifier.fillMaxWidth())
                         Button(
                             onClick = {
                                 onAddService(
@@ -3905,7 +3910,7 @@ private fun TicketItemCard(
             }
         }
         if (deletionOpen) {
-            TextField(
+            NativePosInput(
                 value = deletionReason,
                 onValueChange = { deletionReason = it },
                 label = { Text(copy.deleteReasonRequired) },
@@ -3984,19 +3989,19 @@ private fun NativeTicketItemEditView(
         }
         selectedService?.let { service ->
             if (service.pricingUnit == "per_kg") {
-                TextField(value = weightText, onValueChange = { weightText = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text(copy.weightKg) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                TextField(value = bagCountText, onValueChange = { bagCountText = it.filter(Char::isDigit) }, label = { Text(copy.bagCount) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                NativePosInput(value = weightText, onValueChange = { weightText = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text(copy.weightKg) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                NativePosInput(value = bagCountText, onValueChange = { bagCountText = it.filter(Char::isDigit) }, label = { Text(copy.bagCount) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             } else {
-                TextField(value = quantityText, onValueChange = { quantityText = it.filter(Char::isDigit) }, label = { Text(copy.quantityPieces) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                NativePosInput(value = quantityText, onValueChange = { quantityText = it.filter(Char::isDigit) }, label = { Text(copy.quantityPieces) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             }
         }
-        TextField(value = category, onValueChange = { category = it }, label = { Text(copy.categoryOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        TextField(value = color, onValueChange = { color = it }, label = { Text(copy.colorOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        TextField(value = brand, onValueChange = { brand = it }, label = { Text(copy.brandOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        TextField(value = material, onValueChange = { material = it }, label = { Text(copy.materialOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        TextField(value = defectNotes, onValueChange = { defectNotes = it }, label = { Text(copy.defectsOptional) }, modifier = Modifier.fillMaxWidth())
-        TextField(value = specialRequest, onValueChange = { specialRequest = it }, label = { Text(copy.specialRequestOptional) }, modifier = Modifier.fillMaxWidth())
-        TextField(value = remark, onValueChange = { remark = it }, label = { Text(copy.itemNoteOptional) }, modifier = Modifier.fillMaxWidth())
+        NativePosInput(value = category, onValueChange = { category = it }, label = { Text(copy.categoryOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        NativePosInput(value = color, onValueChange = { color = it }, label = { Text(copy.colorOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        NativePosInput(value = brand, onValueChange = { brand = it }, label = { Text(copy.brandOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        NativePosInput(value = material, onValueChange = { material = it }, label = { Text(copy.materialOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        NativePosInput(value = defectNotes, onValueChange = { defectNotes = it }, label = { Text(copy.defectsOptional) }, modifier = Modifier.fillMaxWidth())
+        NativePosInput(value = specialRequest, onValueChange = { specialRequest = it }, label = { Text(copy.specialRequestOptional) }, modifier = Modifier.fillMaxWidth())
+        NativePosInput(value = remark, onValueChange = { remark = it }, label = { Text(copy.itemNoteOptional) }, modifier = Modifier.fillMaxWidth())
         Button(
             onClick = {
                 selectedService?.let { service ->
@@ -4024,13 +4029,14 @@ private fun NativeTicketItemEditView(
     }
 }
 
-private fun ticketStatusLabel(status: String, copy: NativePosCopy): String = when (status) {
+internal fun ticketStatusLabel(status: String, copy: NativePosCopy): String = when (status) {
     "draft" -> copy.ticketDraft
     "pending" -> copy.ticketPending
     "in_progress" -> copy.ticketInProgress
     "ready_to_pick" -> copy.ticketReadyToPick
     "picked_up" -> copy.ticketPickedUp
     "cancelled" -> copy.ticketCancelled
+    "exception" -> copy.ticketException
     else -> copy.ticketUnknown
 }
 
@@ -4050,7 +4056,7 @@ private fun ticketItemTypeLabel(type: String, copy: NativePosCopy): String = whe
     else -> type
 }
 
-private fun NativeServiceTicket.priorityLabel(copy: NativePosCopy): String = when (priority) {
+internal fun NativeServiceTicket.priorityLabel(copy: NativePosCopy): String = when (priority) {
     "critical" -> copy.priorityCritical
     "urgent" -> copy.priorityUrgent
     else -> copy.priorityNormal
@@ -4061,16 +4067,23 @@ private fun NativeMoreView(
     copy: NativePosCopy,
     current: NativePosSnapshot,
     destination: NativeMoreDestination,
+    overflowDestinations: List<NativeNavigationDestination>,
+    onNavigateDestination: (NativeNavigationDestination) -> Unit,
+    language: NativePinLanguage,
+    onSelectLanguage: (NativePinLanguage) -> Unit,
+    onLock: () -> Unit,
     orders: List<NativeMoreOrder>,
     statistics: NativeMoreStatistics?,
     notifications: List<NativeMoreNotification>,
     terminalSettings: NativeTerminalSettingsSummary?,
+    terminalSettingsReady: Boolean,
     checkoutSettings: NativeCheckoutSettings,
     hardwareStatus: NativeHardwareStatus?,
     hardwareDevices: List<NativeHardwareDevice>,
     bluetoothPrinters: List<NativeBluetoothPrinter>,
     lastHardwareScan: NativeHardwareScan?,
     receiptPrintQueue: NativeReceiptPrintQueueState,
+    receiptPrintPreferences: NativeReceiptPrintSettings,
     canManageSensitiveHardware: Boolean,
     internetAvailable: Boolean,
     busy: Boolean,
@@ -4102,7 +4115,7 @@ private fun NativeMoreView(
     onCreateCashMovement: (String, String, String) -> Unit,
     onCloseRegister: (String, String) -> Unit,
     onClockOut: () -> Unit,
-    onSaveTerminalSettings: (String, String, Boolean, String, String) -> Unit,
+    onSaveTerminalSettings: (NativeTerminalSettingsPatch) -> Unit,
     onRefreshHardware: () -> Unit,
     onTestHardwarePrinter: () -> Unit,
     onTriggerHardwareScanner: () -> Unit,
@@ -4112,21 +4125,27 @@ private fun NativeMoreView(
     onBindBluetoothPrinter: (NativeHardwareDevice, NativeBluetoothPrinter) -> Unit,
     onOpenDrawerFromHardwareSettings: () -> Unit,
     onPrintNextReceipt: () -> Unit,
+    onRetryFailedReceipt: () -> Unit,
     statisticsPeriod: String,
     onStatisticsPeriodChange: (String) -> Unit,
 ) {
+    fun backToMenu() {
+        if (overflowDestinations.isEmpty()) onNavigateDestination(NativeNavigationDestination.Workspace)
+        else onNavigate(NativeMoreDestination.Menu)
+    }
     when (destination) {
         NativeMoreDestination.Menu -> NativeMoreMenuView(copy,
             current = current,
             busy = busy,
             message = message,
-            onNavigate = onNavigate,
+            destinations = overflowDestinations,
+            onNavigate = onNavigateDestination,
         )
         NativeMoreDestination.Customers -> NativeMoreCustomersView(copy,
             customers = current.customers,
             busy = busy,
             message = message,
-            onBack = { onNavigate(NativeMoreDestination.Menu) },
+            onBack = ::backToMenu,
             onStartIntake = onStartIntake,
             onStartIntakeForCustomer = onStartIntakeForCustomer,
             onCreateCustomer = onCreateCustomer,
@@ -4137,7 +4156,7 @@ private fun NativeMoreView(
             internetAvailable = internetAvailable,
             busy = busy,
             message = message,
-            onBack = { onNavigate(NativeMoreDestination.Menu) },
+            onBack = ::backToMenu,
             onStartSale = onStartSale,
             onAddProduct = onAddProduct,
         )
@@ -4146,7 +4165,7 @@ private fun NativeMoreView(
             busy = busy,
             message = message,
             hardwareScan = lastHardwareScan,
-            onBack = { onNavigate(NativeMoreDestination.Menu) },
+            onBack = ::backToMenu,
             onOpenTicket = onOpenTicket,
             onStartIntakeForCustomer = onStartIntakeForCustomer,
             onAddProduct = onAddProduct,
@@ -4159,7 +4178,7 @@ private fun NativeMoreView(
             orders = orders,
             busy = busy,
             message = message,
-            onBack = { onNavigate(NativeMoreDestination.Menu) },
+            onBack = ::backToMenu,
             onRefresh = { onNavigate(NativeMoreDestination.Orders) },
             onOpenOrder = onOpenOrder,
         )
@@ -4181,7 +4200,7 @@ private fun NativeMoreView(
             statistics = statistics,
             busy = busy,
             message = message,
-            onBack = { onNavigate(NativeMoreDestination.Menu) },
+            onBack = ::backToMenu,
             onRefresh = { onNavigate(NativeMoreDestination.Statistics) },
             period = statisticsPeriod,
             onPeriodChange = onStatisticsPeriodChange,
@@ -4191,7 +4210,7 @@ private fun NativeMoreView(
             internetAvailable = internetAvailable,
             busy = busy,
             message = message,
-            onBack = { onNavigate(NativeMoreDestination.Menu) },
+            onBack = ::backToMenu,
             onRefresh = { onNavigate(NativeMoreDestination.Notifications) },
             onMarkRead = onMarkNotificationRead,
             onMarkAllRead = onMarkAllNotificationsRead,
@@ -4210,7 +4229,7 @@ private fun NativeMoreView(
             current = current,
             busy = busy,
             message = message,
-            onBack = { onNavigate(NativeMoreDestination.Menu) },
+            onBack = ::backToMenu,
             onRefresh = { onNavigate(NativeMoreDestination.Shift) },
             onSynchronize = onSynchronize,
             shiftData = shiftData,
@@ -4221,13 +4240,25 @@ private fun NativeMoreView(
             onCloseRegister = onCloseRegister,
             onClockOut = onClockOut,
         )
-        NativeMoreDestination.Settings -> NativeMoreSettingsView(copy,
-            terminal = current.terminal,
+        NativeMoreDestination.Settings -> NativeSettingsWorkspace(copy,
+            current = current,
+            receiptPrintQueue = receiptPrintQueue,
+            receiptPrintSettings = receiptPrintPreferences,
+            language = language,
+            internetAvailable = internetAvailable,
+            onSelectLanguage = onSelectLanguage,
+            onSynchronize = onSynchronize,
+            onLock = onLock,
+            onTestPrinter = onTestHardwarePrinter,
+            onPrintNextReceipt = onPrintNextReceipt,
+            onRetryFailedReceipt = onRetryFailedReceipt,
+            backLabel = if (overflowDestinations.isEmpty()) copy.tabWorkspace else copy.backToMore,
             settings = terminalSettings,
+            settingsReady = terminalSettingsReady,
             checkoutSettings = checkoutSettings,
             busy = busy,
             message = message,
-            onBack = { onNavigate(NativeMoreDestination.Menu) },
+            onBack = ::backToMenu,
             onRefresh = { onNavigate(NativeMoreDestination.Settings) },
             onSave = onSaveTerminalSettings,
             onOpenHardware = { onNavigate(NativeMoreDestination.Hardware) },
@@ -4413,7 +4444,7 @@ private fun NativeShiftHandoverView(
 
                     if (!data.registerOpen || (personalCash && !data.cashSessionOpen)) {
                         if (trackedCash) {
-                            TextField(
+                            NativePosInput(
                                 value = openingFloat,
                                 onValueChange = {
                                     openingFloat = it.filter { char -> char.isDigit() || char == '.' }
@@ -4454,8 +4485,8 @@ private fun NativeShiftHandoverView(
 
                         if (data.cashSessionOpen) {
                             Text(copy.cashInOut, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            TextField(value = movementAmount, onValueChange = { movementAmount = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text(copy.amountLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            TextField(value = movementReason, onValueChange = { movementReason = it; localFeedback = null }, label = { Text(copy.reasonLabel) }, modifier = Modifier.fillMaxWidth())
+                            NativePosInput(value = movementAmount, onValueChange = { movementAmount = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text(copy.amountLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            NativePosInput(value = movementReason, onValueChange = { movementReason = it; localFeedback = null }, label = { Text(copy.reasonLabel) }, modifier = Modifier.fillMaxWidth())
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedButton(
                                     onClick = {
@@ -4503,7 +4534,7 @@ private fun NativeShiftHandoverView(
                             } else {
                                 Text(copy.closeRegisterHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                                 if (data.cashSessionOpen) {
-                                    TextField(
+                                    NativePosInput(
                                         value = countedCash,
                                         onValueChange = { countedCash = it.filter { char -> char.isDigit() || char == '.' }; localFeedback = null },
                                         label = { Text(if (data.requireClosingCount) copy.countedCashRequired else copy.countedCashOptional) },
@@ -4511,7 +4542,7 @@ private fun NativeShiftHandoverView(
                                         modifier = Modifier.fillMaxWidth(),
                                     )
                                 }
-                                TextField(value = closeNotes, onValueChange = { closeNotes = it }, label = { Text(copy.handoverNotes) }, modifier = Modifier.fillMaxWidth())
+                                NativePosInput(value = closeNotes, onValueChange = { closeNotes = it }, label = { Text(copy.handoverNotes) }, modifier = Modifier.fillMaxWidth())
                                 Button(
                                     onClick = {
                                         if (data.cashSessionOpen && data.requireClosingCount && countedCash.isBlank()) {
@@ -4628,87 +4659,23 @@ private fun NativeShiftFeedback(message: String) {
 }
 
 @Composable
-private fun NativeMoreMenuView(
-    copy: NativePosCopy,
-    current: NativePosSnapshot,
-    busy: Boolean,
-    message: String?,
-    onNavigate: (NativeMoreDestination) -> Unit,
-) {
-    val terminal = current.terminal
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(
-                    terminal?.merchantName.orEmpty(),
-                    color = POS_INK,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    terminal?.branchName.orEmpty(),
-                    color = POS_MUTED,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+internal fun NativeMoreMenuView(copy: NativePosCopy, current: NativePosSnapshot, busy: Boolean, message: String?,
+    destinations: List<NativeNavigationDestination>, onNavigate: (NativeNavigationDestination) -> Unit) {
+    LazyColumn(Modifier.fillMaxSize().padding(20.dp)) {
+        item {
+            Text(copy.tabMore, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(current.terminal?.branchName.orEmpty(), color = POS_MUTED, modifier = Modifier.padding(top = 6.dp, bottom = 20.dp))
+        }
+        items(destinations, key = { it.name }) { destination ->
+            Row(Modifier.fillMaxWidth().background(POS_PANEL_BACKGROUND).clickable(enabled = !busy) { onNavigate(destination) }.padding(18.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                NativeNavigationGlyph(destination)
+                Text(destination.title(copy), color = POS_INK, modifier = Modifier.weight(1f))
+                Text("›", color = POS_MUTED)
             }
-            Text(copy.tabMore, color = POS_MUTED, style = MaterialTheme.typography.labelLarge)
+            HorizontalDivider(color = POS_BORDER)
         }
-        Spacer(Modifier.height(8.dp))
-        NativeMoreNavigationRow(copy.scanLabel, "▣", NativeMoreDestination.Scan, busy, onNavigate)
-        NativeMoreNavigationRow(copy.menuCustomers, "◉", NativeMoreDestination.Customers, busy, onNavigate)
-        NativeMoreNavigationRow(copy.productsServices, "□", NativeMoreDestination.Catalog, busy, onNavigate)
-        NativeMoreNavigationRow(copy.menuOrders, "▤", NativeMoreDestination.Orders, busy, onNavigate)
-        NativeMoreNavigationRow(copy.statisticsShort, "◫", NativeMoreDestination.Statistics, busy, onNavigate)
-        NativeMoreNavigationRow(copy.menuShift, "⇄", NativeMoreDestination.Shift, busy, onNavigate)
-        NativeMoreNavigationRow(copy.menuNotifications, "●", NativeMoreDestination.Notifications, busy, onNavigate)
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE5DFE8))
-        NativeMoreNavigationRow(copy.settingsShort, "⚙", NativeMoreDestination.Settings, busy, onNavigate)
-        message?.let {
-            Text(
-                it,
-                modifier = Modifier.padding(top = 12.dp, start = 4.dp, end = 4.dp),
-                color = POS_MUTED,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-    }
-}
-
-@Composable
-private fun NativeMoreNavigationRow(
-    title: String,
-    symbol: String,
-    destination: NativeMoreDestination,
-    busy: Boolean,
-    onNavigate: (NativeMoreDestination) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(enabled = !busy) { onNavigate(destination) }
-            .padding(horizontal = 8.dp, vertical = 15.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Surface(
-            modifier = Modifier.size(36.dp),
-            shape = RoundedCornerShape(12.dp),
-            color = POS_PANEL_BACKGROUND,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(symbol, color = POS_ACCENT, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            }
-        }
-        Text(title, modifier = Modifier.weight(1f), color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-        Text("›", color = POS_MUTED, style = MaterialTheme.typography.headlineSmall)
+        message?.let { item { Text(it, color = POS_MUTED, modifier = Modifier.padding(top = 16.dp)) } }
     }
 }
 
@@ -4734,7 +4701,7 @@ private fun NativeMoreCustomersView(
     }
     NativeMorePage(copy, copy.menuCustomers, onBack) {
         Text(copy.customersCachedHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-        TextField(value = query, onValueChange = { query = it }, label = { Text(copy.nameAccountOrPhone) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        NativePosInput(value = query, onValueChange = { query = it }, label = { Text(copy.nameAccountOrPhone) }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { creating = !creating }, enabled = !busy, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT)) { Text(if (creating) copy.collapseRegistration else copy.newCustomerToggle) }
             OutlinedButton(onClick = onStartIntake, enabled = !busy, modifier = Modifier.weight(1f)) { Text(copy.newServiceTicket) }
@@ -4743,8 +4710,8 @@ private fun NativeMoreCustomersView(
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(copy.customerRegistration, color = POS_INK, fontWeight = FontWeight.SemiBold)
-                    TextField(value = name, onValueChange = { name = it }, label = { Text(copy.customerName) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    TextField(value = phone, onValueChange = { phone = it }, label = { Text(copy.phoneNumber) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    NativePosInput(value = name, onValueChange = { name = it }, label = { Text(copy.customerName) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    NativePosInput(value = phone, onValueChange = { phone = it }, label = { Text(copy.phoneNumber) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     Button(
                         onClick = { onCreateCustomer(name, phone) },
                         enabled = !busy && name.isNotBlank() && phone.isNotBlank(),
@@ -4844,7 +4811,7 @@ private fun NativeMoreScanView(
     val customerMatches = current.customers.filter { keyword.isNotBlank() && (it.fullName.lowercase().contains(keyword) || it.phone.orEmpty().contains(keyword)) }
     NativeMorePage(copy, copy.menuScan, onBack) {
         Text(copy.scanIntro, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-        TextField(value = query, onValueChange = { query = it }, label = { Text(copy.scanOrType) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        NativePosInput(value = query, onValueChange = { query = it }, label = { Text(copy.scanOrType) }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { onSearch(query) }, enabled = !busy && keyword.isNotBlank(), modifier = Modifier.weight(1f)) { Text(if (busy) copy.searching else copy.searchOnline) }
             OutlinedButton(onClick = onTriggerHardwareScanner, enabled = !busy, modifier = Modifier.weight(1f)) { Text(copy.startBuiltInScanner) }
@@ -4953,7 +4920,7 @@ private fun NativeMoreOrderDetailView(
                     Text(copy.cashCollection, color = POS_INK, fontWeight = FontWeight.SemiBold)
                     Text(copy.outstandingHint.format("$outstanding ${order.currency}"), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     if (showTenderInput) {
-                        TextField(value = tendered, onValueChange = { tendered = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text(copy.tenderedForChange) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = tendered, onValueChange = { tendered = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text(copy.tenderedForChange) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         TextButton(onClick = { tendered = ""; showTenderInput = false }) { Text(copy.chargeOutstanding) }
                     } else {
                         Text(copy.defaultChargeOutstanding, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
@@ -4990,7 +4957,7 @@ private fun NativeMoreOrderDetailView(
                 if (payment.status == "pending" && payment.method == "app" && canResolveManualPayments) {
                     Text(copy.paymentReferenceLine.format(payment.externalReference.orEmpty()), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     if (resolutionPaymentId == payment.id) {
-                        TextField(value = resolutionReason, onValueChange = { resolutionReason = it }, label = { Text(copy.manualPaymentReason) }, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = resolutionReason, onValueChange = { resolutionReason = it }, label = { Text(copy.manualPaymentReason) }, modifier = Modifier.fillMaxWidth())
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { onResolveManualPayment(order, payment, true, resolutionReason); resolutionPaymentId = null }, enabled = internetAvailable && !busy && resolutionReason.trim().length >= 3, modifier = Modifier.weight(1f)) { Text(copy.confirmManualPayment) }
                             OutlinedButton(onClick = { onResolveManualPayment(order, payment, false, resolutionReason); resolutionPaymentId = null }, enabled = internetAvailable && !busy && resolutionReason.trim().length >= 3, modifier = Modifier.weight(1f)) { Text(copy.failManualPayment) }
@@ -5008,8 +4975,8 @@ private fun NativeMoreOrderDetailView(
                         if (refundPaymentId == payment.id) {
                             Text(copy.refundLimit.format("${refundMinorToMoney(refundableMinor)} ${order.currency}"), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                             if (payment.method == "cash") Text(copy.cashRefundHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                            TextField(value = refundAmount, onValueChange = { refundAmount = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text(copy.refundAmountLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            TextField(value = refundReason, onValueChange = { refundReason = it }, label = { Text(copy.refundReasonLabel) }, modifier = Modifier.fillMaxWidth())
+                            NativePosInput(value = refundAmount, onValueChange = { refundAmount = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text(copy.refundAmountLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            NativePosInput(value = refundReason, onValueChange = { refundReason = it }, label = { Text(copy.refundReasonLabel) }, modifier = Modifier.fillMaxWidth())
                             Button(
                                 onClick = { onCreateRefund(order, payment, refundAmount, refundReason); refundPaymentId = null },
                                 enabled = internetAvailable && !busy && (parseMoney(refundAmount)?.let { it in 1..refundableMinor } == true) && refundReason.trim().isNotEmpty(),
@@ -5032,8 +4999,8 @@ private fun NativeMoreOrderDetailView(
                 NativeReferenceRow(copy.refundAmountLabel, "${adjustment.status} · ${adjustment.reason}", "${adjustment.amount} ${order.currency}")
                 if (adjustment.status != "succeeded" && canResolveManualPayments) {
                     if (refundAdjustmentId == adjustment.id) {
-                        TextField(value = refundReference, onValueChange = { refundReference = it }, label = { Text(copy.refundReferenceLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        TextField(value = refundResolutionReason, onValueChange = { refundResolutionReason = it }, label = { Text(copy.refundReasonLabel) }, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = refundReference, onValueChange = { refundReference = it }, label = { Text(copy.refundReferenceLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = refundResolutionReason, onValueChange = { refundResolutionReason = it }, label = { Text(copy.refundReasonLabel) }, modifier = Modifier.fillMaxWidth())
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { onResolveRefund(order, adjustment, true, refundReference, refundResolutionReason); refundAdjustmentId = null }, enabled = internetAvailable && !busy && refundReference.trim().isNotEmpty() && refundResolutionReason.trim().length >= 3, modifier = Modifier.weight(1f)) { Text(copy.refundSettledAction) }
                             if (adjustment.status == "pending") OutlinedButton(onClick = { onResolveRefund(order, adjustment, false, "", refundResolutionReason); refundAdjustmentId = null }, enabled = internetAvailable && !busy && refundResolutionReason.trim().length >= 3, modifier = Modifier.weight(1f)) { Text(copy.refundFailedAction) }
@@ -5121,100 +5088,6 @@ private fun NativeMoreNotificationsView(
 }
 
 @Composable
-private fun NativeMoreSettingsView(
-    copy: NativePosCopy,
-    terminal: NativeTerminal?,
-    settings: NativeTerminalSettingsSummary?,
-    checkoutSettings: NativeCheckoutSettings,
-    busy: Boolean,
-    message: String?,
-    onBack: () -> Unit,
-    onRefresh: () -> Unit,
-    onSave: (String, String, Boolean, String, String) -> Unit,
-    onOpenHardware: () -> Unit,
-) {
-    var label by remember { mutableStateOf(settings?.label.orEmpty()) }
-    var lockTimeout by remember { mutableStateOf(settings?.lockTimeoutSeconds?.toString().orEmpty()) }
-    var autoPrint by remember { mutableStateOf(settings?.autoPrintReceipt ?: false) }
-    var printCopies by remember { mutableStateOf(settings?.printCopies?.coerceIn(1, 3)?.toString() ?: "1") }
-    var roundingRule by remember { mutableStateOf(settings?.roundingRule ?: "none") }
-    LaunchedEffect(settings?.label, settings?.lockTimeoutSeconds, settings?.autoPrintReceipt, settings?.printCopies, settings?.roundingRule) {
-        settings?.let {
-            label = it.label.orEmpty()
-            lockTimeout = it.lockTimeoutSeconds.toString()
-            autoPrint = it.autoPrintReceipt
-            printCopies = it.printCopies.coerceIn(1, 3).toString()
-            roundingRule = it.roundingRule
-        }
-    }
-    NativeMorePage(copy, copy.menuSettings, onBack) {
-        OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) copy.loading else copy.refreshTerminalSettings) }
-        terminal?.let { NativeReferenceRow(copy.terminalLabel, it.terminalId, it.branchName) }
-        val receiptProfile = checkoutSettings.receiptProfile
-        receiptProfile.name?.let { NativeReferenceRow(copy.receiptNameLabel, it, null) }
-        receiptProfile.phone?.let { NativeReferenceRow(copy.receiptPhoneLabel, it, null) }
-        receiptProfile.address?.let { NativeReferenceRow(copy.receiptAddressLabel, it, null) }
-        NativeReferenceRow(copy.paymentMethodsLabel, checkoutSettings.paymentMethodsEnabled.joinToString(", ") { method ->
-            if (method == "app") checkoutSettings.mobileMoneyProvidersEnabled.joinToString(" / ").ifBlank { method } else method
-        }.ifBlank { copy.noPaymentMethods }, null)
-        NativeReferenceRow(copy.taxSettingsLabel,
-            if (checkoutSettings.taxEnabled) "${formatNativeTaxRate(checkoutSettings.defaultTaxRate)} · ${if (checkoutSettings.pricesIncludeTax) copy.pricesIncludeTax else copy.pricesExcludeTax}"
-            else copy.taxDisabled,
-            checkoutSettings.taxRegistrationNumber,
-        )
-        Card(
-            modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { onOpenHardware() },
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
-        ) {
-            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(copy.printerDrawerScanner, color = POS_INK, fontWeight = FontWeight.SemiBold)
-                Text(copy.hardwareSettingsHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                Text(copy.openHardwareSettings, color = POS_ACCENT, style = MaterialTheme.typography.labelMedium)
-            }
-        }
-        if (settings != null) {
-            val value = settings
-            NativeReferenceRow(copy.cashHandlingMode, value.cashHandlingMode, null)
-            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
-                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(copy.terminalPreferences, color = POS_INK, fontWeight = FontWeight.SemiBold)
-                    TextField(value = label, onValueChange = { label = it }, label = { Text(copy.terminalName) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    TextField(value = lockTimeout, onValueChange = { lockTimeout = it.filter(Char::isDigit) }, label = { Text(copy.autoLockSeconds) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    Text(copy.autoPrintCopies, color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("1", "2", "3").forEach { value ->
-                            val optionLabel = copy.copiesSuffix.format(value)
-                            OutlinedButton(onClick = { printCopies = value }, modifier = Modifier.weight(1f)) { Text(if (printCopies == value) "✓ $optionLabel" else optionLabel) }
-                        }
-                    }
-                    Text(copy.receiptPrinting, color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { autoPrint = true }, modifier = Modifier.weight(1f)) { Text(if (autoPrint) "✓ ${copy.autoPrintOption}" else copy.autoPrintOption) }
-                        OutlinedButton(onClick = { autoPrint = false }, modifier = Modifier.weight(1f)) { Text(if (!autoPrint) "✓ ${copy.manualPrintOption}" else copy.manualPrintOption) }
-                    }
-                    Text(copy.cashRounding, color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("none" to copy.roundingNone, "round_jiao" to copy.roundingJiao, "round_yuan" to copy.roundingYuan).forEach { (rule, optionLabel) ->
-                            OutlinedButton(onClick = { roundingRule = rule }) { Text(if (roundingRule == rule) "✓ $optionLabel" else optionLabel) }
-                        }
-                    }
-                    Button(
-                        onClick = { onSave(label, lockTimeout, autoPrint, printCopies, roundingRule) },
-                        enabled = !busy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text(if (busy) copy.saving else copy.saveTerminalSettings) }
-                }
-            }
-            NativeReferenceRow(copy.syncStatus, value.syncStatus, value.lastSyncError)
-        } else if (!busy) {
-            Text(copy.settingsWhenOnline, color = POS_MUTED)
-        }
-        message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
-    }
-}
-
-@Composable
 private fun NativeMoreHardwareView(
     copy: NativePosCopy,
     hardwareStatus: NativeHardwareStatus?,
@@ -5243,7 +5116,7 @@ private fun NativeMoreHardwareView(
     val externalPrinterTargets = configuredDevices.filter {
         it.deviceType == "printer" && it.status == "active" && it.provisioningMode != "built_in"
     }
-    NativeMorePage(copy, copy.menuHardware, onBack) {
+    NativeMorePage(copy, copy.menuHardware, onBack, backLabel = copy.menuSettings) {
         Text(copy.hardwareIntro, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
             Text(if (busy) copy.detecting else copy.refreshHardware)
@@ -5415,12 +5288,12 @@ private fun nativeHardwareDeviceTypeLabel(type: String, copy: NativePosCopy): St
 }
 
 @Composable
-private fun NativeMorePage(copy: NativePosCopy, title: String, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+private fun NativeMorePage(copy: NativePosCopy, title: String, onBack: () -> Unit, backLabel: String = copy.backToMore, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text(copy.backToMore) }
+        OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text(backLabel) }
         Text(title, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         content()
     }
@@ -5435,35 +5308,6 @@ private fun NativeReferenceRow(title: String, detail: String, amount: String?) {
                 Text(detail, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
             }
             amount?.let { Text(it, color = POS_INK, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold) }
-        }
-    }
-}
-
-@Composable
-private fun NativeBottomNavigation(copy: NativePosCopy, activeTab: NativePosTab, onSelectTab: (NativePosTab) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(POS_PANEL_BACKGROUND)
-            .border(1.dp, Color(0xFFE8E3ED))
-            .padding(horizontal = 4.dp, vertical = 5.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-    ) {
-        NativePosTab.entries.forEach { tab ->
-            val selected = activeTab == tab
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(58.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(if (selected) Color(0xFFECE6F7) else Color.Transparent)
-                    .clickable { onSelectTab(tab) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text(tab.symbol, color = if (selected) POS_ACCENT else POS_MUTED, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(tab.label(copy), color = if (selected) POS_ACCENT else POS_MUTED, style = MaterialTheme.typography.labelSmall, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
-            }
         }
     }
 }
@@ -5739,7 +5583,7 @@ private fun CashOperationsView(
             }
             if (cashState.shiftId != null && !cashState.isOfflineCashReady()) {
                 if (cashState.needsCashSession()) {
-                    TextField(
+                    NativePosInput(
                         value = openingFloat,
                         onValueChange = { openingFloat = it.filter { char -> char.isDigit() || char == '.' } },
                         label = { Text(copy.drawerOpeningCash) },
@@ -6265,7 +6109,7 @@ private fun NativeCheckoutDialog(
                     }
                 }
                 if (paymentMethod == "wave" || paymentMethod == "orange_money") {
-                    TextField(
+                    NativePosInput(
                         value = externalReference,
                         onValueChange = { externalReference = it },
                         label = { Text(copy.paymentReference) },
@@ -6275,8 +6119,8 @@ private fun NativeCheckoutDialog(
                     Text(copy.manualPaymentPendingHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                 }
                 if (deferredPayment) {
-                    TextField(value = balanceDueAtText, onValueChange = { balanceDueAtText = it }, label = { Text(copy.balanceDueAt) }, placeholder = { Text("2026-10-05 18:00") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    TextField(value = unpaidReason, onValueChange = { unpaidReason = it }, label = { Text(copy.unpaidReason) }, modifier = Modifier.fillMaxWidth())
+                    NativePosInput(value = balanceDueAtText, onValueChange = { balanceDueAtText = it }, label = { Text(copy.balanceDueAt) }, placeholder = { Text("2026-10-05 18:00") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    NativePosInput(value = unpaidReason, onValueChange = { unpaidReason = it }, label = { Text(copy.unpaidReason) }, modifier = Modifier.fillMaxWidth())
                 }
 
                 if (pricingLoading) {
@@ -6324,7 +6168,7 @@ private fun NativeCheckoutDialog(
                 if (canManageSensitiveOperations) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(copy.discountsAndTax, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        TextField(
+                        NativePosInput(
                             value = discountCode,
                             onValueChange = { discountCode = it },
                             label = { Text(copy.discountCodeOptional) },
@@ -6333,7 +6177,7 @@ private fun NativeCheckoutDialog(
                             modifier = Modifier.fillMaxWidth(),
                         )
                         if (normalizedDiscountCode != null) {
-                            TextField(
+                            NativePosInput(
                                 value = discountReason,
                                 onValueChange = { discountReason = it },
                                 label = { Text(copy.discountReason) },
@@ -6343,7 +6187,7 @@ private fun NativeCheckoutDialog(
                             )
                         }
                         if (pricing.taxMinor != 0L) {
-                            TextField(
+                            NativePosInput(
                                 value = taxExemptionReason,
                                 onValueChange = { taxExemptionReason = it },
                                 label = { Text(copy.taxExemptReason) },
@@ -6418,7 +6262,7 @@ private fun NativeCheckoutDialog(
                         shape = RoundedCornerShape(14.dp),
                     ) { Text(copy.otherAmount) }
                     if (useCustomTender) {
-                        TextField(
+                        NativePosInput(
                             value = customTenderedText,
                             onValueChange = { customTenderedText = it.filter { char -> char.isDigit() || char == '.' } },
                             label = { Text(copy.enterCashReceived) },
@@ -6879,7 +6723,7 @@ private fun JSONArray?.toNativeMoreNotifications(): List<NativeMoreNotification>
     }
 }
 
-private fun JSONObject.toNativeTerminalSettingsSummary(): NativeTerminalSettingsSummary = NativeTerminalSettingsSummary(
+private fun JSONObject.toNativeTerminalSettingsSummary(branch: JSONObject? = null): NativeTerminalSettingsSummary = NativeTerminalSettingsSummary(
     label = optString("label").takeIf { it.isNotBlank() && it != "null" },
     cashHandlingMode = optString("cashHandlingMode", "unknown"),
     roundingRule = optString("roundingRule", "none"),
@@ -6888,6 +6732,8 @@ private fun JSONObject.toNativeTerminalSettingsSummary(): NativeTerminalSettings
     printCopies = optInt("printCopies", 1),
     syncStatus = optString("syncStatus", "unknown"),
     lastSyncError = optString("lastSyncError").takeIf { it.isNotBlank() && it != "null" },
+    branchAddress = branch?.optString("address")?.takeIf { it.isNotBlank() && it != "null" },
+    branchPhone = branch?.optString("phone")?.takeIf { it.isNotBlank() && it != "null" },
 )
 
 private fun canAddOffline(product: NativeProduct, quantity: Long): Boolean =
@@ -7115,7 +6961,7 @@ private fun buildNativeReceiptDraft(
     )
 }
 
-private fun formatMoney(minor: Long, currency: String): String = "%s %d.%02d".format(java.util.Locale.ROOT, currency, minor / 100, minor % 100)
+internal fun formatMoney(minor: Long, currency: String): String = "%s %d.%02d".format(java.util.Locale.ROOT, currency, minor / 100, minor % 100)
 
 private fun formatSignedMoney(minor: Long, currency: String): String =
     if (minor < 0) "-${formatMoney(-minor, currency)}" else formatMoney(minor, currency)

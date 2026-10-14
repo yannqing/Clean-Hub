@@ -205,11 +205,10 @@ private fun NativeEntryField(
     val focusManager = LocalFocusManager.current
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(label, color = ENTRY_INK, fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold)
-        OutlinedTextField(
+        NativePosInput(
             value = value, onValueChange = onValueChange, enabled = enabled,
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).semantics { contentDescription = label },
-            shape = RoundedCornerShape(12.dp),
-            singleLine = true, textStyle = MaterialTheme.typography.bodyLarge.copy(color = ENTRY_INK, fontSize = 15.sp),
+            singleLine = true,
             placeholder = { Text(placeholder, fontSize = 14.sp, lineHeight = 20.sp, color = ENTRY_MUTED) },
             leadingIcon = { Icon(icon, null, tint = ENTRY_MUTED, modifier = Modifier.size(19.dp)) },
             trailingIcon = if (secret) ({
@@ -222,12 +221,6 @@ private fun NativeEntryField(
             visualTransformation = if (secret && !revealed) PasswordVisualTransformation() else VisualTransformation.None,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
             keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Down) }, onDone = { onDone() }),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = ENTRY_INK, unfocusedBorderColor = ENTRY_BORDER,
-                focusedContainerColor = Color.White, unfocusedContainerColor = ENTRY_SOFT,
-                disabledContainerColor = ENTRY_SOFT, disabledBorderColor = ENTRY_BORDER,
-                cursorColor = ENTRY_INK, focusedTextColor = ENTRY_INK, unfocusedTextColor = ENTRY_INK,
-            ),
         )
     }
 }

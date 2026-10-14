@@ -42,14 +42,18 @@ internal fun isTransientReplayFailure(error: NativePosApiException): Boolean =
 /** Synchronizes immutable local cash commands before refreshing POS reference data. */
 class NativePosSyncEngine(context: Context) {
     private val database = NativePosDatabase(context.applicationContext)
-    private val api = NativePosApiClient(NativePosSession(context.applicationContext))
+    private val session = NativePosSession(context.applicationContext)
+    private val api = NativePosApiClient(session)
 
     /** Refreshes store-owned checkout and receipt rules without replaying sales. */
-    fun refreshCheckoutSettings(): JSONObject {
+    fun refreshCheckoutSettings(): JSONObject = refreshTerminalConfiguration().second
+
+    fun refreshTerminalConfiguration(): Pair<JSONObject, JSONObject> {
         val branch = api.get("/pos/branches/me")
         val settings = api.get("/pos/terminal-settings")
+        requireNativeTerminalDevice(settings.optString("deviceId"), session.deviceId(), nativePosCopy(session.pinLanguageCode()))
         cacheCheckoutSettings(branch, settings)
-        return settings
+        return branch to settings
     }
 
     fun synchronize(): NativeSyncResult {

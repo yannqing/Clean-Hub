@@ -10,6 +10,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -101,5 +102,29 @@ class NativeCatalogSnapshotInstrumentedTest {
         synchronize()
         database.writableDatabase.delete("catalog_state", null, null)
         assertFalse(database.snapshot(now).catalogIsFresh)
+    }
+
+    @Test
+    fun manualFailedReceiptRetryDoesNotClaimOrdinaryPendingJobs() {
+        database.writableDatabase.execSQL(
+            "INSERT INTO pending_receipt_print(job_id, entity_id, content, copies, created_at, status) VALUES ('pending', 'sale-one', 'Receipt', 1, 1, 'pending'), ('failed', 'sale-two', 'Receipt', 1, 2, 'failed')",
+        )
+        assertEquals("failed", database.claimReceiptPrint(failedOnly = true)?.jobId)
+        assertEquals("pending", database.receiptPrintStatus("pending"))
+        assertNull(database.claimReceiptPrint(failedOnly = true))
+        assertEquals("pending", database.claimReceiptPrint()?.jobId)
+    }
+
+    @Test
+    fun automaticPrintingNeverRetriesFailedReceiptsOrRejectedSales() {
+        database.writableDatabase.execSQL(
+            "INSERT INTO pending_receipt_print(job_id, entity_id, content, copies, created_at, status) VALUES ('failed', 'rejected-sale', 'Receipt', 1, 1, 'failed')",
+        )
+        assertNull(database.claimReceiptPrint())
+        database.writableDatabase.execSQL(
+            "INSERT INTO pending_operation(operation_id, sequence, entity_id, idempotency_key, payload_json, created_at, status) VALUES ('operation', 1, 'rejected-sale', 'key', '{}', 1, 'failed')",
+        )
+        assertNull(database.claimReceiptPrint(failedOnly = true))
+        assertEquals("failed", database.receiptPrintStatus("failed"))
     }
 }
