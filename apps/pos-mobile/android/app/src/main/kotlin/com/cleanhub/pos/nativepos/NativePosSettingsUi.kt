@@ -183,7 +183,7 @@ internal fun NativeSettingsWorkspace(
                             SettingsInfo(copy.settingsPriceMode, if (checkoutSettings.pricesIncludeTax) copy.pricesIncludeTax else copy.pricesExcludeTax)
                             SettingsInfo(copy.settingsTaxNumber, checkoutSettings.taxRegistrationNumber)
                             checkoutSettings.taxComponents.forEach { SettingsInfo(it.name, formatNativeTaxRate(it.rate)) }
-                            if (!checkoutSettings.taxReady) SettingsNotice(copy.settingsTaxNotReady)
+                            NativeTaxReadinessNotice(copy, checkoutSettings, current.terminal?.role, busy, onSynchronize)
                         }
                     }
                     NativeSettingsSection.Printing -> {

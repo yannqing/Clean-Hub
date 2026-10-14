@@ -722,6 +722,10 @@ internal class NativePosCopy(
     val salePayLaterRecorded: String get() = get("salePayLaterRecorded")
     val saleAwaitingConfirmation: String get() = get("saleAwaitingConfirmation")
     val saleNeedsReview: String get() = get("saleNeedsReview")
+    val checkoutSetupRequired: String get() = get("checkoutSetupRequired")
+    val checkoutManagerNextSteps: String get() = get("checkoutManagerNextSteps")
+    val checkoutStaffNextSteps: String get() = get("checkoutStaffNextSteps")
+    val checkoutReviewSettings: String get() = get("checkoutReviewSettings")
     fun taxReadinessMessage(code: String?): String = get(when (code) {
         "POS_TAX_COUNTRY_REQUIRED" -> "taxCountryRequired"
         "POS_TAX_TEMPLATE_NOT_APPLIED" -> "taxTemplateNotApplied"
@@ -1145,6 +1149,10 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
     "salePayLaterRecorded" to "订单已创建，尚未收款。",
     "saleAwaitingConfirmation" to "订单已创建，移动支付待确认。",
     "saleNeedsReview" to "交易已保存在本机，但服务端拒绝了上传；请交由经理处理，勿再次收款。",
+    "checkoutSetupRequired" to "收银配置未完成，暂不可结款",
+    "checkoutManagerNextSteps" to "请在管理后台完善国家、税务模板和税号，再同步此终端。同步本身不会补齐缺失配置；历史订单和工单仍可查看。",
+    "checkoutStaffNextSteps" to "请联系店主或经理完善后台配置。完成后同步此终端；历史订单和工单仍可查看。",
+    "checkoutReviewSettings" to "查看收银配置",
     "taxCountryRequired" to "尚未设置租户国家，暂不能收银。请联系 SaaS 管理员填写国家。",
     "taxTemplateRequired" to "国家税务模板尚未配置，暂不能收银。请 SaaS 管理员填写或上传模板，再由店主应用并同步终端。",
     "taxTemplateNotApplied" to "当前国家税务模板尚未应用或已更新，暂不能收银。请店主应用模板并同步终端。",
@@ -2005,6 +2013,10 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
     "salePayLaterRecorded" to "Order created; payment is still due.",
     "saleAwaitingConfirmation" to "Order created; mobile payment awaits confirmation.",
     "saleNeedsReview" to "The sale is saved locally but the server rejected it. Ask a manager to review it; do not charge again.",
+    "checkoutSetupRequired" to "Checkout setup is incomplete",
+    "checkoutManagerNextSteps" to "Complete the country, tax template and tax number in the admin console, then sync this terminal. Sync alone cannot fill missing settings. Existing orders and tickets remain available.",
+    "checkoutStaffNextSteps" to "Ask the owner or manager to complete the server settings, then sync this terminal. Existing orders and tickets remain available.",
+    "checkoutReviewSettings" to "Review checkout settings",
     "taxCountryRequired" to "The tenant country is missing. Ask a SaaS administrator to set it before checkout.",
     "taxTemplateRequired" to "The country tax template is missing. Ask a SaaS administrator to complete or import it, then ask the owner to apply it and sync the terminal.",
     "taxTemplateNotApplied" to "The current tax template is not applied. Ask the owner to apply it and sync the terminal.",
@@ -2865,6 +2877,10 @@ private val COPY_FR_VALUES: Map<String, String> = mapOf(
     "salePayLaterRecorded" to "Commande créée ; le paiement reste dû.",
     "saleAwaitingConfirmation" to "Commande créée ; le paiement mobile attend confirmation.",
     "saleNeedsReview" to "Vente enregistrée localement, mais refusée par le serveur. Demandez une vérification ; ne facturez pas à nouveau.",
+    "checkoutSetupRequired" to "Configuration de l’encaissement incomplète",
+    "checkoutManagerNextSteps" to "Complétez le pays, le modèle et le numéro fiscal dans l’administration, puis synchronisez ce terminal. La synchronisation seule ne complète pas les paramètres. Les commandes existantes restent accessibles.",
+    "checkoutStaffNextSteps" to "Demandez au propriétaire ou responsable de compléter les paramètres, puis synchronisez ce terminal. Les commandes existantes restent accessibles.",
+    "checkoutReviewSettings" to "Vérifier les paramètres",
     "taxCountryRequired" to "Le pays du locataire manque. Demandez à l'administrateur SaaS de le renseigner avant l'encaissement.",
     "taxTemplateRequired" to "Le modèle fiscal du pays manque. Demandez à l'administrateur SaaS de le saisir ou l'importer, puis au propriétaire de l'appliquer et de synchroniser le terminal.",
     "taxTemplateNotApplied" to "Le modèle fiscal actuel n'est pas appliqué. Demandez au propriétaire de l'appliquer et de synchroniser le terminal.",

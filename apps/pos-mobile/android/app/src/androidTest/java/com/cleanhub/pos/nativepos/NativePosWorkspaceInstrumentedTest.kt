@@ -42,6 +42,45 @@ class NativePosWorkspaceInstrumentedTest {
         ).use { it.readBytes() }
     }
 
+    @Test fun paymentEntryIsDisabledUntilTaxConfigurationHasBeenSynced() {
+        val copy = nativePosCopy("en")
+        val cart = NativePosCart.empty("XOF").copy(products = listOf(NativeCartLine("sku", "Laundry bag", 100000, 1, null)))
+        var fiscal by mutableStateOf(NativeCheckoutSettings(taxReadinessCode = "POS_TAX_COUNTRY_REQUIRED"))
+        compose.setContent {
+            MaterialTheme(colorScheme = nativePosColors) {
+                Box(Modifier.width(390.dp).fillMaxHeight().testTag("preview")) {
+                    CheckoutPanel(cart, "Africa/Dakar", false, copy, null, fiscal, false, false, true,
+                        { basket, _, exemption -> calculateNativeLocalPricing(basket, fiscal, exemption) }, {}, {}, {}, {}, {})
+                }
+            }
+        }
+        compose.onNodeWithText(copy.pay).assertIsNotEnabled()
+        compose.onNodeWithText(copy.viewCartDetail.format(1L)).performClick()
+        compose.onNodeWithText(copy.goToPayment).assertIsNotEnabled()
+        compose.onNodeWithText(copy.close).performClick()
+        compose.runOnIdle { fiscal = fiscal.copy(taxReady = true, taxReadinessCode = null, taxVerifiedAt = System.currentTimeMillis()) }
+        compose.onNodeWithText(copy.pay).assertIsEnabled().performClick()
+        compose.onNodeWithText(copy.confirmCollection).performScrollTo().assertIsEnabled()
+        compose.runOnIdle { fiscal = fiscal.copy(taxReady = false, taxReadinessCode = "POS_TAX_CONFIGURATION_INCOMPLETE") }
+        compose.onNodeWithText(copy.confirmCollection).performScrollTo().assertIsNotEnabled()
+        screenshot("checkout-tax-blocked")
+    }
+
+    @Test fun missingCountryNoticeExplainsThatSyncCannotFillServerSettings() {
+        val copy = nativePosCopy("en")
+        compose.setContent {
+            MaterialTheme(colorScheme = nativePosColors) {
+                Box(Modifier.width(540.dp).testTag("preview")) {
+                    NativeTaxReadinessNotice(copy, NativeCheckoutSettings(taxReadinessCode = "POS_TAX_COUNTRY_REQUIRED"), "manager", false, {}, {})
+                }
+            }
+        }
+        compose.onNodeWithText(copy.taxReadinessMessage("POS_TAX_COUNTRY_REQUIRED")).assertIsDisplayed()
+        compose.onNodeWithText(copy.checkoutManagerNextSteps).assertIsDisplayed()
+        compose.onNodeWithText(copy.checkoutReviewSettings).assertIsEnabled()
+        screenshot("tax-readiness-notice")
+    }
+
     @Test fun printingOnlySubmitsPrintingPreferences() {
         val copy=nativePosCopy("en")
         var submitted: NativeTerminalSettingsPatch?=null

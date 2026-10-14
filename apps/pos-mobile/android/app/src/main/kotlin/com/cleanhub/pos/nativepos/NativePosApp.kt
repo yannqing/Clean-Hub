@@ -87,7 +87,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal data class NativeSetupBranch(val id: String, val name: String)
-private data class NativeAdministrator(val branches: List<NativeSetupBranch>, val requiresReenrollment: Boolean = false)
+private data class NativeAdministrator(val branches: List<NativeSetupBranch>, val requiresReenrollment: Boolean = false, val taxIssueCode: String? = "POS_TAX_STATUS_UNAVAILABLE")
 private data class NativePosBootstrapIdentity(val tenantName: String, val branchName: String?)
 private data class NativeOfflinePinResult(val verified: Boolean, val lockedForSeconds: Long? = null)
 internal enum class NativeMoreDestination {
@@ -2124,6 +2124,7 @@ fun NativePosApp(applicationContext: Context) {
                     onPinEdited = { message = null },
                     onUnlockOffline = { },
                     onOnlineLogin = ::loginWithStaffPin,
+                    checkoutSettings = checkoutSettings,
                 )
                 current.terminal == null -> {
                     if (setupAdministrator == null) {
@@ -2157,9 +2158,11 @@ fun NativePosApp(applicationContext: Context) {
                                             val profile = api.get("/tenant/profile")
                                             val branches = profile.optJSONArray("accessibleBranches").toSetupBranches()
                                             if (branches.isEmpty()) throw NativePosValidationException(copy.noBranchesAvailable)
+                                            val readiness = api.get("/tenant/overview").optJSONObject("checkoutReadiness")?.optJSONObject("taxReadiness")
                                             val bootstrap = api.bootstrap()
                                             NativeAdministrator(
                                                 branches = branches,
+                                                taxIssueCode = if (readiness?.optBoolean("ready") == true) null else readiness?.optString("code") ?: "POS_TAX_STATUS_UNAVAILABLE",
                                                 requiresReenrollment = bootstrap.optString("status") == "credential_lost",
                                             )
                                         }
@@ -2179,6 +2182,7 @@ fun NativePosApp(applicationContext: Context) {
                             language = pinLanguage,
                             onLanguageSelected = ::selectLanguage,
                             branches = setupAdministrator!!.branches,
+                            taxIssueCode = setupAdministrator!!.taxIssueCode,
                             requiresReenrollment = setupAdministrator!!.requiresReenrollment,
                             busy = busy,
                             message = message,
@@ -2260,9 +2264,11 @@ fun NativePosApp(applicationContext: Context) {
                     onPinEdited = { message = null },
                     onUnlockOffline = { pin -> unlockWithOfflinePin(current.terminal.userId, pin) },
                     onOnlineLogin = ::loginWithStaffPin,
+                    checkoutSettings = checkoutSettings,
                 )
                 !current.catalogIsFresh -> CachedDataExpiredView(copy, busy, message, ::synchronize)
                 else -> NativePosShell(copy,
+                    checkoutSettings = checkoutSettings,
                     activeMoreDestination = moreDestination,
                     onNavigateMore = ::openMoreDestination,
                     languageCode = pinLanguage.code,
@@ -2311,6 +2317,7 @@ fun NativePosApp(applicationContext: Context) {
                                 message = message,
                                 checkoutSettings = checkoutSettings,
                                 receiptPrinterConfigured = receiptPrinterConfigured,
+                                onOpenSettings = { activeTab = NativePosTab.More; openMoreDestination(NativeMoreDestination.Settings) },
                                 onRefreshPricing = { checkoutCart, discountCode, taxExemptionReason ->
                                     withContext(Dispatchers.IO) {
                                         if (internetAvailable) {
@@ -2354,8 +2361,8 @@ fun NativePosApp(applicationContext: Context) {
                                 onCheckout = { checkoutRequest ->
                                     val cartAtCheckout = cart
                                     val terminalAtCheckout = current.terminal
-                                    if (!checkoutSettings.taxReady) {
-                                        checkoutFailure = copy.taxReadinessMessage(checkoutSettings.taxReadinessCode)
+                                    if (!checkoutSettings.taxReadyForCheckout()) {
+                                        checkoutFailure = copy.taxReadinessMessage(checkoutSettings.taxCheckoutBlockCode())
                                         message = checkoutFailure
                                         return@NativeSaleView
                                     }
@@ -2796,6 +2803,7 @@ internal fun NativePosShell(
     onAddTicketItemsToCart: (NativeServiceTicket, List<NativeTicketItem>) -> Unit,
     saleContent: @Composable () -> Unit,
     moreContent: @Composable (List<NativeNavigationDestination>, (NativeNavigationDestination) -> Unit) -> Unit,
+    checkoutSettings: NativeCheckoutSettings = NativeCheckoutSettings(),
 ) {
     val terminal = current.terminal ?: return
     val canManageSensitiveOperations = terminal.role == "owner" || terminal.role == "manager"
@@ -2865,6 +2873,8 @@ internal fun NativePosShell(
                             internetAvailable = internetAvailable,
                             busy = busy,
                             message = message,
+                            checkoutSettings = checkoutSettings,
+                            onOpenSettings = { navigate(NativeNavigationDestination.Settings) },
                             onStartSale = { onSelectTab(NativePosTab.Sale) },
                             onSynchronize = onSynchronize,
                         )
@@ -2925,6 +2935,8 @@ private fun NativeWorkspaceView(
     message: String?,
     onStartSale: () -> Unit,
     onSynchronize: () -> Unit,
+    checkoutSettings: NativeCheckoutSettings,
+    onOpenSettings: () -> Unit,
 ) {
     val expanded = nativePosScreenClass() == NativePosScreenClass.Expanded
     Column(
@@ -2933,6 +2945,7 @@ private fun NativeWorkspaceView(
     ) {
         Text(copy.workspaceTitle, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text(if (internetAvailable) copy.workspaceOnlineHint else copy.workspaceOfflineHint, color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
+        NativeTaxReadinessNotice(copy, checkoutSettings, current.terminal?.role, busy, onSynchronize, onOpenSettings)
         if (expanded) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 WorkspaceMetric(copy.metricCatalog, current.products.size.toString(), Modifier.weight(1f))
@@ -5397,6 +5410,7 @@ private fun NativeSaleView(
     onRemoveTicketItem: (String) -> Unit,
     onCheckout: (NativeCheckoutRequest) -> Unit,
     onSynchronize: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val terminal = current.terminal ?: return
     val screenClass = nativePosScreenClass()
@@ -5478,13 +5492,8 @@ private fun NativeSaleView(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        if (!checkoutSettings.taxReady) {
-            Text(
-                copy.taxReadinessMessage(checkoutSettings.taxReadinessCode),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-            )
+        Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            NativeTaxReadinessNotice(copy, checkoutSettings, terminal.role, busy, onSynchronize, onOpenSettings)
         }
 
         if (expanded) {
@@ -5709,7 +5718,7 @@ private fun CartQuantityStepper(quantity: Long, onAdd: () -> Unit, onRemove: () 
 }
 
 @Composable
-private fun CheckoutPanel(
+internal fun CheckoutPanel(
     cart: NativePosCart,
     timeZone: String,
     busy: Boolean,
@@ -5728,6 +5737,7 @@ private fun CheckoutPanel(
     modifier: Modifier = Modifier.fillMaxWidth(),
     persistent: Boolean = false,
 ) {
+    val taxReady = rememberNativeTaxCheckoutReady(checkoutSettings)
     val itemCount = cart.itemCount
     val totalMinor = cart.totalMinor
     var checkoutOpen by remember { mutableStateOf(false) }
@@ -5768,8 +5778,8 @@ private fun CheckoutPanel(
                 )
             }
             Button(
-                onClick = { checkoutOpen = true },
-                enabled = !cart.isEmpty && !busy,
+                onClick = { if (checkoutSettings.taxReadyForCheckout()) checkoutOpen = true },
+                enabled = !cart.isEmpty && !busy && taxReady,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
@@ -5780,6 +5790,7 @@ private fun CheckoutPanel(
         NativeCartDrawer(copy,
             cart = cart,
             busy = busy,
+            checkoutAllowed = taxReady,
             onDismiss = { cartDrawerOpen = false },
             onAddProduct = onAddProduct,
             onRemoveProduct = onRemoveProduct,
@@ -5787,7 +5798,7 @@ private fun CheckoutPanel(
             onRemoveTicketItem = onRemoveTicketItem,
             onCheckout = {
                 cartDrawerOpen = false
-                checkoutOpen = true
+                if (checkoutSettings.taxReadyForCheckout()) checkoutOpen = true
             },
         )
     }
@@ -5823,6 +5834,7 @@ private fun NativeCartDrawer(
     onClearProduct: (String) -> Unit,
     onRemoveTicketItem: (String) -> Unit,
     onCheckout: () -> Unit,
+    checkoutAllowed: Boolean,
 ) {
     Dialog(
         onDismissRequest = { if (!busy) onDismiss() },
@@ -5897,9 +5909,10 @@ private fun NativeCartDrawer(
                             }
                         }
                     }
+                    if (!checkoutAllowed) Text(copy.checkoutSetupRequired, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     Button(
                         onClick = onCheckout,
-                        enabled = !cart.isEmpty && !busy,
+                        enabled = !cart.isEmpty && !busy && checkoutAllowed,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
@@ -5953,7 +5966,7 @@ private fun NativeCheckoutProductLine(
  * tender is preselected; free-form entry is only for a note that needs change.
  */
 @Composable
-private fun NativeCheckoutDialog(
+internal fun NativeCheckoutDialog(
     cart: NativePosCart,
     timeZone: String,
     busy: Boolean,
@@ -5969,6 +5982,7 @@ private fun NativeCheckoutDialog(
     var discountCode by remember(cart.checkoutId) { mutableStateOf("") }
     var discountReason by remember(cart.checkoutId) { mutableStateOf("") }
     var taxExemptionReason by remember(cart.checkoutId) { mutableStateOf("") }
+    val taxReady = rememberNativeTaxCheckoutReady(checkoutSettings)
     val paymentOptions = buildList {
         if ("cash" in checkoutSettings.paymentMethodsEnabled) add("cash")
         if (internetAvailable && "app" in checkoutSettings.paymentMethodsEnabled) {
@@ -6087,6 +6101,7 @@ private fun NativeCheckoutDialog(
                     }
                 }
 
+                NativeTaxReadinessNotice(copy, checkoutSettings, if (canManageSensitiveOperations) "manager" else "cashier", busy)
                 if (paymentOptions.isEmpty()) {
                     Text(copy.noPaymentMethods, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 } else {
@@ -6364,7 +6379,7 @@ private fun NativeCheckoutDialog(
                             )
                         }
                     },
-                    enabled = !busy && pricingReady && isTenderValid && discountValid && paymentDetailsValid,
+                    enabled = !busy && taxReady && pricingReady && isTenderValid && discountValid && paymentDetailsValid,
                     modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),

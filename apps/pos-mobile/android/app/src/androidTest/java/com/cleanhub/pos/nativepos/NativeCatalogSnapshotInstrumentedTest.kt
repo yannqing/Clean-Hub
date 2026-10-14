@@ -60,6 +60,45 @@ class NativeCatalogSnapshotInstrumentedTest {
     }
 
     @Test
+    fun fiscalCacheKeepsItsVerificationTimeWhenLocalPreferencesChange() {
+        synchronize()
+        database.replaceCheckoutSettings(NativeCheckoutSettings(taxReady = true, taxVerifiedAt = now))
+        database.replaceCheckoutSettings(database.checkoutSettings().copy(autoPrintReceipt = false))
+        val cached = database.checkoutSettings()
+        assertEquals(now, cached.taxVerifiedAt)
+        assertTrue(cached.taxReadyForCheckout(now + 1000))
+        assertFalse(cached.taxReadyForCheckout(now + NATIVE_TAX_READINESS_MAX_AGE_MS + 1))
+    }
+
+    @Test
+    fun movingToAnotherBranchClearsFiscalCacheAndPreservesPendingSales() {
+        synchronize()
+        database.replaceCheckoutSettings(NativeCheckoutSettings(taxReady = true, taxVerifiedAt = now))
+        database.writableDatabase.execSQL("INSERT INTO pending_operation (operation_id,sequence,entity_id,idempotency_key,payload_json,status,created_at) VALUES ('pending-original',1,'order-original','key-original','{}','pending',?)", arrayOf(now))
+        val previous = database.snapshot(now).terminal!!
+        database.replaceSnapshot(previous.copy(branchId = "another-branch"), emptyList(), null)
+        assertFalse(database.checkoutSettings().taxReady)
+        assertEquals(1, database.snapshot(now).pendingSales)
+    }
+
+    @Test
+    fun taxFailureCannotCreateAnyDurablePaymentCommand() {
+        val runtimeNow = System.currentTimeMillis()
+        synchronize()
+        val terminal = database.snapshot(now).terminal!!.copy(lastSyncedAt = runtimeNow)
+        database.replaceSnapshot(terminal, emptyList(), null)
+        database.replaceCheckoutSettings(NativeCheckoutSettings(taxReadinessCode = "POS_TAX_COUNTRY_REQUIRED", taxVerifiedAt = runtimeNow))
+        val cart = NativePosCart.empty("XOF").copy(products = listOf(NativeCartLine("sku", "Bag", 100000, 1, null)))
+        try {
+            database.enqueueCheckout(cart, NativeCheckoutRequest(100000, 100000), false)
+            org.junit.Assert.fail("Missing country must fail before recording any payment")
+        } catch (error: NativePosValidationException) {
+            assertTrue(error.message in listOf("en", "fr", "zh-CN").map { nativePosCopy(it).taxReadinessMessage("POS_TAX_COUNTRY_REQUIRED") })
+        }
+        assertEquals(0, database.snapshot().pendingSales)
+    }
+
+    @Test
     fun aFreshServiceCatalogueDoesNotRequireRetailProducts() {
         val service = NativeService(
             id = "01KRERJN8G0000000000000041", name = "Laundry", businessLine = "laundry",

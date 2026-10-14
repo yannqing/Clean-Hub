@@ -323,6 +323,7 @@ internal fun TerminalEnrollmentView(
     copy: NativePosCopy, language: NativePinLanguage, onLanguageSelected: (NativePinLanguage) -> Unit,
     branches: List<NativeSetupBranch>, requiresReenrollment: Boolean, busy: Boolean,
     message: String?, onEnroll: (String, String) -> Unit,
+    taxIssueCode: String? = null,
 ) {
     var branchId by remember { mutableStateOf(branches.first().id) }
     var label by remember { mutableStateOf("${branches.first().name} POS") }
@@ -330,6 +331,7 @@ internal fun TerminalEnrollmentView(
     val submit = { if (label.isNotBlank() && !busy) { keyboard?.hide(); onEnroll(branchId, label) } }
     NativeEntryShell(copy, language, onLanguageSelected, busy, step = 1, cardWidth = 640.dp) {
         NativeEntryTitle(if (requiresReenrollment) copy.rebindTerminal else copy.bindTerminal, copy.authStoreHint, EntryIcons.Store)
+        taxIssueCode?.let { NativeEntryFeedback(copy.checkoutSetupRequired + "\n" + copy.taxReadinessMessage(it), warning = true) }
         if (requiresReenrollment) NativeEntryFeedback(copy.rebindWarning, warning = true)
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val columns = if (maxWidth >= 460.dp) 2 else 1
@@ -373,6 +375,7 @@ internal fun StaffPinGate(
     tenantName: String?, branchName: String?, offlineAvailable: Boolean, internetAvailable: Boolean,
     busy: Boolean, message: String?, onPinEdited: () -> Unit,
     onUnlockOffline: (String) -> Unit, onOnlineLogin: (String) -> Unit,
+    checkoutSettings: NativeCheckoutSettings? = null,
 ) {
     var pin by remember { mutableStateOf("") }
     val copy = nativePosCopy(language.code)
@@ -400,6 +403,7 @@ internal fun StaffPinGate(
                 Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     NativeEntryTitle(if (unlockingOffline) copy.authWelcomeBack else copy.authPinTitle,
                         if (unlockingOffline) copy.authPinOfflineHint else copy.authPinOnlineHint, EntryIcons.Lock)
+                    checkoutSettings?.let { NativeTaxReadinessNotice(copy, it, null, busy) }
                     if (!tenantName.isNullOrBlank() || !branchName.isNullOrBlank()) {
                         Surface(shape = RoundedCornerShape(12.dp), color = ENTRY_SOFT, border = BorderStroke(1.dp, ENTRY_BORDER)) {
                             Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically,

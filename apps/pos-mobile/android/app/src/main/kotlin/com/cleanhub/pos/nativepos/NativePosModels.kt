@@ -312,6 +312,8 @@ data class NativeCheckoutSettings(
     val taxLabel: String? = null,
     val taxComponents: List<NativeTaxComponent> = emptyList(),
     val taxReady: Boolean = false,
+    /** Last successful server verification; local preference changes must preserve it. */
+    val taxVerifiedAt: Long = 0L,
     val taxReadinessCode: String? = "POS_TAX_STATUS_UNAVAILABLE",
     val emailReceiptEnabled: Boolean = false,
     val autoPrintReceipt: Boolean = true,

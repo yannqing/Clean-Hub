@@ -294,12 +294,12 @@ class NativePosDatabase(
             put("email_receipt_enabled", if (settings.emailReceiptEnabled) 1 else 0)
             put("auto_print_receipt", if (settings.autoPrintReceipt) 1 else 0)
             put("lock_timeout_seconds", settings.lockTimeoutSeconds.coerceAtLeast(0))
-            put("updated_at", System.currentTimeMillis())
+            put("updated_at", settings.taxVerifiedAt)
         }, SQLiteDatabase.CONFLICT_REPLACE)
     }
 
     fun checkoutSettings(): NativeCheckoutSettings = readableDatabase.rawQuery(
-        "SELECT rounding_rule, cash_rounding_step, tax_enabled, default_tax_rate, prices_include_tax, tax_registration_number, email_receipt_enabled, auto_print_receipt, lock_timeout_seconds, default_payment_method, payment_methods_enabled, mobile_money_providers_enabled, receipt_profile_json, tax_label, tax_components_json, tax_ready, tax_readiness_code FROM checkout_settings WHERE singleton = 1",
+        "SELECT rounding_rule, cash_rounding_step, tax_enabled, default_tax_rate, prices_include_tax, tax_registration_number, email_receipt_enabled, auto_print_receipt, lock_timeout_seconds, default_payment_method, payment_methods_enabled, mobile_money_providers_enabled, receipt_profile_json, tax_label, tax_components_json, tax_ready, tax_readiness_code, updated_at FROM checkout_settings WHERE singleton = 1",
         null,
     ).use { cursor ->
         if (!cursor.moveToFirst()) return@use NativeCheckoutSettings()
@@ -308,6 +308,7 @@ class NativePosDatabase(
             cashRoundingStep = cursor.getInt(1).coerceIn(1, 100),
             taxEnabled = cursor.getInt(2) == 1,
             taxReady = cursor.getInt(15) == 1,
+            taxVerifiedAt = cursor.getLong(17),
             taxReadinessCode = cursor.getStringOrNull(16),
             defaultTaxRate = cursor.getString(3),
             pricesIncludeTax = cursor.getInt(4) == 1,
@@ -537,6 +538,11 @@ class NativePosDatabase(
     ) {
         writableDatabase.beginTransaction()
         try {
+            val previous = readTerminal()
+            if (previous == null || previous.tenantId != terminal.tenantId || previous.branchId != terminal.branchId ||
+                previous.terminalId != terminal.terminalId || previous.credentialVersion != terminal.credentialVersion) {
+                writableDatabase.delete("checkout_settings", null, null)
+            }
             val reservedBySku = reservedQuantitiesBySku()
             writableDatabase.insertWithOnConflict("terminal_state", null, ContentValues().apply {
                 put("singleton", 1)
@@ -606,9 +612,11 @@ class NativePosDatabase(
     ): NativeCheckoutResult {
         require(!cart.isEmpty) { copy.cartIsEmpty }
         val now = System.currentTimeMillis()
-        val terminal = snapshot(now).terminal ?: throw NativePosValidationException(copy.localDataExpired)
+        val current = snapshot(now)
+        val terminal = current.terminal ?: throw NativePosValidationException(copy.localDataExpired)
+        if (!current.catalogIsFresh) throw NativePosValidationException(copy.localDataExpired)
         val taxSettings = checkoutSettings()
-        if (!taxSettings.taxReady) throw NativePosValidationException(copy.taxReadinessMessage(taxSettings.taxReadinessCode))
+        if (!taxSettings.taxReadyForCheckout(now)) throw NativePosValidationException(copy.taxReadinessMessage(taxSettings.taxCheckoutBlockCode(now)))
         val paymentMethod = checkoutRequest.paymentMethod
         require(paymentMethod in setOf("cash", "wave", "orange_money", "later")) { "Unsupported payment method" }
         val cashState = if (paymentMethod == "cash") {

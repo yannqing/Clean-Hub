@@ -133,10 +133,9 @@ class NativePosSyncEngine(context: Context) {
         val shift = api.get("/pos/staff/current-shift").takeUnless { it.isNullObject() }
         val register = api.get("/pos/staff/current-register")
         val cashMode = register.requiredString("cashHandlingMode")
-        // Receipt policy must be available after a cold offline restart. A
-        // settings read is best-effort so a restricted/cached terminal can
-        // still refresh its operational catalog and cash state.
-        val printSettings = runCatching { api.get("/pos/terminal-settings") }.getOrNull()
+        // A successful sync must include financial readiness, not just the catalogue.
+        val printSettings = api.get("/pos/terminal-settings")
+        requireNativeTerminalDevice(printSettings.optString("deviceId"), session.deviceId(), nativePosCopy(session.pinLanguageCode()))
         val hardwareDevices = runCatching {
             api.get("/pos/hardware-devices").optJSONArray("data")
         }.getOrNull()
@@ -169,7 +168,7 @@ class NativePosSyncEngine(context: Context) {
             customers = customers?.optJSONArray("data")?.toNativeCustomers(),
             tickets = tickets?.optJSONArray("data")?.toNativeTickets(terminal.currency),
         )
-        printSettings?.let { cacheCheckoutSettings(branch, it) }
+        cacheCheckoutSettings(branch, printSettings)
         hardwareDevices?.let { devices ->
             database.replaceReceiptPrinterBinding(devices.defaultReceiptPrinterId())
         }
@@ -198,6 +197,7 @@ class NativePosSyncEngine(context: Context) {
                         ?: NativeReceiptProfile().fields,
                 ),
                 taxEnabled = settings.optBoolean("taxEnabled"),
+                taxVerifiedAt = System.currentTimeMillis(),
                 taxReady = settings.optJSONObject("taxReadiness")?.optBoolean("ready") == true,
                 taxReadinessCode = settings.optJSONObject("taxReadiness")?.optString("code")?.takeIf { it.isNotBlank() && it != "null" },
                 defaultTaxRate = settings.optString("defaultTaxRate", "0.0000"),
