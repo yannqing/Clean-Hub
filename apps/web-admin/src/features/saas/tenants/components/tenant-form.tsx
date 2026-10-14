@@ -112,10 +112,10 @@ export function TenantForm({
     .map((code) => ({ code, label: getLocalizedCountryName(code, locale) }))
     .sort((left, right) => left.label.localeCompare(right.label, locale)), [locale]);
   const countryCopy = locale === "zh-CN"
-    ? { unavailable: "无法加载国家税务模板，请稍后重试。", empty: "尚无可用的国家税务模板，请先在平台设置中配置。", missing: "该国家尚未配置可用的税务模板，暂时无法创建租户或结款。", configure: "前往配置税务模板", currency: "货币由所选国家的税务模板自动确定。", change: "更换国家将同步税务模板及币种，并清除原税号；若已有交易、购物车、价格或绑定终端，跨币种更换需先完成专门迁移。" }
+    ? { required: "国家为必填项，用于确定收银税务和币种。", pending: "创建后仍需填写税务登记号、建立门店和目录、绑定终端，完成前不可收银。", selected: "将自动应用税务模板", unavailable: "无法加载国家税务模板，请稍后重试。", empty: "尚无可用的国家税务模板，请先在平台设置中配置。", missing: "该国家尚未配置可用的税务模板，暂时无法创建租户或结款。", configure: "前往配置税务模板", currency: "货币由所选国家的税务模板自动确定。", change: "更换国家将同步税务模板及币种，并清除原税号；若已有交易、购物车、价格或绑定终端，跨币种更换需先完成专门迁移。" }
     : locale === "fr"
-      ? { unavailable: "Impossible de charger les modèles fiscaux. Réessayez plus tard.", empty: "Aucun modèle fiscal disponible. Configurez-en un dans les paramètres de la plateforme.", missing: "Ce pays n'a pas de modèle fiscal utilisable. La création du locataire et l'encaissement sont indisponibles.", configure: "Configurer le modèle fiscal", currency: "La devise est définie automatiquement par le modèle fiscal du pays.", change: "Changer de pays synchronise le modèle fiscal et la devise, puis efface l'ancien numéro fiscal. Si des ventes, paniers, prix ou terminaux inscrits existent, le changement de devise exige une migration dédiée." }
-      : { unavailable: "Could not load country tax templates. Try again later.", empty: "No country tax templates are ready. Configure one in platform settings first.", missing: "This country has no usable tax template. Tenant creation and checkout are unavailable until one is configured.", configure: "Configure tax template", currency: "Currency is set automatically by the selected country's tax template.", change: "Changing country synchronizes tax and currency and clears the old tax number. Existing sales, carts, prices, or enrolled terminals require a dedicated migration before a currency change." };
+      ? { required: "Le pays est obligatoire pour déterminer la fiscalité et la devise.", pending: "Après la création, renseignez le numéro fiscal, créez un magasin et un catalogue, puis inscrivez un terminal avant l’encaissement.", selected: "Modèle fiscal appliqué automatiquement", unavailable: "Impossible de charger les modèles fiscaux. Réessayez plus tard.", empty: "Aucun modèle fiscal disponible. Configurez-en un dans les paramètres de la plateforme.", missing: "Ce pays n'a pas de modèle fiscal utilisable. La création du locataire et l'encaissement sont indisponibles.", configure: "Configurer le modèle fiscal", currency: "La devise est définie automatiquement par le modèle fiscal du pays.", change: "Changer de pays synchronise le modèle fiscal et la devise, puis efface l'ancien numéro fiscal. Si des ventes, paniers, prix ou terminaux inscrits existent, le changement de devise exige une migration dédiée." }
+      : { required: "Country is required to determine checkout tax and currency.", pending: "After creation, enter the tax number, create a branch and catalogue, and enroll a terminal before checkout.", selected: "Tax template applied automatically", unavailable: "Could not load country tax templates. Try again later.", empty: "No country tax templates are ready. Configure one in platform settings first.", missing: "This country has no usable tax template. Tenant creation and checkout are unavailable until one is configured.", configure: "Configure tax template", currency: "Currency is set automatically by the selected country's tax template.", change: "Changing country synchronizes tax and currency and clears the old tax number. Existing sales, carts, prices, or enrolled terminals require a dedicated migration before a currency change." };
   const languageOptions = showDefaults
     ? tenantCreateLanguageOptions
     : tenantLanguageOptions;
@@ -160,8 +160,8 @@ export function TenantForm({
       return;
     }
 
-    if (showDefaults && values.country && !isUsableTaxTemplate(selectedTemplate)) {
-      const message = templateError ? countryCopy.unavailable : countryCopy.missing;
+    if (!values.country.trim() || (showDefaults && !isUsableTaxTemplate(selectedTemplate))) {
+      const message = !values.country.trim() ? countryCopy.required : templateError ? countryCopy.unavailable : countryCopy.missing;
       setErrors((current) => ({ ...current, country: message }));
       setFormError(message);
       toast.error(message);
@@ -271,7 +271,7 @@ export function TenantForm({
 
                 <div className="grid gap-2">
                   <Label htmlFor="tenant-country">
-                    {m.tenants.form.fields.country}
+                    {m.tenants.form.fields.country} <span aria-hidden="true" className="text-destructive">*</span>
                   </Label>
                   <Select disabled={disabled || submitting} onValueChange={(countryCode) => {
                       const template = taxTemplates.find((entry) => entry.countryCode === countryCode);
@@ -279,12 +279,15 @@ export function TenantForm({
                       setErrors((current) => ({ ...current, country: undefined, defaultCurrency: undefined }));
                       setFormError(null);
                     }} value={selectedCountry}>
-                      <SelectTrigger aria-invalid={Boolean(errors.country)} id="tenant-country"><SelectValue placeholder={m.tenants.form.fields.country} /></SelectTrigger>
+                      <SelectTrigger aria-required="true" aria-describedby="tenant-country-hint" aria-invalid={Boolean(errors.country)} id="tenant-country"><SelectValue placeholder={m.tenants.form.fields.country} /></SelectTrigger>
                       <SelectContent className="max-h-80">
                         {values.country && !countryOptions.some((country) => country.code === values.country) ? <SelectItem value={values.country}>{values.country}</SelectItem> : null}
                         {countryOptions.map((country) => <SelectItem key={country.code} value={country.code}>{country.label} ({country.code})</SelectItem>)}
                       </SelectContent>
                     </Select>
+                  <p id="tenant-country-hint" className="text-xs text-muted-foreground">{countryCopy.required}</p>
+                  {showDefaults && isUsableTaxTemplate(selectedTemplate) ? <p className="text-xs text-emerald-700">{countryCopy.selected}: {selectedTemplate!.name} · {selectedTemplate!.currencyCode}</p> : null}
+                  {showDefaults ? <p className="text-xs leading-5 text-muted-foreground">{countryCopy.pending}</p> : null}
                   {templateError ? <p className="text-xs text-destructive">{countryCopy.unavailable}</p> : null}
                   {!templateError && taxTemplates.length === 0 ? <p className="text-xs text-muted-foreground">{countryCopy.empty}</p> : null}
                   {values.country && !templateError && !isUsableTaxTemplate(selectedTemplate) ? (

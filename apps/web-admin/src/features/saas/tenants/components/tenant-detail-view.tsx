@@ -17,6 +17,8 @@ import { Building2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { CheckoutReadinessCard } from "@/features/shared/checkout-readiness/components/checkout-readiness-card";
+
 import { webAdminRoutes } from "@/config/routes";
 import { getCurrentAuthQuery } from "@/features/auth/queries";
 import { SaasBreadcrumbs } from "@/features/saas/shared";
@@ -105,11 +107,6 @@ export function TenantDetailView({
 }: TenantDetailViewProps) {
   const isDialog = presentation === "dialog";
   const { locale, m, formatDate } = useSaasI18n();
-  const readinessCopy = locale === "zh-CN"
-    ? { title: "开店就绪检查", owner: "店主账号", branch: "营业门店", catalog: "商品或服务", terminal: "已绑定终端", tax: "已启用税务", taxTemplate: "已应用当前国家税务模板", taxNumber: "税务登记号" }
-    : locale === "fr"
-      ? { title: "Préparation du magasin", owner: "Compte propriétaire", branch: "Magasin actif", catalog: "Produit ou service", terminal: "Terminal inscrit", tax: "Taxe activée", taxTemplate: "Modèle fiscal national actuel appliqué", taxNumber: "Numéro fiscal" }
-      : { title: "Store readiness", owner: "Owner account", branch: "Active branch", catalog: "Product or service", terminal: "Enrolled terminal", tax: "Tax enabled", taxTemplate: "Current country tax template applied", taxNumber: "Tax registration number" };
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [tenant, setTenant] = useState<TenantDetail | null>(null);
@@ -394,6 +391,8 @@ export function TenantDetailView({
             </div>
           ) : null}
 
+          <CheckoutReadinessCard readiness={tenant.readiness} locale={locale} tenantId={tenant.id} />
+
           <TenantForm
             disabled={!canManageTenant}
             featureFlagsContent={
@@ -513,28 +512,10 @@ export function TenantDetailView({
                   tenantId={tenantId}
                 />
 
-                <Card className="gap-0 rounded-lg py-0 shadow-none">
-                  <CardContent className="grid gap-3 py-5">
-                    <h2 className="text-sm font-semibold">{readinessCopy.title}</h2>
-                    {([
-                      [readinessCopy.owner, tenant.readiness.activeOwnerCount > 0, tenant.readiness.activeOwnerCount],
-                      [readinessCopy.branch, tenant.readiness.activeBranchCount > 0, tenant.readiness.activeBranchCount],
-                      [readinessCopy.catalog, tenant.readiness.activeCatalogItemCount > 0, null],
-                      [readinessCopy.terminal, tenant.readiness.enrolledTerminalCount > 0, tenant.readiness.enrolledTerminalCount],
-                      [readinessCopy.tax, tenant.readiness.taxEnabled, null],
-                      [readinessCopy.taxTemplate, tenant.readiness.taxTemplateApplied, null],
-                      [readinessCopy.taxNumber, tenant.readiness.taxRegistrationNumberSet, null],
-                    ] as const).map(([label, ready, count]) => (
-                      <div className="flex items-center justify-between gap-3 text-sm" key={label}>
-                        <span>{label}{count === null ? "" : ` (${count})`}</span>
-                        <Badge variant={ready ? "default" : "secondary"}>{ready ? "✓" : "—"}</Badge>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
+
 
                 <Card className="gap-0 rounded-lg py-0 shadow-none">
-                  <CardContent className="grid gap-4 py-5">
+                  <CardContent id="tenant-status" className="grid gap-4 py-5">
                     <div>
                       <h2 className="text-sm font-semibold text-foreground">
                         {m.tenants.detail.statusSection}

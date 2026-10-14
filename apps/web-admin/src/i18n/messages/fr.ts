@@ -229,6 +229,8 @@ export const frMessages: WebAdminMessages = {
       "restore_request.created": "Demande de restauration créée",
       "feedback_ticket.status_updated": "Statut du ticket mis à jour",
       "feedback_ticket.assignee_updated": "Responsable du ticket mis à jour",
+      "tenant.demo_tax_readiness_repaired": "Fiscalité du locataire de test complétée",
+      "tenant.demo_store_provisioned": "Magasin et prix de test créés",
       "tenant.created": "Locataire créé",
       "tenant.updated": "Locataire mis à jour",
       "tenant.status_updated": "Statut du locataire mis à jour",

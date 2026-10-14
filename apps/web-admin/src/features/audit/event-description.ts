@@ -28,6 +28,8 @@ export const AUDIT_EVENT_DICTIONARY = {
   ],
   saas_tenant: [
     "tenant.created",
+    "tenant.demo_tax_readiness_repaired",
+    "tenant.demo_store_provisioned",
     "tenant.updated",
     "tenant.status_updated",
     "tenant_settings.updated",

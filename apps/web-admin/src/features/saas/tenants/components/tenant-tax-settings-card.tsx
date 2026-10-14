@@ -82,7 +82,7 @@ export function TenantTaxSettingsCard({ tenantId, canEdit, templateApplied, onSa
   }
 
   return (
-    <Card className="gap-0 rounded-lg py-0 shadow-none">
+    <Card id="tenant-tax-settings" className="gap-0 rounded-lg py-0 shadow-none">
       <CardContent className="grid gap-3 py-5">
         <h2 className="text-sm font-semibold">{copy.title}</h2>
         {form ? <>

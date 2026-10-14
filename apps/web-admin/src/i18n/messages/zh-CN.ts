@@ -298,6 +298,8 @@ export const zhCNMessages: WebAdminMessages = {
       "restore_request.created": "恢复请求已创建",
       "feedback_ticket.status_updated": "反馈工单状态已更新",
       "feedback_ticket.assignee_updated": "反馈工单受理人已更新",
+      "tenant.demo_tax_readiness_repaired": "测试租户税务配置已补齐",
+      "tenant.demo_store_provisioned": "测试门店及演示价格已建立",
       "tenant.created": "租户已创建",
       "tenant.updated": "租户资料已更新",
       "tenant.status_updated": "租户状态已更新",

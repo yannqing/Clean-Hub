@@ -54,6 +54,8 @@ export type AuditEventCode =
   | "feedback_ticket.status_updated"
   | "feedback_ticket.assignee_updated"
   | "tenant.created"
+  | "tenant.demo_tax_readiness_repaired"
+  | "tenant.demo_store_provisioned"
   | "tenant.updated"
   | "tenant.status_updated"
   | "tenant_settings.updated"

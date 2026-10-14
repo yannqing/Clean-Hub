@@ -55,6 +55,8 @@ import {
   useState,
 } from "react";
 
+import { TenantCheckoutReadinessPanel } from "./tenant-checkout-readiness";
+
 import { webAdminRoutes } from "@/config/routes";
 import { useTenantI18n, useWebAdminLocale } from "@/i18n";
 import { webAdminApi } from "@/lib/api-client";
@@ -860,6 +862,7 @@ export function TenantHomeSearch() {
       className="mx-auto flex min-h-[calc(100vh-7rem)] w-full max-w-5xl flex-col justify-start pb-8 pt-14"
       data-testid="tenant-home-search-panel"
     >
+      <TenantCheckoutReadinessPanel />
       <div className="text-center">
         <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
           {m.overview.welcomeTitle}

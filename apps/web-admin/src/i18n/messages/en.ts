@@ -324,6 +324,8 @@ export const enMessages: WebAdminMessages = {
       "restore_request.created": "Restore request created",
       "feedback_ticket.status_updated": "Feedback ticket status updated",
       "feedback_ticket.assignee_updated": "Feedback ticket assignee updated",
+      "tenant.demo_tax_readiness_repaired": "Demo tenant tax setup completed",
+      "tenant.demo_store_provisioned": "Demo store and test prices created",
       "tenant.created": "Tenant created",
       "tenant.updated": "Tenant updated",
       "tenant.status_updated": "Tenant status updated",
