@@ -1287,8 +1287,8 @@ fun NativePosApp(applicationContext: Context) {
             return
         }
         val cashState = snapshot?.cashState
-        if (cashState?.isOfflineCashReady() != true) {
-            message = copy.needOpenCashSession
+        if (cashState == null) {
+            message = copy.cashDisabledStore
             return
         }
         val outstanding = outstandingAmount(order.totalAmount, order.paidAmount)
@@ -1311,9 +1311,6 @@ fun NativePosApp(applicationContext: Context) {
                         put("paymentMethod", "cash")
                         put("amount", outstanding)
                         put("tenderedAmount", actualTenderedAmount)
-                        cashState.shiftId?.let { put("shiftId", it) }
-                        cashState.registerSessionId?.let { put("registerSessionId", it) }
-                        cashState.cashSessionId?.let { put("cashDrawerSessionId", it) }
                         put("occurredAt", occurredAt)
                         put("idempotencyKey", idempotencyKey)
                     })
@@ -1578,24 +1575,6 @@ fun NativePosApp(applicationContext: Context) {
                     }
                     else -> message = copy.pinIncorrect
                 }
-            } catch (error: Exception) {
-                message = error.userMessage(copy)
-            } finally {
-                busy = false
-            }
-        }
-    }
-
-    fun startShift() {
-        scope.launch {
-            busy = true
-            try {
-                withContext(Dispatchers.IO) {
-                    api.post("/pos/staff/clock", JSONObject().put("action", "clock_in"))
-                    NativePosSyncEngine(applicationContext).synchronize()
-                }
-                reload()
-                message = copy.shiftStartedOpenDrawer
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -2304,8 +2283,7 @@ fun NativePosApp(applicationContext: Context) {
                                 internetAvailable = false,
                                 busy = busy,
                                 message = message,
-                                onStartShift = ::startShift,
-                                onOpenRegister = ::openRegister,
+                                onSynchronize = ::synchronize,
                             )
                         } else {
                             NativeSaleView(
@@ -5574,38 +5552,16 @@ private fun CashOperationsView(
     internetAvailable: Boolean,
     busy: Boolean,
     message: String?,
-    onStartShift: () -> Unit,
-    onOpenRegister: (String) -> Unit,
+    onSynchronize: () -> Unit,
 ) {
-    var openingFloat by remember { mutableStateOf("0") }
     FormColumn(if (internetAvailable) copy.readyOnlineCash else copy.readyOfflineCash) {
-        if (cashState == null) {
-            Text(copy.cashDisabledStore)
-        } else {
-            Text(
-                if (internetAvailable) copy.cashNeedsShiftOnline else copy.cashNeedsShiftOffline,
-            )
-            if (cashState.shiftId == null) {
-                Button(onClick = onStartShift, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.startMyShift) }
-            } else {
-                Text(copy.shiftStarted)
-            }
-            if (cashState.shiftId != null && !cashState.isOfflineCashReady()) {
-                if (cashState.needsCashSession()) {
-                    NativePosInput(
-                        value = openingFloat,
-                        onValueChange = { openingFloat = it.filter { char -> char.isDigit() || char == '.' } },
-                        label = { Text(copy.drawerOpeningCash) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                Button(
-                    onClick = { onOpenRegister(openingFloat.ifBlank { "0" }) },
-                    enabled = !busy && parseMoney(openingFloat.ifBlank { "0" }) != null,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(copy.openDrawerAndSync) }
-            }
+        Text(if (cashState == null) copy.cashDisabledStore else copy.cashNeedsSync)
+        if (cashState != null) {
+            OutlinedButton(
+                onClick = onSynchronize,
+                enabled = internetAvailable && !busy,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (busy) copy.synchronizing else copy.syncLocalData) }
         }
         ErrorText(message)
     }

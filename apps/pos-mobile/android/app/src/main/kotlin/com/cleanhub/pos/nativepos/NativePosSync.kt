@@ -130,8 +130,18 @@ class NativePosSyncEngine(context: Context) {
         val tickets = runCatching {
             api.get("/pos/service-tickets?branchId=$branchId&limit=100&offset=0")
         }.getOrNull()
-        val shift = api.get("/pos/staff/current-shift").takeUnless { it.isNullObject() }
-        val register = api.get("/pos/staff/current-register")
+        val shift = runCatching {
+            api.get("/pos/staff/current-shift").takeUnless { it.isNullObject() }
+        }.getOrNull()
+        var register = api.get("/pos/staff/current-register")
+        if (shouldPrepareNativeCashRegister(
+                mode = register.requiredString("cashHandlingMode"),
+                registerOpen = register.optJSONObject("registerSession")?.optString("status") == "open",
+                cashSessionOpen = register.optJSONObject("cashSession")?.optString("status") == "open",
+                requireOpeningFloat = register.optBoolean("requireOpeningFloat", true),
+            )) {
+            register = api.post("/pos/staff/register-sessions/open", JSONObject())
+        }
         val cashMode = register.requiredString("cashHandlingMode")
         // A successful sync must include financial readiness, not just the catalogue.
         val printSettings = api.get("/pos/terminal-settings")

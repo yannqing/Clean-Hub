@@ -738,7 +738,6 @@ function CartPanel({
         Boolean(register.cashSession) ||
         (trackedCashMode && !register.requireOpeningFloat)
       : Boolean(register.registerSession) &&
-        Boolean(currentShift) &&
         (register.cashHandlingMode === "untracked" ||
           Boolean(register.cashSession)));
   // Cash rounding is only meaningful when the whole tender is cash and the

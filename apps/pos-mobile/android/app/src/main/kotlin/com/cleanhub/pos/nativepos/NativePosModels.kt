@@ -173,18 +173,29 @@ data class NativeCashState(
     val updatedAt: Long,
 )
 
-/** A cash sale is only safe offline when its complete accountability context was cached online. */
+/** Staff identity comes from the authenticated terminal; clocking in is optional. */
 fun NativeCashState.isOfflineCashReady(): Boolean =
-    shiftId != null &&
-        registerSessionId != null &&
+    !registerSessionId.isNullOrBlank() &&
         when (cashHandlingMode) {
             "untracked" -> true
-            "shared_drawer", "cash_in_hand" -> cashSessionId != null
+            "shared_drawer", "cash_in_hand" -> !cashSessionId.isNullOrBlank()
             else -> false
         }
 
 fun NativeCashState.needsCashSession(): Boolean =
     cashHandlingMode == "shared_drawer" || cashHandlingMode == "cash_in_hand"
+
+/** Prepare bookkeeping automatically when no manual opening float is required. */
+fun shouldPrepareNativeCashRegister(
+    mode: String,
+    registerOpen: Boolean,
+    cashSessionOpen: Boolean,
+    requireOpeningFloat: Boolean,
+): Boolean = when (mode) {
+    "untracked" -> !registerOpen
+    "shared_drawer", "cash_in_hand" -> !requireOpeningFloat && (!registerOpen || !cashSessionOpen)
+    else -> false
+}
 
 data class NativeCartLine(
     val skuId: String,
