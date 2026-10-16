@@ -20,6 +20,8 @@ const nextConfig: NextConfig = {
     ? {}
     : { outputFileTracingRoot: join(currentDir, "../..") }),
   experimental: {
+    // A 512 KB CSV expands when its rows are encoded as a typed JSON batch.
+    serverActions: { bodySizeLimit: "2mb" },
     // Tree-shake icon/ barrel imports so only the icons actually referenced
     // by the app (e.g. the sidebar nav icons) end up in the client bundle,
     // rather than the whole lucide-react / @cleanhub/ui catalog.

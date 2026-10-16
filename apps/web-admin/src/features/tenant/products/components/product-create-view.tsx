@@ -1342,18 +1342,19 @@ export function ProductCreateView({
 
                   <div className="grid gap-2">
                     <Label htmlFor="product-sku-code">
-                      {m.products.create.fields.skuCode} <RequiredMark />
+                      {m.products.create.fields.skuCode} {isEditMode ? <RequiredMark /> : null}
                     </Label>
                     <Input
                       aria-invalid={Boolean(errors.skuCode)}
-                      aria-required="true"
+                      aria-required={isEditMode}
                       defaultValue={initialProduct?.sku.skuCode ?? ""}
                       id="product-sku-code"
                       maxLength={80}
                       name="skuCode"
-                      placeholder={m.products.create.placeholders.skuCode}
-                      required
+                      placeholder={isEditMode ? m.products.create.placeholders.skuCode : m.products.create.skuAutoPlaceholder}
+                      required={isEditMode}
                     />
+                    <p className="text-xs text-muted-foreground">{isEditMode ? m.products.create.skuEditHelp : m.products.create.skuAutoHelp}</p>
                     <FieldError message={getErrorMessage("skuCode")} />
                   </div>
 

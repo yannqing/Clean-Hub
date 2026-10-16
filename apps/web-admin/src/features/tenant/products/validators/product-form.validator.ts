@@ -12,7 +12,7 @@ const DECIMAL_12_2_PATTERN = /^(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/;
 export type ProductFormValidationResult =
   | {
       ok: true;
-      data: CreateTenantProductRequest & { currency: string };
+      data: CreateTenantProductRequest & { currency: string; skuCode: string };
     }
   | {
       ok: false;
@@ -189,7 +189,7 @@ export function validateProductForm(
     errors.status = "statusInvalid";
   }
 
-  if (!skuCode) {
+  if (mode === "edit" && !skuCode) {
     errors.skuCode = "skuCodeRequired";
   } else if (skuCode.length > 80) {
     errors.skuCode = "skuCodeTooLong";

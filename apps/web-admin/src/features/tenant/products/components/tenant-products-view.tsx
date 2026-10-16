@@ -40,6 +40,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -51,6 +52,7 @@ import { interpolate, useTenantI18n } from "@/i18n";
 import { formatMoney } from "@/lib/format";
 import { isProductsFeatureDisabled } from "../product-access";
 import { ProductAccessNotice } from "./product-access-notice";
+import { ProductImportDialog } from "./product-import-dialog";
 
 import { buildTenantCreatedAtDateRange } from "../../date-range";
 import {
@@ -214,6 +216,8 @@ export function TenantProductsView({
   const [listError, setListError] = useState<string | null>(null);
   const [overviewError, setOverviewError] = useState<string | null>(null);
   const [featureDisabled, setFeatureDisabled] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const handleProductsFeatureDisabled = useCallback(() => setFeatureDisabled(true), []);
   const { createdAfter, createdBefore } = buildTenantCreatedAtDateRange(
     dateFilter,
     timeZone,
@@ -625,7 +629,8 @@ export function TenantProductsView({
           <Button
             className="h-8 gap-1.5 px-2.5 text-xs"
             data-testid="tenant-products-import"
-            disabled={actionsUnavailable}
+            disabled={actionsUnavailable || !canEditProducts}
+            onClick={() => setImportOpen(true)}
             size="sm"
             type="button"
             variant="outline"
@@ -1107,6 +1112,15 @@ export function TenantProductsView({
             />
           </DataTableSurface>
       </>
+      {importOpen ? <ProductImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onFeatureDisabled={handleProductsFeatureDisabled}
+        onImported={() => {
+          setRefreshVersion((current) => current + 1);
+          router.refresh();
+        }}
+      /> : null}
     </section>
   );
 }

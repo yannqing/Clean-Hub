@@ -334,6 +334,7 @@ export const zhCNMessages: WebAdminMessages = {
       "settings.updated": "设置已更新",
       "product.created": "商品已创建",
       "product.updated": "商品已更新",
+      "product.imported": "商品已批量导入",
       "tenant.customer.comment_created": "已为顾客添加备注",
       "tenant.customer.comment_updated": "顾客备注已修改",
       "tenant.order.comment_created": "已为订单添加备注",

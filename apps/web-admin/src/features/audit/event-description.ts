@@ -66,7 +66,7 @@ export const AUDIT_EVENT_DICTIONARY = {
   ],
   tenant_notification: ["notification_settings.updated"],
   tenant_settings: ["settings.updated"],
-  tenant_product: ["product.created", "product.updated"],
+  tenant_product: ["product.created", "product.updated", "product.imported"],
   tenant_customer: [
     "tenant.customer.comment_created",
     "tenant.customer.comment_updated",

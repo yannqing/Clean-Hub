@@ -265,6 +265,7 @@ export const frMessages: WebAdminMessages = {
       "settings.updated": "Paramètres mis à jour",
       "product.created": "Produit créé",
       "product.updated": "Produit mis à jour",
+      "product.imported": "Produits importés",
       "tenant.customer.comment_created": "Commentaire ajouté au client",
       "tenant.customer.comment_updated": "Commentaire client modifié",
       "tenant.order.comment_created": "Commentaire ajouté à la commande",

@@ -360,6 +360,7 @@ export const enMessages: WebAdminMessages = {
       "settings.updated": "Settings updated",
       "product.created": "Product created",
       "product.updated": "Product updated",
+      "product.imported": "Products imported",
       "tenant.customer.comment_created": "Comment added to customer",
       "tenant.customer.comment_updated": "Customer comment edited",
       "tenant.order.comment_created": "Comment added to order",

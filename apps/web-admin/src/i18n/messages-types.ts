@@ -89,6 +89,7 @@ export type AuditEventCode =
   | "settings.updated"
   | "product.created"
   | "product.updated"
+  | "product.imported"
   | "tenant.customer.comment_created"
   | "tenant.customer.comment_updated"
   | "tenant.order.comment_created"
