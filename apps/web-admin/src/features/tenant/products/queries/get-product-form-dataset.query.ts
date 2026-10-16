@@ -8,6 +8,7 @@ import type { BranchSummary } from "../../branches/types";
 import { getTaxRateOptionsQuery } from "../../tax-rates/queries";
 import type { TaxRateOptions } from "../../tax-rates/types";
 import type { TenantProductCategorySummary } from "../types";
+import { isProductsFeatureDisabled } from "../product-access";
 import { getProductCurrencyDatasetQuery } from "./get-product-currency-dataset.query";
 
 const BRANCH_PAGE_SIZE = 100;
@@ -20,6 +21,7 @@ export type ProductFormDataset = {
   categoryLoadFailed: boolean;
   currencyLoadFailed: boolean;
   defaultCurrency: string | null;
+  featureDisabled: boolean;
   taxRateOptions: TaxRateOptions;
 };
 
@@ -72,8 +74,13 @@ export async function getProductFormDatasetQuery(
           code: category.code,
         })),
         categoryLoadFailed: false,
+        featureDisabled: false,
       }))
-      .catch(() => ({ categories: [], categoryLoadFailed: true })),
+      .catch((error: unknown) => ({
+        categories: [],
+        categoryLoadFailed: !isProductsFeatureDisabled(error),
+        featureDisabled: isProductsFeatureDisabled(error),
+      })),
     getProductCurrencyDatasetQuery(requestOptions)
       .then((dataset) => ({
         ...dataset,

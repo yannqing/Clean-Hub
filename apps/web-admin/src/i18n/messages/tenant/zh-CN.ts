@@ -1075,9 +1075,14 @@ export const tenantMessagesZhCN: TenantMessages = {
     noBarcode: "未设置条码",
     noPrice: "未设置价格",
     inventoryNotTracked: "不跟踪库存",
-    featureDisabledTitle: "产品功能尚未启用",
+    featureDisabledTitle: "零售商品功能未启用",
     featureDisabledDescription:
-      "当前租户尚未启用零售产品功能，请联系平台管理员启用后再使用。",
+      "当前租户尚未启用零售商品功能，无法新增、编辑、导入、导出或上传商品图片。请联系平台管理员开通后使用。",
+    featureAccessLoadFailedTitle: "暂时无法确认产品功能权限",
+    featureAccessLoadFailedDescription:
+      "无法读取当前租户的功能权限，产品相关操作已暂停。请重新检查；若问题持续，请联系管理员。",
+    recheckAccess: "重新检查权限",
+    returnHome: "返回主页",
     emptyTitle: "暂无产品",
     emptyDescription: "创建产品和 SKU 后，将会显示在这里。",
     filteredEmptyTitle: "没有匹配的产品",

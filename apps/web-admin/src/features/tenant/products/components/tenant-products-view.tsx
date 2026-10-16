@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  isApiHttpError,
   type TenantProductOverview,
   type TenantProductStatus,
   type TenantProductSummary,
@@ -50,6 +49,8 @@ import {
 import { webAdminRoutes } from "@/config/routes";
 import { interpolate, useTenantI18n } from "@/i18n";
 import { formatMoney } from "@/lib/format";
+import { isProductsFeatureDisabled } from "../product-access";
+import { ProductAccessNotice } from "./product-access-notice";
 
 import { buildTenantCreatedAtDateRange } from "../../date-range";
 import {
@@ -157,10 +158,6 @@ function getProductStatusVariant(
   return status === "active" ? "default" : "outline";
 }
 
-function isProductsFeatureDisabled(error: unknown): boolean {
-  return isApiHttpError(error) && error.code === "FEATURE_DISABLED";
-}
-
 function getProductImageKey(productId: string, mediaId: string): string {
   return `${productId}:${mediaId}`;
 }
@@ -241,7 +238,6 @@ export function TenantProductsView({
 
         setProductDataset(result);
         setListError(null);
-        setFeatureDisabled(false);
       })
       .catch((error: unknown) => {
         if (!current) {
@@ -595,7 +591,7 @@ export function TenantProductsView({
     event: ReactMouseEvent<HTMLTableRowElement>,
     productId: string,
   ) {
-    if (!canEditProducts) {
+    if (!canEditProducts || featureDisabled || listLoading || listError) {
       return;
     }
 
@@ -611,6 +607,12 @@ export function TenantProductsView({
     router.push(webAdminRoutes.tenant.product(productId));
   }
 
+  if (featureDisabled) {
+    return <ProductAccessNotice />;
+  }
+
+  const actionsUnavailable = listLoading || listError !== null;
+
   return (
     <section className="space-y-7 pb-8" data-testid="tenant-products-view">
       <header className="flex items-center justify-between gap-3">
@@ -623,6 +625,7 @@ export function TenantProductsView({
           <Button
             className="h-8 gap-1.5 px-2.5 text-xs"
             data-testid="tenant-products-import"
+            disabled={actionsUnavailable}
             size="sm"
             type="button"
             variant="outline"
@@ -634,6 +637,7 @@ export function TenantProductsView({
           <Button
             className="h-8 gap-1.5 px-2.5 text-xs"
             data-testid="tenant-products-export"
+            disabled={actionsUnavailable}
             size="sm"
             type="button"
             variant="outline"
@@ -689,31 +693,23 @@ export function TenantProductsView({
             </PopoverContent>
           </Popover>
 
-          <Button
-            asChild
-            className="h-8 gap-1.5 px-2.5 text-xs"
-            data-testid="tenant-products-add"
-            size="sm"
-          >
-            <Link href={webAdminRoutes.tenant.newProduct}>
+          {actionsUnavailable ? (
+            <Button className="h-8 gap-1.5 px-2.5 text-xs" data-testid="tenant-products-add" disabled size="sm">
               <Icon aria-hidden icon={Plus} size={14} />
               <span>{m.products.toolbar.addProductAction}</span>
-            </Link>
-          </Button>
+            </Button>
+          ) : (
+            <Button asChild className="h-8 gap-1.5 px-2.5 text-xs" data-testid="tenant-products-add" size="sm">
+              <Link href={webAdminRoutes.tenant.newProduct}>
+                <Icon aria-hidden icon={Plus} size={14} />
+                <span>{m.products.toolbar.addProductAction}</span>
+              </Link>
+            </Button>
+          )}
         </div>
       </header>
 
-      {featureDisabled ? (
-        <section className="border-y border-dashed bg-background px-4 py-14 text-center">
-          <h2 className="text-base font-semibold">
-            {m.products.featureDisabledTitle}
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {m.products.featureDisabledDescription}
-          </p>
-        </section>
-      ) : (
-        <>
+      <>
           <DataTableMetricCards
             ariaLabel={m.products.metrics.label}
             loading={overviewLoading}
@@ -1110,8 +1106,7 @@ export function TenantProductsView({
               totalPages={totalPages}
             />
           </DataTableSurface>
-        </>
-      )}
+      </>
     </section>
   );
 }

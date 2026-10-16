@@ -830,6 +830,10 @@ export type TenantMessages = {
     inventoryNotTracked: string;
     featureDisabledTitle: string;
     featureDisabledDescription: string;
+    featureAccessLoadFailedTitle: string;
+    featureAccessLoadFailedDescription: string;
+    recheckAccess: string;
+    returnHome: string;
     emptyTitle: string;
     emptyDescription: string;
     filteredEmptyTitle: string;

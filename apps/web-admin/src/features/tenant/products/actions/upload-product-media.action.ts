@@ -5,6 +5,7 @@ import type { TenantProductMediaUploadTicket } from "@cleanhub/api-client";
 import { webAdminApi } from "@/lib/api-client";
 
 import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
+import { isProductsFeatureDisabled } from "../product-access";
 
 const MAX_PRODUCT_MEDIA_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_PRODUCT_MEDIA_TYPES = new Set([
@@ -20,7 +21,7 @@ export type UploadProductMediaActionResult =
     }
   | {
       ok: false;
-      reason: "missing" | "type" | "size" | "upload";
+      reason: "missing" | "type" | "size" | "upload" | "feature_disabled";
     };
 
 export async function uploadProductMediaAction(input: {
@@ -53,7 +54,10 @@ export async function uploadProductMediaAction(input: {
       ok: true,
       ticket,
     };
-  } catch {
+  } catch (error) {
+    if (isProductsFeatureDisabled(error)) {
+      return { ok: false, reason: "feature_disabled" };
+    }
     return { ok: false, reason: "upload" };
   }
 }

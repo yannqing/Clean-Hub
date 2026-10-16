@@ -75,6 +75,7 @@ import {
   type CategoryMetafieldsLoadState,
 } from "./category-metafields-editor";
 import { ProductRichTextEditor } from "./product-rich-text-editor";
+import { ProductAccessNotice } from "./product-access-notice";
 
 const MAX_PRODUCT_IMAGES = 10;
 const MAX_PRODUCT_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
@@ -327,6 +328,7 @@ export function ProductCreateView({
   const [errors, setErrors] = useState<ProductFormErrors>({});
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [featureDisabled, setFeatureDisabled] = useState(false);
 
   const selectedBranches = useMemo(
     () => branches.filter((branch) => !excludedBranchIds.has(branch.id)),
@@ -370,6 +372,9 @@ export function ProductCreateView({
         }
 
         if (!result.ok) {
+          if (result.reason === "feature_disabled") {
+            setFeatureDisabled(true);
+          }
           setCategoryMetafieldsLoadState("error");
           return;
         }
@@ -393,7 +398,7 @@ export function ProductCreateView({
   }, [initialProduct?.categoryId]);
 
   useEffect(() => {
-    if (!isDirty) {
+    if (!isDirty || featureDisabled) {
       return;
     }
 
@@ -404,10 +409,10 @@ export function ProductCreateView({
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isDirty]);
+  }, [isDirty, featureDisabled]);
 
   useEffect(() => {
-    if (!isDirty && !saving) {
+    if (featureDisabled || (!isDirty && !saving)) {
       return;
     }
 
@@ -445,7 +450,7 @@ export function ProductCreateView({
     document.addEventListener("click", handleDocumentLink, true);
     return () =>
       document.removeEventListener("click", handleDocumentLink, true);
-  }, [isDirty, m.products.create.unsavedChanges, saving]);
+  }, [isDirty, m.products.create.unsavedChanges, saving, featureDisabled]);
 
   useEffect(
     () => () => {
@@ -518,6 +523,9 @@ export function ProductCreateView({
     }
 
     if (!result.ok) {
+      if (result.reason === "feature_disabled") {
+        setFeatureDisabled(true);
+      }
       setCategoryMetafieldsLoadState("error");
       return;
     }
@@ -746,6 +754,10 @@ export function ProductCreateView({
       });
 
       if (!result.ok) {
+        if (result.reason === "feature_disabled") {
+          setFeatureDisabled(true);
+          return null;
+        }
         toast.error(
           result.reason === "type"
             ? m.products.create.mediaTypeInvalid
@@ -794,7 +806,7 @@ export function ProductCreateView({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (saving) {
+    if (saving || formUnavailable || featureDisabled) {
       return;
     }
 
@@ -887,6 +899,10 @@ export function ProductCreateView({
           : await createProductAction(formValues);
 
       if (!result.ok) {
+        if (result.code === "FEATURE_DISABLED") {
+          setFeatureDisabled(true);
+          return;
+        }
         const isMediaError = result.code?.startsWith("PRODUCT_MEDIA_") ?? false;
 
         if (isMediaError) {
@@ -946,6 +962,10 @@ export function ProductCreateView({
     } finally {
       setSaving(false);
     }
+  }
+
+  if (featureDisabled) {
+    return <ProductAccessNotice />;
   }
 
   const pageTitle = isEditMode

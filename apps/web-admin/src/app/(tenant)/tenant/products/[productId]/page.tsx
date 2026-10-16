@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 
 import { getAuthSessionQuery } from "@/features/auth/queries";
 import { ProductCreateView } from "@/features/tenant/products/components";
-import {
-  getProductDetailQuery,
-} from "@/features/tenant/products/queries";
+import { ProductAccessNotice } from "@/features/tenant/products/components/product-access-notice";
+import { isProductsFeatureDisabled } from "@/features/tenant/products/product-access";
+import { getProductAccessQuery } from "@/features/tenant/products/queries/get-product-access.query";
+import { getProductDetailQuery } from "@/features/tenant/products/queries";
 import { getProductFormDatasetQuery } from "@/features/tenant/products/queries/get-product-form-dataset.query";
 import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-request-options";
 
@@ -27,6 +28,9 @@ async function loadEditProductPageData(
       getProductFormDatasetQuery(requestOptions),
     ]);
   } catch (error) {
+    if (isProductsFeatureDisabled(error)) {
+      return null;
+    }
     if (
       isApiHttpError(error) &&
       (error.status === 403 || error.status === 404)
@@ -54,10 +58,16 @@ export default async function EditProductPage({
     notFound();
   }
 
-  const [initialProduct, dataset] = await loadEditProductPageData(
-    productId,
-    requestOptions,
-  );
+  const access = await getProductAccessQuery(requestOptions);
+  if (access !== "enabled") {
+    return <ProductAccessNotice access={access} />;
+  }
+
+  const loaded = await loadEditProductPageData(productId, requestOptions);
+  if (!loaded || loaded[1].featureDisabled) {
+    return <ProductAccessNotice />;
+  }
+  const [initialProduct, dataset] = loaded;
   const availableCurrencies = dataset.availableCurrencies.includes(
     initialProduct.currency,
   )

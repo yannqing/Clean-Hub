@@ -1119,9 +1119,14 @@ export const tenantMessagesEn: TenantMessages = {
     noBarcode: "No barcode",
     noPrice: "No price configured",
     inventoryNotTracked: "Inventory not tracked",
-    featureDisabledTitle: "Products are not enabled",
+    featureDisabledTitle: "Retail products are not enabled",
     featureDisabledDescription:
-      "Retail products are not enabled for this tenant. Ask a platform administrator to enable the feature.",
+      "Retail products are not enabled for this tenant. Adding, editing, importing, exporting and uploading product images are unavailable. Contact a platform administrator to enable this feature.",
+    featureAccessLoadFailedTitle: "Product access could not be verified",
+    featureAccessLoadFailedDescription:
+      "The current tenant's feature permissions could not be loaded. Product actions are temporarily unavailable. Check again or contact an administrator if this continues.",
+    recheckAccess: "Check access again",
+    returnHome: "Back to home",
     emptyTitle: "No products yet",
     emptyDescription: "Products and SKUs will appear here after creation.",
     filteredEmptyTitle: "No matching products",

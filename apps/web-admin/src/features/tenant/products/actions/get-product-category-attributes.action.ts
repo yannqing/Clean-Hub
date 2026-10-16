@@ -5,6 +5,7 @@ import type { TenantProductCategoryAttributeListResponse } from "@cleanhub/api-c
 import { webAdminApi } from "@/lib/api-client";
 
 import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
+import { isProductsFeatureDisabled } from "../product-access";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
@@ -15,7 +16,7 @@ export type GetProductCategoryAttributesActionResult =
     }
   | {
       ok: false;
-      reason: "invalid" | "request";
+      reason: "invalid" | "request" | "feature_disabled";
     };
 
 export async function getProductCategoryAttributesAction(
@@ -32,7 +33,10 @@ export async function getProductCategoryAttributesAction(
     );
 
     return { ok: true, data };
-  } catch {
+  } catch (error) {
+    if (isProductsFeatureDisabled(error)) {
+      return { ok: false, reason: "feature_disabled" };
+    }
     return { ok: false, reason: "request" };
   }
 }

@@ -1133,9 +1133,14 @@ export const tenantMessagesFr: TenantMessages = {
     noBarcode: "Pas de code barre",
     noPrice: "Aucun prix configuré",
     inventoryNotTracked: "Inventaire non suivi",
-    featureDisabledTitle: "Les produits ne sont pas activés",
+    featureDisabledTitle: "La vente de produits n'est pas activée",
     featureDisabledDescription:
-      "Les produits de vente au détail ne sont pas activés pour ce locataire. Demandez à un administrateur de plateforme d'activer la fonctionnalité.",
+      "La vente de produits n'est pas activée pour ce locataire. L'ajout, la modification, l'importation, l'exportation et l'envoi d'images de produits sont indisponibles. Contactez un administrateur de plateforme pour activer cette fonctionnalité.",
+    featureAccessLoadFailedTitle: "Impossible de vérifier l'accès aux produits",
+    featureAccessLoadFailedDescription:
+      "Les autorisations du locataire n'ont pas pu être chargées. Les actions sur les produits sont temporairement indisponibles. Réessayez ou contactez un administrateur si le problème persiste.",
+    recheckAccess: "Vérifier les autorisations",
+    returnHome: "Retour à l'accueil",
     emptyTitle: "Aucun produit pour l'instant",
     emptyDescription:
       "Les produits et les SKU apparaîtront ici après leur création.",
