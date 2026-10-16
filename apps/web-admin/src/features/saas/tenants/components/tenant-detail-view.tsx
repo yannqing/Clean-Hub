@@ -376,6 +376,15 @@ export function TenantDetailView({
           <CheckoutReadinessCard readiness={tenant.readiness} locale={locale} tenantId={tenant.id} />
 
           <TenantForm
+            additionalContent={
+              <TenantTaxSettingsCard
+                canEdit={authContext?.role === "super_admin"}
+                key={`${tenant.id}-${tenant.updatedAt}`}
+                onSaved={() => { void getTenantDetailQuery(tenantId).then(setTenant); }}
+                templateApplied={tenant.readiness.taxTemplateApplied}
+                tenantId={tenantId}
+              />
+            }
             disabled={!canManageTenant}
             featureFlagsContent={
               <TenantFeatureFlagsPanel
@@ -500,16 +509,6 @@ export function TenantDetailView({
                     )}
                   </CardContent>
                 </Card>
-
-                <TenantTaxSettingsCard
-                  canEdit={authContext?.role === "super_admin"}
-                  key={`${tenant.id}-${tenant.updatedAt}`}
-                  onSaved={() => { void getTenantDetailQuery(tenantId).then(setTenant); }}
-                  templateApplied={tenant.readiness.taxTemplateApplied}
-                  tenantId={tenantId}
-                />
-
-
 
                 <Card className="gap-0 rounded-lg py-0 shadow-none">
                   <CardContent id="tenant-status" className="grid gap-4 py-5">

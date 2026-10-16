@@ -44,6 +44,7 @@ type TenantFormResult =
     };
 
 type TenantFormProps = {
+  additionalContent?: ReactNode;
   aside?: ReactNode;
   disabled?: boolean;
   featureFlagsContent?: ReactNode;
@@ -76,6 +77,7 @@ function isUsableTaxTemplate(template: PlatformTaxTemplate | undefined): templat
 }
 
 export function TenantForm({
+  additionalContent,
   aside,
   disabled = false,
   featureFlagsContent,
@@ -204,6 +206,20 @@ export function TenantForm({
     }
   }
 
+  const submitAction = (
+    <div className="flex justify-end pt-1">
+      <Button disabled={disabled || submitting} type="submit">
+        {submitting
+          ? mode === "create"
+            ? m.common.creating
+            : m.common.saving
+          : mode === "create"
+            ? m.tenants.form.createTenant
+            : m.common.saveChanges}
+      </Button>
+    </div>
+  );
+
   return (
     <form className="grid gap-5" onSubmit={handleSubmit}>
       {formError ? (
@@ -213,7 +229,7 @@ export function TenantForm({
       ) : null}
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="grid gap-5">
+        <div className="grid min-w-0 gap-5">
           <Card className="gap-0 rounded-lg py-0 shadow-none">
             <CardContent className="grid gap-4 py-5">
               <h2 className="text-sm font-semibold text-foreground">
@@ -493,9 +509,11 @@ export function TenantForm({
               </div>
             </CardContent>
           </Card>
+          {!showDefaults ? submitAction : null}
+          {additionalContent}
         </div>
 
-        <aside className="grid gap-5">
+        <aside className="grid min-w-0 gap-5">
           {showDefaults ? (
             <Card className="gap-0 rounded-lg py-0 shadow-none">
               <CardContent className="grid gap-4 py-5">
@@ -558,17 +576,7 @@ export function TenantForm({
         </aside>
       </div>
 
-      <div className="flex justify-end pt-1">
-        <Button disabled={disabled || submitting} type="submit">
-          {submitting
-            ? mode === "create"
-              ? m.common.creating
-              : m.common.saving
-            : mode === "create"
-              ? m.tenants.form.createTenant
-              : m.common.saveChanges}
-        </Button>
-      </div>
+      {showDefaults ? submitAction : null}
     </form>
   );
 }
