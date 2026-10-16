@@ -1,0 +1,44 @@
+{
+  "name": "@cleanhub/pos-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Set CLEANHUB_POS_SERVER_URL to this computer LAN URL, then run cap:run:ios or cap:run:android'",
+    "build": "tsc -p tsconfig.json",
+    "build:production": "node scripts/release.mjs build",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "cap:sync": "node scripts/run-capacitor.mjs sync",
+    "cap:sync:android": "node scripts/run-capacitor.mjs sync android",
+    "cap:sync:ios": "node scripts/run-capacitor.mjs sync ios",
+    "cap:android": "cap open android",
+    "cap:ios": "cap open ios",
+    "cap:run:android": "node scripts/run-capacitor.mjs run android",
+    "cap:run:ios": "node scripts/run-capacitor.mjs run ios",
+    "release:sync": "node scripts/release.mjs sync",
+    "release:sync:android": "node scripts/release.mjs sync android",
+    "release:sync:ios": "node scripts/release.mjs sync ios",
+    "release:validate": "node scripts/release.mjs validate",
+    "package:android": "node scripts/package-android.mjs release",
+    "package:android:debug": "node scripts/package-android.mjs debug",
+    "smoke:native-release-validation": "node scripts/native-release-validation.smoke.mjs"
+  },
+  "dependencies": {
+    "@capacitor-community/sqlite": "^8.1.1",
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "@capacitor/device": "^8.0.3",
+    "@capacitor/ios": "^8.4.1",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2"
+  },
+  "devDependencies": {
+    "@cleanhub/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "dotenv": "^17.4.2",
+    "eslint": "^9.0.0",
+    "typescript": "^5.8.0"
+  }
+}

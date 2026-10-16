@@ -1,0 +1,1 @@
+ALTER TABLE "tenant_feature_flags" ADD COLUMN "email_enabled" boolean DEFAULT false NOT NULL;

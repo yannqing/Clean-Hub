@@ -1,0 +1,331 @@
+"use client";
+
+import type { TranslationKey } from "@cleanhub/i18n";
+import { useTranslation } from "@cleanhub/i18n/react";
+import { cn } from "@cleanhub/ui";
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+
+import { posRoutes, posSidebarNavigation } from "@/config";
+import { usePendingPrintJobCounts } from "@/features/hardware/components/pending-print-jobs";
+import { usePrintJobRecovery } from "@/features/hardware/lib/use-print-job-recovery";
+
+import { Icon } from "./icons";
+import { PosGlobalHeader } from "./pos-global-header";
+import { PosMobileNavigation } from "./pos-mobile-navigation";
+
+function isActivePath(pathname: string, href: string): boolean {
+  if (href === posRoutes.workspace) {
+    return pathname === href;
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export type PosShellProfile = {
+  name: string;
+  role: string;
+  initials: string;
+};
+
+type PosShellProps = {
+  branchName?: string;
+  children: React.ReactNode;
+  merchantName?: string;
+  notificationUnreadCount?: number;
+  profile?: PosShellProfile;
+};
+
+const FALLBACK_PROFILE: PosShellProfile = {
+  name: "",
+  role: "",
+  initials: "?",
+};
+
+const ROLE_LABEL_KEYS: Record<string, TranslationKey> = {
+  owner: "pos.role.owner",
+  manager: "pos.role.manager",
+  cashier: "pos.role.cashier",
+};
+
+function buildInitials(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    return FALLBACK_PROFILE.initials;
+  }
+
+  return [...trimmed][0] ?? FALLBACK_PROFILE.initials;
+}
+
+function localizeProfileName(
+  name: string,
+  roleLabel: string,
+  locale: string,
+): string {
+  if (locale === "zh-CN") {
+    return name;
+  }
+
+  const suffix = name.match(/\d+$/)?.[0];
+  if (/收银员|店长|店主/.test(name)) {
+    return suffix ? `${roleLabel} ${suffix}` : roleLabel;
+  }
+
+  return name;
+}
+
+function resolveActivePathname(
+  pathname: string,
+  searchParams: Pick<URLSearchParams, "get">,
+): string {
+  const entrySource = searchParams.get("from");
+  const ticketEntrySource = searchParams.get("ticketFrom");
+
+  if (
+    entrySource === "intake" &&
+    (pathname.startsWith("/customers/") || pathname.startsWith("/tickets/"))
+  ) {
+    return posRoutes.newIntake;
+  }
+
+  if (entrySource === "customer" && pathname.startsWith("/tickets/")) {
+    return posRoutes.customers;
+  }
+
+  if (entrySource === "ticket" && pathname.startsWith("/orders/")) {
+    if (ticketEntrySource === "intake") {
+      return posRoutes.newIntake;
+    }
+    if (ticketEntrySource === "customer") {
+      return posRoutes.customers;
+    }
+    return posRoutes.tickets;
+  }
+
+  return pathname;
+}
+
+export function PosShell({
+  branchName = "—",
+  children,
+  merchantName = "POS",
+  notificationUnreadCount = 0,
+  profile,
+}: PosShellProps) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const contentScrollRef = useRef<HTMLDivElement>(null);
+  const activePathname = resolveActivePathname(pathname, searchParams);
+  const { locale, t } = useTranslation();
+  const [currentUnreadCount, setCurrentUnreadCount] = useState(
+    notificationUnreadCount,
+  );
+  const resolvedProfile = profile ?? FALLBACK_PROFILE;
+  const roleLabelKey = ROLE_LABEL_KEYS[resolvedProfile.role];
+  const roleLabel = roleLabelKey ? t(roleLabelKey) : resolvedProfile.role;
+  const profileName =
+    localizeProfileName(resolvedProfile.name, roleLabel, locale) || roleLabel;
+  const displayInitials =
+    resolvedProfile.initials || buildInitials(profileName);
+  const settingsActive = isActivePath(pathname, posRoutes.settings);
+  const canReprint =
+    resolvedProfile.role === "owner" || resolvedProfile.role === "manager";
+  const { actionable: pendingPrintTaskCount, syncPending: syncingPrintTaskCount } =
+    usePendingPrintJobCounts();
+  usePrintJobRecovery();
+  const printTaskAttentionCount =
+    pendingPrintTaskCount + syncingPrintTaskCount;
+  const hasPrintTaskAttention =
+    printTaskAttentionCount > 0;
+
+  useEffect(() => {
+    contentScrollRef.current?.scrollTo({ left: 0, top: 0 });
+  }, [pathname]);
+
+  // Settings is a workspace, not a page inside the till: it brings its own
+  // navigation, so rendering it inside the shell put two sidebars side by side
+  // and left the cashier unsure which one they were in. Mirrors how the tenant
+  // console drops its dashboard chrome on the settings routes.
+  //
+  // The mobile bottom bar stays: on a phone it is how settings was reached and
+  // how the cashier gets back out, and the shell's sidebar is hidden there
+  // anyway, so it was never part of the problem.
+  if (settingsActive) {
+    return (
+      <div className="flex h-screen h-dvh min-h-0 flex-col overflow-hidden bg-[#f1f1f1] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] text-foreground">
+        <div className="relative z-50 hidden shrink-0 bg-black pt-[env(safe-area-inset-top)] lg:block">
+          <PosGlobalHeader
+            canReprint={canReprint}
+            displayInitials={displayInitials}
+            merchantName={merchantName}
+            notificationUnreadCount={currentUnreadCount}
+            onUnreadCountChange={setCurrentUnreadCount}
+            pendingPrintTaskCount={pendingPrintTaskCount}
+            profileName={profileName}
+            roleLabel={roleLabel}
+            syncingPrintTaskCount={syncingPrintTaskCount}
+          />
+        </div>
+
+        <main
+          className="pos-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-[env(safe-area-inset-top)] lg:pt-0"
+          ref={contentScrollRef}
+        >
+          {children}
+        </main>
+
+        <PosMobileNavigation
+          activePathname={activePathname}
+          branchName={branchName}
+          hasNotificationAttention={
+            currentUnreadCount > 0 || hasPrintTaskAttention
+          }
+          profileName={profileName}
+          settingsActive={settingsActive}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-screen h-dvh min-h-0 flex-col overflow-hidden bg-muted/30 pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] text-foreground">
+      <div className="relative z-50 hidden shrink-0 bg-black pt-[env(safe-area-inset-top)] lg:block">
+        <PosGlobalHeader
+          canReprint={canReprint}
+          displayInitials={displayInitials}
+          merchantName={merchantName}
+          notificationUnreadCount={currentUnreadCount}
+          onUnreadCountChange={setCurrentUnreadCount}
+          pendingPrintTaskCount={pendingPrintTaskCount}
+          profileName={profileName}
+          roleLabel={roleLabel}
+          syncingPrintTaskCount={syncingPrintTaskCount}
+        />
+      </div>
+
+      <div className="relative flex min-h-0 flex-1 pt-[env(safe-area-inset-top)] lg:pt-0">
+        <aside
+          className="hidden w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar px-3 py-4 text-sidebar-foreground lg:flex"
+          data-testid="pos-sidebar"
+        >
+          <nav
+            aria-label={t("common.mainNavigation")}
+            className="pos-scrollbar grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pb-5"
+          >
+            {posSidebarNavigation.map((item) => {
+              const active = isActivePath(activePathname, item.href);
+              const label = t(item.labelKey);
+              const showNotificationIndicator =
+                (currentUnreadCount > 0 || hasPrintTaskAttention) &&
+                item.href === posRoutes.notifications;
+
+              return (
+                <Link
+                  aria-current={active ? "page" : undefined}
+                  aria-label={
+                    showNotificationIndicator
+                      ? `${
+                          currentUnreadCount > 0
+                            ? t("pos.shell.unreadMessages", {
+                                count: currentUnreadCount,
+                              })
+                            : label
+                        }${
+                          hasPrintTaskAttention
+                            ? `，${printTaskAttentionCount} 个终端打印事项`
+                            : ""
+                        }`
+                      : label
+                  }
+                  className={cn(
+                    "group relative flex min-h-12 items-center gap-3 rounded-lg px-3 text-base font-semibold transition-colors",
+                    "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    active
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                      : "text-muted-foreground",
+                  )}
+                  href={item.href}
+                  key={item.href}
+                >
+                  <span
+                    className={cn(
+                      "absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity",
+                      active && "opacity-100",
+                    )}
+                  />
+                  <Icon
+                    className={cn(
+                      "size-5 shrink-0 text-muted-foreground transition-colors",
+                      active && "text-sidebar-accent-foreground",
+                    )}
+                    name={item.icon}
+                  />
+                  <span className="min-w-0 flex-1 truncate">{label}</span>
+                  {showNotificationIndicator ? (
+                    <span
+                      className={cn(
+                        "h-2 w-2 shrink-0 rounded-full",
+                        currentUnreadCount > 0 ? "bg-red-500" : "bg-amber-500",
+                      )}
+                    />
+                  ) : null}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="border-t border-sidebar-border pt-3">
+            <Link
+              aria-current={settingsActive ? "page" : undefined}
+              className={cn(
+                "relative flex min-h-12 items-center gap-3 rounded-lg px-3 text-base font-semibold transition-colors",
+                "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                settingsActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-muted-foreground",
+              )}
+              href={posRoutes.settings}
+            >
+              <span
+                className={cn(
+                  "absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity",
+                  settingsActive && "opacity-100",
+                )}
+              />
+              <Icon
+                className={cn(
+                  "size-5 shrink-0 text-muted-foreground",
+                  settingsActive && "text-sidebar-accent-foreground",
+                )}
+                name="settings"
+              />
+              <span className="truncate">{t("pos.nav.settings")}</span>
+            </Link>
+          </div>
+        </aside>
+
+        <main className="flex min-w-0 flex-1 flex-col">
+          <div
+            className="pos-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 py-6 lg:px-8"
+            ref={contentScrollRef}
+          >
+            {children}
+          </div>
+        </main>
+      </div>
+
+      <PosMobileNavigation
+        activePathname={activePathname}
+        branchName={branchName}
+        hasNotificationAttention={
+          currentUnreadCount > 0 || hasPrintTaskAttention
+        }
+        profileName={profileName}
+        settingsActive={settingsActive}
+      />
+    </div>
+  );
+}

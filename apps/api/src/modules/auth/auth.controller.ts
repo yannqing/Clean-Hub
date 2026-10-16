@@ -4,28 +4,79 @@ import { getRequestMeta } from "../../http/request-meta.js";
 import { appendSetCookieHeaders } from "../../http/response.js";
 import type { AppBindings } from "../../http/types.js";
 import type { AuthService } from "./auth.service.js";
-import { loginRequestSchema } from "./auth.validation.js";
 import {
-  ACCESS_COOKIE_NAME,
-  REFRESH_COOKIE_NAME,
+  loginRequestSchema,
+  posBootstrapRequestSchema,
+  posPinLoginRequestSchema,
+} from "./auth.validation.js";
+import {
+  AUTH_CLIENT_HEADER_NAME,
+  resolveAuthCookieNames,
+  scopeAuthCookieHeaders,
 } from "./cookie.service.js";
+import { POS_TERMINAL_CREDENTIAL_COOKIE_NAME } from "./pos-terminal-credential.js";
 
 export type AuthControllerOptions = {
   authService: AuthService;
 };
 
+function getAuthCookieContext(c: import("hono").Context<AppBindings>) {
+  const authClient = c.req.header(AUTH_CLIENT_HEADER_NAME);
+  return {
+    authClient,
+    names: resolveAuthCookieNames(authClient),
+  };
+}
+
+function appendScopedAuthCookieHeaders(
+  c: import("hono").Context<AppBindings>,
+  headers: string[],
+  authClient: string | undefined,
+) {
+  appendSetCookieHeaders(c, scopeAuthCookieHeaders(headers, authClient));
+}
+
 export function createAuthController({ authService }: AuthControllerOptions) {
   return {
     login: async (c: import("hono").Context<AppBindings>) => {
+      const { authClient } = getAuthCookieContext(c);
       const body = loginRequestSchema.parse(await c.req.json());
       const result = await authService.login({
         identifier: body.identifier,
         password: body.password,
-        tenantCode: body.tenantCode,
         ...getRequestMeta(c, body.deviceId),
       });
 
-      appendSetCookieHeaders(c, result.setCookieHeaders);
+      appendScopedAuthCookieHeaders(c, result.setCookieHeaders, authClient);
+
+      return c.json({
+        authContext: result.authContext,
+      });
+    },
+
+    posBootstrap: async (c: import("hono").Context<AppBindings>) => {
+      const { names } = getAuthCookieContext(c);
+      const body = posBootstrapRequestSchema.parse(await c.req.json());
+      const state = await authService.getPosBootstrapState({
+        deviceId: body.deviceId,
+        accessToken: getCookie(c, names.access),
+        terminalCredential: getCookie(c, POS_TERMINAL_CREDENTIAL_COOKIE_NAME),
+      });
+
+      return c.json(state);
+    },
+
+    posPinLogin: async (c: import("hono").Context<AppBindings>) => {
+      const { authClient } = getAuthCookieContext(c);
+      const body = posPinLoginRequestSchema.parse(await c.req.json());
+      const result = await authService.loginWithPosPin({
+        pin: body.pin,
+        deviceId: body.deviceId,
+        terminalCredential: getCookie(c, POS_TERMINAL_CREDENTIAL_COOKIE_NAME),
+        ...getRequestMeta(c, body.deviceId),
+      });
+
+      appendScopedAuthCookieHeaders(c, result.setCookieHeaders, authClient);
 
       return c.json({
         authContext: result.authContext,
@@ -33,14 +84,16 @@ export function createAuthController({ authService }: AuthControllerOptions) {
     },
 
     refresh: async (c: import("hono").Context<AppBindings>) => {
-      const refreshToken = getCookie(c, REFRESH_COOKIE_NAME);
+      const { authClient, names } = getAuthCookieContext(c);
+      const refreshToken = getCookie(c, names.refresh);
 
       const result = await authService.refresh({
         refreshToken: refreshToken ?? "",
+        terminalCredential: getCookie(c, POS_TERMINAL_CREDENTIAL_COOKIE_NAME),
         ...getRequestMeta(c),
       });
 
-      appendSetCookieHeaders(c, result.setCookieHeaders);
+      appendScopedAuthCookieHeaders(c, result.setCookieHeaders, authClient);
 
       return c.json({
         authContext: result.authContext,
@@ -48,19 +101,21 @@ export function createAuthController({ authService }: AuthControllerOptions) {
     },
 
     logout: async (c: import("hono").Context<AppBindings>) => {
+      const { authClient, names } = getAuthCookieContext(c);
       const setCookieHeaders = await authService.logout({
-        accessToken: getCookie(c, ACCESS_COOKIE_NAME),
-        refreshToken: getCookie(c, REFRESH_COOKIE_NAME),
+        accessToken: getCookie(c, names.access),
+        refreshToken: getCookie(c, names.refresh),
         ...getRequestMeta(c),
       });
 
-      appendSetCookieHeaders(c, setCookieHeaders);
+      appendScopedAuthCookieHeaders(c, setCookieHeaders, authClient);
 
       return c.body(null, 204);
     },
 
     me: async (c: import("hono").Context<AppBindings>) => {
-      const accessToken = getCookie(c, ACCESS_COOKIE_NAME);
+      const { names } = getAuthCookieContext(c);
+      const accessToken = getCookie(c, names.access);
       const authContext = await authService.getAuthContext(accessToken ?? "");
 
       return c.json(authContext);

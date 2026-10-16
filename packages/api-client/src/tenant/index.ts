@@ -1,44 +1,99 @@
-import type { ApiClient, QueryParams } from "../types";
+import type { ApiClient } from "../types";
+// Resources grouped by domain. The insights/ folder holds operation-data
+// resources (overview, reports, audit-logs) that share no cross-type deps but
+// belong to the same "tenant observability" concern.
+import {
+  createTenantAuditLogsApi,
+  createTenantOverviewApi,
+  createTenantReportsApi,
+} from "./insights";
+import { createTenantBackupsApi } from "./backups";
 import { createTenantBranchesApi } from "./branches";
+import { createTenantCustomersApi } from "./customers";
+import { createTenantProductsApi, createTenantServicesApi } from "./catalog";
+import { createTenantDiscountsApi } from "./discounts";
+import { createTenantFinanceApi } from "./finance";
 import { createTenantHardwareApi } from "./hardware";
-import { createTenantPricesApi } from "./prices";
-import { createTenantReportsApi } from "./reports";
-import { createTenantServicesApi } from "./services";
-import { createTenantUsersApi } from "./users";
+import { createTenantUsersApi } from "./identity";
+import { createTenantNotificationsApi } from "./notifications";
+import { createTenantOrdersApi } from "./orders";
+import { createTenantPaymentIntegrationsApi } from "./payment-integrations";
+import { createTenantPosChannelApi } from "./pos-channel";
+import { createTenantProfileApi } from "./profile";
+import { createTenantSettingsApi } from "./settings";
+import { createTenantSearchApi } from "./search";
+import { createTenantTaxRatesApi } from "./tax-rates";
 
+export * from "./insights";
+export * from "./backups";
 export * from "./branches";
-export * from "./branches.types";
+export * from "./customers";
+export * from "./catalog";
+export * from "./discounts";
+export * from "./finance";
 export * from "./hardware";
-export * from "./hardware.types";
-export * from "./prices";
-export * from "./prices.types";
-export * from "./reports";
-export * from "./reports.types";
-export * from "./services";
-export * from "./services.types";
-export * from "./users";
-export * from "./users.types";
+export * from "./identity";
+export * from "./notifications";
+export * from "./orders";
+export * from "./payment-integrations";
+export * from "./pos-channel";
+export * from "./profile";
+export * from "./search";
+export * from "./tax-rates";
+// NOTE: settings types are exported explicitly below (not via `export *`),
+// because `TenantSettings` / `UpdateTenantSettingsRequest` collide with the
+// SaaS-domain types of the same name (see ../saas/tenants). They are re-exported
+// here under the `*BackOffice*` aliases so both names coexist at the package barrel.
+export type {
+  TenantPilotStatus,
+  TenantSettingsFeatureFlags,
+  TenantSettingsLanguage,
+  TenantSettings as TenantBackOfficeSettings,
+  UpdateTenantSettingsRequest as UpdateTenantBackOfficeSettingsRequest,
+} from "./settings";
 
 export function createTenantApi(client: ApiClient) {
+  const auditLogs = createTenantAuditLogsApi(client);
+  const backups = createTenantBackupsApi(client);
   const branches = createTenantBranchesApi(client);
-  const users = createTenantUsersApi(client);
+  const customers = createTenantCustomersApi(client);
+  const overview = createTenantOverviewApi(client);
+  const settings = createTenantSettingsApi(client);
   const services = createTenantServicesApi(client);
-  const prices = createTenantPricesApi(client);
+  const products = createTenantProductsApi(client);
+  const discounts = createTenantDiscountsApi(client);
+  const finance = createTenantFinanceApi(client);
   const hardware = createTenantHardwareApi(client);
+  const users = createTenantUsersApi(client);
+  const notifications = createTenantNotificationsApi(client);
+  const orders = createTenantOrdersApi(client);
+  const paymentIntegrations = createTenantPaymentIntegrationsApi(client);
+  const posChannel = createTenantPosChannelApi(client);
+  const profile = createTenantProfileApi(client);
   const reports = createTenantReportsApi(client);
+  const search = createTenantSearchApi(client);
+  const taxRates = createTenantTaxRatesApi(client);
 
   return {
+    auditLogs,
+    backups,
     branches,
-    users,
+    customers,
+    overview,
+    settings,
     services,
-    prices,
+    products,
+    discounts,
+    finance,
     hardware,
+    users,
+    notifications,
+    orders,
+    paymentIntegrations,
+    posChannel,
+    profile,
     reports,
-    listBranches: (query?: QueryParams) => branches.list(query),
-    listUsers: (query?: QueryParams) => users.list(query),
-    listServices: (query?: QueryParams) => services.list(query),
-    listPriceBooks: (query?: QueryParams) => prices.list(query),
-    listDevices: (query?: QueryParams) => hardware.listDevices(query),
-    getReportSummary: (query?: QueryParams) => reports.getSummary(query),
+    search,
+    taxRates,
   };
 }

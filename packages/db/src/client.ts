@@ -1,5 +1,7 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
-import { Pool, type PoolConfig } from "pg";
+import { Pool, type PoolClient, type PoolConfig } from "pg";
 
 import * as schema from "./schema.js";
 
@@ -10,6 +12,15 @@ export type DbConnection = {
   pool: Pool;
 };
 
+export type DatabaseScope =
+  | { kind: "system" }
+  | { kind: "tenant"; tenantId: string };
+
+type ScopedDatabaseContext = {
+  db: Database;
+  scope: DatabaseScope;
+};
+
 export type DbPoolOptions = {
   databaseUrl: string;
   poolConfig?: Omit<PoolConfig, "connectionString">;
@@ -18,13 +29,22 @@ export type DbPoolOptions = {
 
 const DEFAULT_POOL_MAX = 10;
 const DEFAULT_IDLE_TIMEOUT_MS = 30_000;
-const DEFAULT_CONNECTION_TIMEOUT_MS = 10_000;
+const DEFAULT_CONNECTION_TIMEOUT_MS = 30_000;
 const DEFAULT_QUERY_TIMEOUT_MS = 30_000;
 const DEFAULT_KEEP_ALIVE_INITIAL_DELAY_MS = 10_000;
+// Rotate pooled connections regularly so a NAT/firewall silently killing a
+// long-lived connection to a remote database cannot poison the pool
+// ("Connection terminated unexpectedly" on the next checkout).
+const DEFAULT_MAX_LIFETIME_SECONDS = 300;
+const DEFAULT_WARM_UP_RETRIES = 5;
+const DEFAULT_WARM_UP_DELAY_MS = 500;
 
 declare global {
   var __cleanHubDbConnection: DbConnection | undefined;
+  var __cleanHubContextAwareDb: Database | undefined;
 }
+
+const scopedDatabaseStorage = new AsyncLocalStorage<ScopedDatabaseContext>();
 
 function readPositiveInteger(
   value: string | undefined,
@@ -69,6 +89,10 @@ export function getDefaultPoolConfig(
     keepAliveInitialDelayMillis: readPositiveInteger(
       env.DATABASE_POOL_KEEP_ALIVE_INITIAL_DELAY_MS,
       DEFAULT_KEEP_ALIVE_INITIAL_DELAY_MS,
+    ),
+    maxLifetimeSeconds: readPositiveInteger(
+      env.DATABASE_POOL_MAX_LIFETIME_SECONDS,
+      DEFAULT_MAX_LIFETIME_SECONDS,
     ),
     application_name: env.DATABASE_APPLICATION_NAME ?? "cleanhub",
   };
@@ -123,7 +147,131 @@ export function getDbConnection(): DbConnection {
 }
 
 export function getDb(): Database {
-  return getDbConnection().db;
+  const scoped = scopedDatabaseStorage.getStore();
+  if (scoped) {
+    return scoped.db;
+  }
+
+  if (!globalThis.__cleanHubContextAwareDb) {
+    globalThis.__cleanHubContextAwareDb = new Proxy({} as Database, {
+      get(_target, property) {
+        const activeDb =
+          scopedDatabaseStorage.getStore()?.db ?? getDbConnection().db;
+        const value = Reflect.get(activeDb, property, activeDb) as unknown;
+
+        return typeof value === "function" ? value.bind(activeDb) : value;
+      },
+    });
+  }
+
+  return globalThis.__cleanHubContextAwareDb;
+}
+
+function scopesMatch(left: DatabaseScope, right: DatabaseScope): boolean {
+  return (
+    left.kind === right.kind &&
+    (left.kind === "system" ||
+      (right.kind === "tenant" && left.tenantId === right.tenantId))
+  );
+}
+
+async function configureDatabaseScope(
+  client: PoolClient,
+  scope: DatabaseScope,
+): Promise<void> {
+  await client.query("select set_config('app.current_tenant_id', $1, false)", [
+    scope.kind === "tenant" ? scope.tenantId : "",
+  ]);
+  await client.query("select set_config('app.rls_bypass', $1, false)", [
+    scope.kind === "system" ? "on" : "off",
+  ]);
+}
+
+async function resetDatabaseScope(client: PoolClient): Promise<void> {
+  await client.query("reset app.current_tenant_id");
+  await client.query("reset app.rls_bypass");
+}
+
+function createSerializedPoolClient(client: PoolClient): PoolClient {
+  let queryQueue: Promise<void> = Promise.resolve();
+
+  return new Proxy(client, {
+    get(target, property) {
+      if (property !== "query") {
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      }
+
+      return (...args: unknown[]) => {
+        const queryResult = queryQueue.then(
+          () => Reflect.apply(target.query, target, args) as Promise<unknown>,
+        );
+        queryQueue = queryResult.then(
+          () => undefined,
+          () => undefined,
+        );
+        return queryResult;
+      };
+    },
+  }) as PoolClient;
+}
+
+async function runWithDatabaseScope<T>(
+  scope: DatabaseScope,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const existing = scopedDatabaseStorage.getStore();
+  if (existing && scopesMatch(existing.scope, scope)) {
+    return operation();
+  }
+
+  const client = await getDbConnection().pool.connect();
+  let destroyClient = false;
+
+  try {
+    await configureDatabaseScope(client, scope);
+    // Repositories often use Promise.all. A PoolClient must execute those
+    // statements serially so pg never receives overlapping query() calls on
+    // the same request-scoped session (and every statement keeps the same RLS
+    // settings).
+    const db = drizzle(createSerializedPoolClient(client), { schema });
+
+    return await scopedDatabaseStorage.run({ db, scope }, operation);
+  } finally {
+    try {
+      await resetDatabaseScope(client);
+    } catch {
+      destroyClient = true;
+    }
+    client.release(destroyClient);
+  }
+}
+
+export function runWithSystemDatabaseContext<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  return runWithDatabaseScope({ kind: "system" }, operation);
+}
+
+export function runWithTenantDatabaseContext<T>(
+  tenantId: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const normalizedTenantId = tenantId.trim();
+  if (!normalizedTenantId) {
+    return Promise.reject(
+      new Error("tenantId is required to establish a tenant database context."),
+    );
+  }
+
+  return runWithDatabaseScope(
+    { kind: "tenant", tenantId: normalizedTenantId },
+    operation,
+  );
+}
+
+export function getDatabaseScope(): DatabaseScope | null {
+  return scopedDatabaseStorage.getStore()?.scope ?? null;
 }
 
 export async function closeDbConnection(): Promise<void> {
@@ -133,4 +281,50 @@ export async function closeDbConnection(): Promise<void> {
 
   await globalThis.__cleanHubDbConnection.pool.end();
   globalThis.__cleanHubDbConnection = undefined;
+  globalThis.__cleanHubContextAwareDb = undefined;
+}
+
+export type WarmUpDbOptions = {
+  retries?: number;
+  delayMs?: number;
+  connection?: { pool: Pick<Pool, "query"> };
+  sleep?: (ms: number) => Promise<void>;
+};
+
+const defaultSleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Eagerly open a pooled connection by running `select 1`, retrying with linear
+ * backoff. Warming the pool during startup avoids the cold-connection 5xx that
+ * can hit the first real request, which is most noticeable against a remote
+ * database. Resolves once a probe succeeds; rejects with the last error if all
+ * attempts fail.
+ */
+export async function warmUpDbConnection(
+  options: WarmUpDbOptions = {},
+): Promise<void> {
+  const connection = options.connection ?? getDbConnection();
+  const retries = Math.max(1, options.retries ?? DEFAULT_WARM_UP_RETRIES);
+  const delayMs = options.delayMs ?? DEFAULT_WARM_UP_DELAY_MS;
+  const sleep = options.sleep ?? defaultSleep;
+
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    try {
+      await connection.pool.query("select 1");
+      return;
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < retries) {
+        await sleep(delayMs * attempt);
+      }
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Database warm-up failed.");
 }

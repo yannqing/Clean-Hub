@@ -1,1 +1,207 @@
 @import "@cleanhub/ui/styles.css";
+
+@keyframes login-ambient-particle-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(0.72);
+  }
+
+  42% {
+    transform: translate3d(
+        var(--login-particle-drift-x),
+        var(--login-particle-drift-y),
+        0
+      )
+      scale(1.22);
+  }
+
+  72% {
+    transform: translate3d(
+        var(--login-particle-drift-x-alt),
+        var(--login-particle-drift-y-alt),
+        0
+      )
+      scale(0.92);
+  }
+}
+
+@keyframes login-ambient-blob-one {
+  0%,
+  100% {
+    border-radius: 42% 58% 65% 35% / 46% 38% 62% 54%;
+    transform: translate3d(0, 0, 0) rotate(-8deg) scale(1);
+  }
+
+  50% {
+    border-radius: 58% 42% 39% 61% / 37% 61% 39% 63%;
+    transform: translate3d(-7%, 10%, 0) rotate(7deg) scale(1.08);
+  }
+}
+
+@keyframes login-ambient-blob-two {
+  0%,
+  100% {
+    border-radius: 57% 43% 35% 65% / 48% 61% 39% 52%;
+    transform: translate3d(0, 0, 0) rotate(10deg) scale(1);
+  }
+
+  50% {
+    border-radius: 39% 61% 58% 42% / 62% 42% 58% 38%;
+    transform: translate3d(9%, -8%, 0) rotate(-5deg) scale(1.12);
+  }
+}
+
+@keyframes login-ambient-orbit {
+  from {
+    transform: rotate(0deg) scale(1);
+  }
+
+  50% {
+    transform: rotate(180deg) scale(1.06);
+  }
+
+  to {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes login-ambient-grain-shift {
+  0% {
+    transform: translate3d(-3%, -2%, 0);
+  }
+
+  25% {
+    transform: translate3d(2%, -4%, 0);
+  }
+
+  50% {
+    transform: translate3d(-4%, 3%, 0);
+  }
+
+  75% {
+    transform: translate3d(3%, 2%, 0);
+  }
+
+  100% {
+    transform: translate3d(-3%, -2%, 0);
+  }
+}
+
+.login-ambient-particle {
+  animation: login-ambient-particle-drift 16s ease-in-out infinite;
+  background: rgb(255 255 255 / 0.92);
+  border-radius: 9999px;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08);
+  mix-blend-mode: difference;
+  position: absolute;
+  will-change: transform;
+}
+
+.login-ambient-blob {
+  filter: blur(2px);
+  position: absolute;
+  will-change: border-radius, transform;
+}
+
+.login-ambient-blob-one {
+  animation: login-ambient-blob-one 18s ease-in-out infinite;
+  background:
+    radial-gradient(circle at 68% 32%, rgb(63 63 70 / 0.88), transparent 42%),
+    linear-gradient(145deg, #09090b 8%, #18181b 64%, #3f3f46 100%);
+  height: 66%;
+  left: -30%;
+  top: 14%;
+  width: 58%;
+}
+
+.login-ambient-blob-two {
+  animation: login-ambient-blob-two 22s ease-in-out infinite;
+  background:
+    radial-gradient(circle at 28% 34%, rgb(82 82 91 / 0.76), transparent 45%),
+    linear-gradient(155deg, #3f3f46 0%, #18181b 54%, #09090b 100%);
+  bottom: -24%;
+  height: 54%;
+  right: -20%;
+  width: 50%;
+}
+
+.login-ambient-orbit {
+  border: 1px solid rgb(255 255 255 / 0.38);
+  mix-blend-mode: difference;
+  position: absolute;
+  will-change: transform;
+}
+
+.login-ambient-orbit-one {
+  animation: login-ambient-orbit 32s linear infinite;
+  border-radius: 44% 56% 38% 62% / 61% 38% 62% 39%;
+  height: 52%;
+  right: -20%;
+  top: 23%;
+  width: 72%;
+}
+
+.login-ambient-orbit-two {
+  animation: login-ambient-orbit 42s linear infinite reverse;
+  border-radius: 63% 37% 59% 41% / 36% 58% 42% 64%;
+  bottom: 4%;
+  height: 38%;
+  left: 7%;
+  width: 56%;
+}
+
+.login-ambient-grain {
+  animation: login-ambient-grain-shift 1.8s steps(2, end) infinite;
+  height: 112%;
+  left: -6%;
+  mix-blend-mode: soft-light;
+  opacity: 0.3;
+  position: absolute;
+  top: -6%;
+  width: 112%;
+  will-change: transform;
+}
+
+.login-ambient-grain-fill {
+  fill: #fafafa;
+}
+
+.dark .login-ambient-particle {
+  background: rgb(250 250 250 / 0.78);
+  box-shadow: 0 0 0 1px rgb(24 24 27 / 0.2);
+}
+
+.dark .login-ambient-blob-one {
+  background:
+    radial-gradient(circle at 34% 28%, rgb(82 82 91 / 0.56), transparent 44%),
+    linear-gradient(140deg, rgb(63 63 70 / 0.68), rgb(24 24 27 / 0.3));
+}
+
+.dark .login-ambient-blob-two {
+  background:
+    radial-gradient(circle at 62% 34%, rgb(212 212 216 / 0.12), transparent 48%),
+    linear-gradient(160deg, rgb(82 82 91 / 0.28), rgb(24 24 27 / 0.18));
+}
+
+.dark .login-ambient-orbit {
+  border-color: rgb(244 244 245 / 0.1);
+}
+
+.dark .login-ambient-grain {
+  mix-blend-mode: screen;
+  opacity: 0.18;
+}
+
+.dark .login-ambient-grain-fill {
+  fill: #fafafa;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-login-ambient] .login-ambient-particle,
+  [data-login-ambient] .login-ambient-blob,
+  [data-login-ambient] .login-ambient-orbit,
+  [data-login-ambient] .login-ambient-grain {
+    animation: none;
+    transform: none;
+  }
+}

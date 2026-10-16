@@ -1,0 +1,2 @@
+ALTER TABLE "products" ADD COLUMN "tags" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "products" ADD CONSTRAINT "products_tags_array_check" CHECK (jsonb_typeof("products"."tags") = 'array');

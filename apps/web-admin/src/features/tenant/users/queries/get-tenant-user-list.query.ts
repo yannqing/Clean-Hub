@@ -1,5 +1,10 @@
-import type { TenantUserSummary } from "../types";
+import type { ApiRequestOptions, TenantUserListQuery, TenantUserSummary } from "@cleanhub/api-client";
 
-export async function getTenantUserListQuery(): Promise<TenantUserSummary[]> {
-  return [];
+import { webAdminApi } from "@/lib/api-client";
+
+export async function getTenantUserListQuery(
+  query?: TenantUserListQuery,
+  options: Omit<ApiRequestOptions, "method" | "body" | "query"> = {},
+): Promise<TenantUserSummary[]> {
+  return webAdminApi.tenant.users.list(query, options);
 }

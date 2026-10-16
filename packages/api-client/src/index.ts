@@ -3,8 +3,14 @@ export * from "./auth-client";
 export * from "./cleanhub-client";
 export * from "./errors";
 export * from "./http-client";
+export * from "./mobile";
+export * from "./mobile-client";
+export * from "./pos";
+export * from "./pos-client";
 export * from "./saas";
 export * from "./saas-client";
 export * from "./tenant";
 export * from "./tenant-client";
 export * from "./types";
+
+export type { TenantCheckoutReadiness, PosTaxReadiness } from "./tenant/checkout-readiness.types";

@@ -1,0 +1,53 @@
+import { z } from "zod";
+
+const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+
+export const backupJobListQuerySchema = z.object({
+  scope: z.enum(["platform", "tenant"]).optional(),
+  status: z.enum(["pending", "running", "succeeded", "failed"]).optional(),
+  tenantId: z.string().regex(ULID_PATTERN).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export const createBackupJobBodySchema = z
+  .object({
+    scope: z.enum(["platform", "tenant"]),
+    tenantId: z.string().regex(ULID_PATTERN).optional(),
+    reason: z.string().trim().max(500).optional(),
+  })
+  .refine(
+    (value) =>
+      value.scope === "platform" ? !value.tenantId : Boolean(value.tenantId),
+    {
+      message:
+        "Tenant-scoped requests require a tenant ID; platform requests must omit it.",
+    },
+  );
+
+export const backupJobParamsSchema = z.object({
+  backupId: z.string().regex(ULID_PATTERN),
+});
+
+export const createRestoreRequestBodySchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+});
+
+export const restoreRequestListQuerySchema = z.object({
+  status: z
+    .enum(["pending", "approved", "rejected", "completed", "cancelled"])
+    .optional(),
+  tenantId: z.string().regex(ULID_PATTERN).optional(),
+  backupJobId: z.string().regex(ULID_PATTERN).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export const reviewRestoreRequestParamsSchema = z.object({
+  requestId: z.string().regex(ULID_PATTERN),
+  action: z.enum(["approve", "reject", "complete", "cancel"]),
+});
+
+export const reviewRestoreRequestBodySchema = z.object({
+  reviewNote: z.string().trim().max(500).optional(),
+});

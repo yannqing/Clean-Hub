@@ -1,40 +1,57 @@
-import type { ApiClient, QueryParams } from "../types";
-import { createSaasAuditLogsApi } from "./audit-logs";
+import type { ApiClient } from "../types";
+// Resources are grouped into subdirectories by domain. Some factories live in a
+// sibling resource's folder because they share types (e.g. restore-requests
+// belongs under backups/ since backups.ts imports RestoreRequest).
+import { createSaasAuditLogsApi, createSaasOperationLogsApi } from "./audit";
+import { createSaasBackupsApi, createSaasRestoreRequestsApi } from "./backups";
+import { createSaasFeedbackTicketsApi } from "./feedback-tickets";
+import { createSaasOverviewApi } from "./overview";
+import { createSaasProfileApi } from "./profile";
+import { createSaasPlatformSettingsApi } from "./platform-settings";
+import { createSaasRolesApi, createSaasUsersApi } from "./identity";
+import {
+  createSaasSecurityEventsApi,
+  createSaasSecuritySettingsApi,
+} from "./security";
 import { createSaasTenantsApi } from "./tenants";
-import type {
-  CreateTenantRequest,
-  UpdateTenantRequest,
-  UpdateTenantStatusRequest,
-} from "./tenants.types";
-import { createSaasUsersApi } from "./users";
 
-export * from "./audit-logs";
-export * from "./audit-logs.types";
+export * from "./audit";
+export * from "./backups";
+export * from "./feedback-tickets";
+export * from "./overview";
+export * from "./profile";
+export * from "./platform-settings";
+export * from "./identity";
+export * from "./security";
 export * from "./tenants";
-export * from "./tenants.types";
-export * from "./users";
-export * from "./users.types";
 
 export function createSaasApi(client: ApiClient) {
   const tenants = createSaasTenantsApi(client);
   const users = createSaasUsersApi(client);
+  const roles = createSaasRolesApi(client);
   const auditLogs = createSaasAuditLogsApi(client);
+  const backups = createSaasBackupsApi(client);
+  const feedbackTickets = createSaasFeedbackTicketsApi(client);
+  const overview = createSaasOverviewApi(client);
+  const operationLogs = createSaasOperationLogsApi(client);
+  const platformSettings = createSaasPlatformSettingsApi(client);
+  const restoreRequests = createSaasRestoreRequestsApi(client);
+  const securityEvents = createSaasSecurityEventsApi(client);
+  const securitySettings = createSaasSecuritySettingsApi(client);
 
   return {
     tenants,
     users,
+    roles,
     auditLogs,
-    listTenants: (query?: QueryParams) => tenants.list(query),
-    createTenant: (input: CreateTenantRequest) => tenants.create(input),
-    getTenant: (tenantId: string) => tenants.get(tenantId),
-    updateTenant: (tenantId: string, input: UpdateTenantRequest) =>
-      tenants.update(tenantId, input),
-    updateTenantStatus: (
-      tenantId: string,
-      input: UpdateTenantStatusRequest,
-    ) => tenants.updateStatus(tenantId, input),
-    listUsers: (query?: QueryParams) => users.list(query),
-    listAuditLogs: (query?: QueryParams) => auditLogs.list(query),
-    test: () => users.test(),
+    backups,
+    feedbackTickets,
+    overview,
+    profile: createSaasProfileApi(client),
+    operationLogs,
+    platformSettings,
+    restoreRequests,
+    securityEvents,
+    securitySettings,
   };
 }

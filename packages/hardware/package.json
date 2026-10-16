@@ -4,5 +4,18 @@
   "private": true,
   "type": "module",
   "main": "src/index.ts",
-  "types": "src/index.ts"
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "smoke": "pnpm --filter @cleanhub/desktop exec tsx ../../packages/hardware/src/hardware.smoke.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cleanhub/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  }
 }
