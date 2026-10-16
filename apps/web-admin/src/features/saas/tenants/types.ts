@@ -37,7 +37,6 @@ export type TenantFormValues = {
 
 export type TenantSettingsFormValues = {
   defaultLanguage: TenantLanguage;
-  defaultCurrency: string;
 };
 
 export type TenantFeatureFlagsFormValues = {

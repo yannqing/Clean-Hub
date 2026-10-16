@@ -45,13 +45,13 @@ import { TenantIdentitySummary } from "./tenant-identity-summary";
 import { TenantFeatureFlagsPanel } from "./tenant-feature-flags-panel";
 import { TenantForm } from "./tenant-form";
 import { TenantTaxSettingsCard } from "./tenant-tax-settings-card";
+import { TenantDefaultsPanel } from "./tenant-defaults-panel";
 
 export type TenantDetailPresentation = "page" | "dialog";
 
 export type TenantDetailViewProps = {
   tenantId: string;
   presentation?: TenantDetailPresentation;
-  onOpenSettings?: () => void;
   onTenantUpdated?: () => void;
 };
 
@@ -102,7 +102,6 @@ function getStatusActionLabel(
 export function TenantDetailView({
   tenantId,
   presentation = "page",
-  onOpenSettings,
   onTenantUpdated,
 }: TenantDetailViewProps) {
   const isDialog = presentation === "dialog";
@@ -328,13 +327,6 @@ export function TenantDetailView({
         rootIcon={Building2}
         rootLabel={m.tenants.list.title}
       />
-      {tenant ? (
-        <Button asChild size="sm" variant="outline">
-          <Link href={webAdminRoutes.saas.tenantSettings(tenant.id)}>
-            {m.tenants.detail.settings}
-          </Link>
-        </Button>
-      ) : null}
     </div>
   ) : (
     <DialogHeader className="shrink-0 space-y-1 border-b px-6 py-4 text-left">
@@ -347,16 +339,6 @@ export function TenantDetailView({
             <p className="break-all text-sm text-muted-foreground">{m.tenants.identity.systemId}: {tenantId}</p>
           )}
         </div>
-        {tenant && onOpenSettings ? (
-          <Button
-            onClick={onOpenSettings}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            {m.tenants.detail.settings}
-          </Button>
-        ) : null}
       </div>
       <DialogDescription className="sr-only">
         {m.tenants.detail.title}
@@ -408,6 +390,21 @@ export function TenantDetailView({
             mode="edit"
             aside={
               <>
+                <TenantDefaultsPanel
+                  defaultCurrency={tenant.defaultCurrency}
+                  defaultLanguage={tenant.defaultLanguage}
+                  disabled={!canManageTenant}
+                  key={`defaults-${tenant.id}-${tenant.defaultLanguage}-${tenant.defaultCurrency}`}
+                  onSaved={(settings) => {
+                    setTenant((current) => current ? {
+                      ...current,
+                      defaultLanguage: settings.defaultLanguage,
+                      defaultCurrency: settings.defaultCurrency,
+                    } : current);
+                    onTenantUpdated?.();
+                  }}
+                  tenantId={tenant.id}
+                />
                 <Card className="gap-0 rounded-lg py-0 shadow-none">
                   <CardContent className="grid gap-4 py-5">
                     <div className="flex items-start justify-between gap-3">

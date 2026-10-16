@@ -241,6 +241,7 @@ export type SaasMessages = {
       notFoundTitle: string;
       notFoundDescription: string;
       defaultsSection: string;
+      currencyHint: string;
       featureFlagsSection: string;
       featureFlagOptions: {
         laundryEnabled: { label: string; description: string };

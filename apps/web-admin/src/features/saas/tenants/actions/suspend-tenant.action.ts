@@ -67,7 +67,6 @@ export async function suspendTenantAction(
     revalidatePath("/saas");
     revalidatePath("/saas/tenants");
     revalidatePath(`/saas/tenants/${tenantId}`);
-    revalidatePath(`/saas/tenants/${tenantId}/settings`);
 
     return {
       ok: true as const,

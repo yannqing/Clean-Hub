@@ -245,6 +245,7 @@ export const saasMessagesZhCN: SaasMessages = {
       notFoundTitle: "未找到租户设置",
       notFoundDescription: "无法加载请求的租户设置。",
       defaultsSection: "租户默认值",
+      currencyHint: "币种由租户国家的税务模板决定。如需变更，请在本页修改国家；已有业务数据时须遵守币种迁移规则。",
       featureFlagsSection: "功能开关",
       featureFlagOptions: {
         laundryEnabled: { label: "洗衣与干洗", description: "洗衣、熨烫和干洗的核心业务流程。" },

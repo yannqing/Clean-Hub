@@ -45,7 +45,6 @@ function revalidateTenant(tenantId: string): void {
   revalidatePath("/saas");
   revalidatePath("/saas/tenants");
   revalidatePath(`/saas/tenants/${tenantId}`);
-  revalidatePath(`/saas/tenants/${tenantId}/settings`);
 }
 
 /**

@@ -28,7 +28,6 @@ export const tenantFormFieldNames = [
 
 export const tenantSettingsFieldNames = [
   "defaultLanguage",
-  "defaultCurrency",
 ] as const satisfies ReadonlyArray<keyof TenantSettingsFormValues>;
 
 export const tenantFeatureFlagFieldNames = [

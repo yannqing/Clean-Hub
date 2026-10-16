@@ -121,24 +121,17 @@ function validateTenantBasics(input: TenantFormValues, requirePressingCode: bool
 function validateSettings(input: TenantSettingsFormValues): {
   errors: Partial<Record<keyof TenantSettingsFormValues, string>>;
   defaultLanguage: TenantSettingsFormValues["defaultLanguage"];
-  defaultCurrency: string;
 } {
   const errors: Partial<Record<keyof TenantSettingsFormValues, string>> = {};
-  const defaultCurrency = input.defaultCurrency.trim().toUpperCase();
   const defaultLanguage = input.defaultLanguage;
 
   if (!isValidDefaultLanguage(defaultLanguage)) {
     errors.defaultLanguage = "Select a valid default language.";
   }
 
-  if (!/^[A-Z]{3}$/.test(defaultCurrency)) {
-    errors.defaultCurrency = "Currency must be a 3-letter code.";
-  }
-
   return {
     errors,
     defaultLanguage,
-    defaultCurrency,
   };
 }
 
@@ -291,7 +284,6 @@ export function validateTenantSettingsForm(
     ok: true,
     data: {
       defaultLanguage: settings.defaultLanguage,
-      defaultCurrency: settings.defaultCurrency,
     },
   };
 }

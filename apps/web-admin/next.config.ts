@@ -7,6 +7,15 @@ const isDevelopment = process.env.NODE_ENV === "development";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  async redirects() {
+    return [
+      {
+        source: "/saas/tenants/:tenantId/settings",
+        destination: "/saas/tenants/:tenantId",
+        permanent: true,
+      },
+    ];
+  },
   ...(isDevelopment
     ? {}
     : { outputFileTracingRoot: join(currentDir, "../..") }),

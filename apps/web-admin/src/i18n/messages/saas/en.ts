@@ -249,6 +249,7 @@ export const saasMessagesEn: SaasMessages = {
       notFoundTitle: "Tenant settings not found",
       notFoundDescription: "The requested tenant settings could not be loaded.",
       defaultsSection: "Tenant Defaults",
+      currencyHint: "Currency follows the country's tax template. Change the country on this page to update it. Existing business data requires a currency migration.",
       featureFlagsSection: "Feature Flags",
       featureFlagOptions: {
         laundryEnabled: { label: "Laundry and dry cleaning", description: "Core laundry, pressing, and dry cleaning workflows." },

@@ -9,8 +9,6 @@ export const webAdminRoutes = {
     newTenant: "/saas/tenants/new",
     tenant: (tenantId: string) =>
       `/saas/tenants/${encodeURIComponent(tenantId)}`,
-    tenantSettings: (tenantId: string) =>
-      `/saas/tenants/${encodeURIComponent(tenantId)}/settings`,
     users: "/saas/users",
     newUser: "/saas/users/new",
     user: (userId: string) => `/saas/users/${encodeURIComponent(userId)}`,

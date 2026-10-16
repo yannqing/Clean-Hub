@@ -57,7 +57,6 @@ export async function updateTenantFeatureFlagsAction(
     revalidatePath("/saas");
     revalidatePath("/saas/tenants");
     revalidatePath(`/saas/tenants/${tenantId}`);
-    revalidatePath(`/saas/tenants/${tenantId}/settings`);
 
     return {
       ok: true,
