@@ -65,7 +65,8 @@
     "start": "node dist/index.js",
     "lint": "eslint src",
     "typecheck": "pnpm audit:tenant-scopes && tsc --noEmit",
-    "test:integration:product-sku-import": "tsx src/modules/tenant/products/products.sku-import.integration.ts"
+    "test:integration:product-sku-import": "tsx src/modules/tenant/products/products.sku-import.integration.ts",
+    "test:integration:optional-checkout": "tsx src/modules/pos/staff/staff.optional-checkout.integration.ts"
   },
   "dependencies": {
     "@cleanhub/db": "workspace:*",

@@ -409,7 +409,7 @@ async function runOrderLifecycleAssertions(
   assert.equal(retriedCheckout.order.id, ids.checkoutOrderId);
   assert.equal(retriedCheckout.idempotent, true);
   const checkoutPayments = await db
-    .select({ id: paymentTransactions.id })
+    .select({ id: paymentTransactions.id, createdBy: paymentTransactions.createdBy, shiftId: paymentTransactions.shiftId, registerSessionId: paymentTransactions.registerSessionId, cashDrawerSessionId: paymentTransactions.cashDrawerSessionId })
     .from(paymentTransactions)
     .where(eq(paymentTransactions.orderId, ids.checkoutOrderId));
   assert.equal(
@@ -417,6 +417,11 @@ async function runOrderLifecycleAssertions(
     1,
     "power-loss replay must not create a second checkout payment",
   );
+
+  assert.equal(checkoutPayments[0]?.createdBy, authContext.userId, "cash payments retain the authenticated employee without a shift");
+  assert.equal(checkoutPayments[0]?.shiftId, null, "checkout does not require an employee shift");
+  assert.ok(checkoutPayments[0]?.registerSessionId, "checkout prepares register bookkeeping automatically");
+  assert.equal(checkoutPayments[0]?.cashDrawerSessionId, null, "default checkout does not require a drawer");
 
   const guestOrder = await createPosOrder(
     {

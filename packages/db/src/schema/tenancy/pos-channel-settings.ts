@@ -28,13 +28,13 @@ export const posChannelSettings = pgTable(
       .references(() => tenants.id),
     cashTrackingEnabled: boolean("cash_tracking_enabled")
       .notNull()
-      .default(true),
+      .default(false),
     requireOpeningFloat: boolean("require_opening_float")
       .notNull()
-      .default(true),
+      .default(false),
     requireClosingCount: boolean("require_closing_count")
       .notNull()
-      .default(true),
+      .default(false),
     requireReturnReason: boolean("require_return_reason")
       .notNull()
       .default(true),

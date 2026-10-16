@@ -42,10 +42,10 @@ function toSummary(
     // the real values. These placeholders keep the row shape complete.
     defaultPaymentMethod: "cash",
     paymentMethodsEnabled: ["cash", "app"],
-    cashHandlingMode: "shared_drawer",
-    cashTrackingEnabled: true,
-    requireOpeningFloat: true,
-    requireClosingCount: true,
+    cashHandlingMode: "untracked",
+    cashTrackingEnabled: false,
+    requireOpeningFloat: false,
+    requireClosingCount: false,
     mobileMoneyProvidersEnabled: [],
     roundingRule: row.roundingRule,
     taxEnabled: false,
@@ -146,9 +146,9 @@ export async function findTenantPosTerminalDefaults(
 
   return (
     rows[0] ?? {
-      cashTrackingEnabled: true,
-      requireOpeningFloat: true,
-      requireClosingCount: true,
+      cashTrackingEnabled: false,
+      requireOpeningFloat: false,
+      requireClosingCount: false,
       roundingRule: "none",
       autoPrintReceipt: true,
       printCopies: 1,

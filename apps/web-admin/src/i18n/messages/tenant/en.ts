@@ -2229,13 +2229,13 @@ export const tenantMessagesEn: TenantMessages = {
       },
       hints: {
         cashTrackingEnabled:
-          "Track opening float, counted cash, and variances by register session.",
+          "Optional and off by default. Track opening float, counted cash and variances by register session. Employee shifts are not required for checkout.",
         cashHandlingMode:
           "Choose based on whether the store has a drawer and who owns the cash.",
         openingFloatRequired:
-          "Staff must enter an opening cash amount before starting a session.",
+          "Applies only to cash tracking. When enabled, enter the starting cash when opening a drawer session.",
         closingCountRequired:
-          "Staff must count cash before a session can be finalized.",
+          "Applies only to cash tracking. When enabled, count cash when closing a drawer session.",
         returnReasonRequired:
           "Refunds and returns must include an operational reason.",
         recentCartRetentionHours:

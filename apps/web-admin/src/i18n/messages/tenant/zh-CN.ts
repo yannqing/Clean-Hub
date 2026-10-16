@@ -2108,10 +2108,10 @@ export const tenantMessagesZhCN: TenantMessages = {
         lockTimeoutSeconds: "自动锁定时间",
       },
       hints: {
-        cashTrackingEnabled: "按收银班次记录备用金、实盘现金和现金差异。",
+        cashTrackingEnabled: "可选功能，默认关闭。启用后按收银会话记录备用金、实盘现金和差异；员工班次不作为结款前提。",
         cashHandlingMode: "根据门店是否配有钱箱，以及现金由谁负责来选择。",
-        openingFloatRequired: "员工开始班次前必须填写开班现金金额。",
-        closingCountRequired: "班次完成结算前必须盘点现金。",
+        openingFloatRequired: "仅启用现金追踪后生效；开启后，打开钱箱会话时需填写期初现金。",
+        closingCountRequired: "仅启用现金追踪后生效；开启后，关闭钱箱会话时需盘点现金。",
         returnReasonRequired: "退款和退货操作必须填写业务原因。",
         recentCartRetentionHours: "暂存或近期使用的购物车可以保留多长时间。",
         offlineModeEnabled: "网络中断时，终端可以继续执行支持的离线操作。",

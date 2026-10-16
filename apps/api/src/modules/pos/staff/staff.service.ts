@@ -808,6 +808,24 @@ export async function ensurePaymentRegisterContext(
         422,
       );
     }
+    // Commands queued before cash tracking was switched off still belong to
+    // their original drawer. Keep that link rather than silently losing cash
+    // accountability during the change to optional cash management.
+    if (configuration.mode === "untracked" && requested?.cashDrawerSessionId) {
+      cashSession = await findCashDrawerSessionByIdForUpdate(db, {
+        tenantId,
+        cashDrawerSessionId: requested.cashDrawerSessionId,
+      });
+      if (!cashSession || cashSession.registerSessionId !== register.id ||
+          cashSession.status !== "open" ||
+          (cashSession.handlingMode === "cash_in_hand" && cashSession.assignedStaffId !== authContext.userId)) {
+        throw new PosStaffError(
+          "CASH_SESSION_REQUIRED",
+          "The requested cash session is not open for this register.",
+          409,
+        );
+      }
+    }
     if (isTrackedCashMode(configuration.mode)) {
       cashSession = requested?.cashDrawerSessionId
         ? await findCashDrawerSessionByIdForUpdate(db, {

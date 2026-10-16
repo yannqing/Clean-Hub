@@ -2270,13 +2270,13 @@ export const tenantMessagesFr: TenantMessages = {
       },
       hints: {
         cashTrackingEnabled:
-          "Suivez le fonds de caisse initial, les espèces comptées et les écarts pour chaque session de caisse.",
+          "Facultatif et désactivé par défaut. Suivez le fonds initial, les espèces comptées et les écarts par session de caisse. Aucun service employé n’est requis pour encaisser.",
         cashHandlingMode:
           "Choisissez selon la présence d’un tiroir et la personne responsable des espèces.",
         openingFloatRequired:
-          "Le personnel doit saisir un montant en espèces d’ouverture avant de commencer une session.",
+          "Uniquement pour le suivi des espèces. Si activé, saisissez le fonds initial à l’ouverture d’une session de tiroir.",
         closingCountRequired:
-          "Le personnel doit compter l’argent liquide avant de pouvoir finaliser une séance.",
+          "Uniquement pour le suivi des espèces. Si activé, comptez les espèces à la fermeture d’une session de tiroir.",
         returnReasonRequired:
           "Les remboursements et les retours doivent inclure une raison opérationnelle.",
         recentCartRetentionHours:

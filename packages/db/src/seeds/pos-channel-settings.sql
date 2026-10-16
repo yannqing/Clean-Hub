@@ -28,9 +28,9 @@ INSERT INTO pos_channel_settings (
 VALUES (
   '01SEED0100PCS0000000000001',
   '01KRERJN800000000000000001',
-  true,
-  true,
-  true,
+  false,
+  false,
+  false,
   true,
   24,
   true,

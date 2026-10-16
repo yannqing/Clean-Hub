@@ -126,9 +126,9 @@ type BranchOperationalMetrics = {
 };
 
 const DEFAULT_POS_CHANNEL_SETTINGS = {
-  cashTrackingEnabled: true,
-  requireOpeningFloat: true,
-  requireClosingCount: true,
+  cashTrackingEnabled: false,
+  requireOpeningFloat: false,
+  requireClosingCount: false,
   requireReturnReason: true,
   recentCartRetentionHours: 24,
   offlineModeEnabled: true,
