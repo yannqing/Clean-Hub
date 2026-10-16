@@ -4,6 +4,7 @@ import type { AppBindings } from "../../../http/types.js";
 import { TenantProductsError } from "./products.errors.js";
 import {
   createTenantProduct,
+  importTenantProducts,
   getTenantProductDetail,
   getTenantProductCategoryAttributes,
   getTenantProductOverview,
@@ -15,6 +16,7 @@ import {
 } from "./products.service.js";
 import {
   createTenantProductBodySchema,
+  importTenantProductsBodySchema,
   requestTenantProductMediaDownloadsBodySchema,
   requestTenantProductMediaUploadBodySchema,
   tenantProductCategoryParamsSchema,
@@ -41,6 +43,7 @@ function createTenantProductsErrorResponse(
     {
       message: error.message,
       code: error.code,
+      ...(error.row ? { row: error.row } : {}),
       requestId: c.get("requestId"),
     },
     error.status,
@@ -64,6 +67,16 @@ export async function createTenantProductController(c: Context<AppBindings>) {
       return createTenantProductsErrorResponse(c, error);
     }
 
+    throw error;
+  }
+}
+
+export async function importTenantProductsController(c: Context<AppBindings>) {
+  const data = importTenantProductsBodySchema.parse(await c.req.json().catch(() => ({})));
+  try {
+    return c.json(await importTenantProducts(c.get("authContext"), data, getRequestMeta(c)), 201);
+  } catch (error) {
+    if (error instanceof TenantProductsError) return createTenantProductsErrorResponse(c, error);
     throw error;
   }
 }

@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { AppBindings } from "../../../http/types.js";
 import {
   createTenantProductController,
+  importTenantProductsController,
   getTenantProductController,
   getTenantProductOverviewController,
   getTenantProductCategoryAttributesController,
@@ -26,6 +27,7 @@ export function createTenantProductRoutes() {
   routes.post("/media/downloads", requestTenantProductMediaDownloadsController);
   routes.get("/", listTenantProductsController);
   routes.post("/", createTenantProductController);
+  routes.post("/import", importTenantProductsController);
   routes.patch("/:productId", updateTenantProductController);
   routes.get("/:productId", getTenantProductController);
 

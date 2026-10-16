@@ -94,6 +94,12 @@ export function runTenantProductValidationSmokeChecks(): void {
   assert.equal(mediaConflict.status, 409);
 
   const parsed = createTenantProductBodySchema.parse(validProductBody());
+  for (const skuCode of [undefined, "", "  "]) {
+    assert.equal(createTenantProductBodySchema.parse({ ...validProductBody(), skuCode }).skuCode, undefined);
+  }
+  assert.equal(createTenantProductBodySchema.parse({ ...validProductBody(), skuCode: "  MY-SKU  " }).skuCode, "MY-SKU");
+  assert.equal(createTenantProductBodySchema.safeParse({ ...validProductBody(), skuCode: "X".repeat(81) }).success, false);
+  assert.equal(updateTenantProductBodySchema.safeParse({ ...validUpdateBody(), skuCode: "" }).success, false, "editing cannot clear a SKU");
 
   assert.deepEqual(
     parsed.branchSettings.map((setting) => setting.openingStock),

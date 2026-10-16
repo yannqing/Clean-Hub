@@ -27,10 +27,13 @@ import {
   findTenantProducts,
   updateTenantProductRecord,
 } from "./products.repository.js";
+import { importTenantProductRecords } from "./products.import.repository.js";
 import { TenantProductsError } from "./products.errors.js";
 import type {
   CreateTenantProductRequest,
   CreateTenantProductResponse,
+  ImportTenantProductsRequest,
+  ImportTenantProductsResponse,
   RequestTenantProductMediaDownloads,
   RequestTenantProductMediaUpload,
   TenantProductCategoryAttributeListResponse,
@@ -196,6 +199,26 @@ export async function createTenantProduct(
     tenantId: scope.tenantId,
     actorUserId: authContext.userId,
     createTenantDefaultPrice: scope.role === TENANT_OWNER_ROLE,
+    requestMeta,
+  });
+}
+
+export async function importTenantProducts(
+  authContext: AuthContext,
+  data: ImportTenantProductsRequest,
+  requestMeta: AuthRequestMeta = {},
+  db: Database = getDb(),
+): Promise<ImportTenantProductsResponse> {
+  requireTenantRole(authContext, ["owner"]);
+  const scope = await resolveProductAccess(authContext, db);
+  const branchIds = [...new Set(data.products.flatMap(({ product }) =>
+    product.branchSettings.map((setting) => setting.branchId),
+  ))];
+  await assertBranchIdsSubset(authContext, branchIds, db);
+  return importTenantProductRecords(db, {
+    ...data,
+    tenantId: scope.tenantId,
+    actorUserId: authContext.userId,
     requestMeta,
   });
 }

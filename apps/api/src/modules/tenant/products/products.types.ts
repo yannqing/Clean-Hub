@@ -29,7 +29,8 @@ export type CreateTenantProductRequest = {
   status: TenantProductStatus;
   /** null sells the product at the tenant default; omitted on update keeps it. */
   taxRateId?: string | null;
-  skuCode: string;
+  /** Omit or leave blank to generate a SKU on creation. */
+  skuCode?: string;
   barcode?: string;
   variantName?: string;
   unitOfMeasure: string;
@@ -45,6 +46,17 @@ export type CreateTenantProductRequest = {
 
 export type CreateTenantProductResponse = {
   id: string;
+  skuCode: string;
+};
+
+export type ImportTenantProductsRequest = {
+  importId: string;
+  products: Array<{ rowNumber: number; product: CreateTenantProductRequest }>;
+};
+
+export type ImportTenantProductsResponse = {
+  imported: number;
+  data: CreateTenantProductResponse[];
 };
 
 export type UpdateTenantProductBranchSetting = {
@@ -56,8 +68,9 @@ export type UpdateTenantProductBranchSetting = {
 
 export type UpdateTenantProductRequest = Omit<
   CreateTenantProductRequest,
-  "branchSettings" | "mediaObjectKeys"
+  "branchSettings" | "mediaObjectKeys" | "skuCode"
 > & {
+  skuCode: string;
   currency: string;
   version: number;
   skuId: string;

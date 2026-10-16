@@ -2,6 +2,8 @@ import type { ApiClient, ApiRequestOptions, QueryParams } from "../../types";
 import type {
   CreateTenantProductRequest,
   CreateTenantProductResponse,
+  ImportTenantProductsRequest,
+  ImportTenantProductsResponse,
   RequestTenantProductMediaDownloads,
   RequestTenantProductMediaUploadRequest,
   TenantProductCategoryAttributeListResponse,
@@ -43,6 +45,11 @@ export function createTenantProductsApi(client: ApiClient) {
         input,
         options,
       ),
+    import: (input: ImportTenantProductsRequest, options?: RequestOptions) =>
+      client.post<ImportTenantProductsResponse>("/tenant/products/import", input, {
+        ...options,
+        timeoutMs: 120_000,
+      }),
     get: (productId: string, options?: RequestOptions) =>
       client.get<TenantProductDetail>(
         `/tenant/products/${encodeURIComponent(productId)}`,

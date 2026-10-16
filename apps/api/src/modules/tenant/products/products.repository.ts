@@ -39,6 +39,7 @@ import { writeAuditLog } from "../../audit/audit.helper.js";
 import { findTenantDefaultCurrency } from "../settings/settings.repository.js";
 import { DEFAULT_PRODUCT_CATEGORIES } from "./products.category-defaults.js";
 import { TenantProductsError } from "./products.errors.js";
+import { generateProductSkuCode } from "./product-sku.js";
 import type {
   CreateTenantProductCategoryAttribute,
   CreateTenantProductRequest,
@@ -1037,12 +1038,47 @@ async function requireAssignableProductTaxRate(
   }
 }
 
+export async function lockTenantProductSkuWrites(
+  db: Database,
+  tenantId: string,
+): Promise<void> {
+  await db.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`product_sku:${tenantId}`}, 0))`,
+  );
+}
+
+async function resolveNewProductSku(
+  db: Database,
+  tenantId: string,
+  supplied?: string,
+): Promise<string> {
+  if (supplied?.trim()) return supplied.trim();
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const skuCode = generateProductSkuCode();
+    const existing = await db
+      .select({ id: productSkus.id })
+      .from(productSkus)
+      .where(and(eq(productSkus.tenantId, tenantId), eq(productSkus.skuCode, skuCode)))
+      .limit(1);
+    // Include deleted rows so generated codes are not reused after deletion.
+    if (existing.length === 0) return skuCode;
+  }
+  throw new TenantProductsError(
+    "PRODUCT_SKU_GENERATION_FAILED",
+    "Could not generate a unique SKU. Please try again.",
+    500,
+  );
+}
+
 export async function createTenantProductRecord(
   db: Database,
   input: CreateTenantProductRecordInput,
 ): Promise<CreateTenantProductResponse> {
   try {
     return await db.transaction(async (tx) => {
+      await lockTenantProductSkuWrites(tx, input.tenantId);
+      const skuCode = await resolveNewProductSku(tx, input.tenantId, input.skuCode);
       const branchIds = input.branchSettings.map((setting) => setting.branchId);
       const defaultCurrency = await findTenantDefaultCurrency(
         tx,
@@ -1053,7 +1089,7 @@ export async function createTenantProductRecord(
         tenantId: input.tenantId,
         branchIds,
       });
-      await requireUniqueSkuIdentifiers(tx, input);
+      await requireUniqueSkuIdentifiers(tx, { ...input, skuCode });
       await requireAssignableProductTaxRate(tx, {
         tenantId: input.tenantId,
         taxRateId: input.taxRateId,
@@ -1141,7 +1177,7 @@ export async function createTenantProductRecord(
         id: productSkuId,
         tenantId: input.tenantId,
         productId,
-        skuCode: input.skuCode,
+        skuCode,
         barcode: normalizeNullable(input.barcode),
         variantName: normalizeNullable(input.variantName),
         unitOfMeasure: input.unitOfMeasure,
@@ -1332,7 +1368,7 @@ export async function createTenantProductRecord(
           status: input.status,
           taxRateId: input.taxRateId ?? null,
           productSkuId,
-          skuCode: input.skuCode,
+          skuCode,
           barcode: normalizeNullable(input.barcode),
           variantName: normalizeNullable(input.variantName),
           unitOfMeasure: input.unitOfMeasure,
@@ -1353,7 +1389,7 @@ export async function createTenantProductRecord(
         userAgent: input.requestMeta?.userAgent,
       });
 
-      return { id: productId };
+      return { id: productId, skuCode };
     });
   } catch (error) {
     if (error instanceof TenantProductsError) {
@@ -1415,6 +1451,7 @@ export async function updateTenantProductRecord(
 ): Promise<TenantProductDetailRecord> {
   try {
     return await db.transaction(async (tx) => {
+      await lockTenantProductSkuWrites(tx, input.tenantId);
       const branchScopeFilter = buildProductBranchScopeFilter(
         input.allowedBranchIds,
       );

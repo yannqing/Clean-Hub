@@ -222,7 +222,8 @@ export const createTenantProductBodySchema = z
     tags: tenantProductTagsSchema,
     status: tenantProductStatusSchema,
     taxRateId: z.string().regex(ULID_PATTERN).nullable().optional(),
-    skuCode: z.string().trim().min(1).max(80),
+    skuCode: z.string().trim().max(80).optional()
+      .transform((value) => value || undefined),
     barcode: optionalTrimmedStringSchema(80),
     variantName: optionalTrimmedStringSchema(160),
     unitOfMeasure: z.string().trim().min(1).max(32),
@@ -503,3 +504,14 @@ export const tenantProductOverviewQuerySchema = z
       path: ["createdAfter"],
     },
   );
+
+export const importTenantProductsBodySchema = z.object({
+  importId: z.string().regex(ULID_PATTERN),
+  products: z.array(z.object({
+    rowNumber: z.number().int().min(2).max(100_000),
+    product: createTenantProductBodySchema.refine(
+      (product) => product.mediaObjectKeys.length === 0,
+      { message: "Add product images after importing.", path: ["mediaObjectKeys"] },
+    ),
+  }).strict()).min(1).max(100),
+}).strict();

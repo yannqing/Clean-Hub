@@ -1,4 +1,6 @@
 export type TenantProductsErrorCode =
+  | "PRODUCT_SKU_GENERATION_FAILED"
+  | "PRODUCT_IMPORT_CONFLICT"
   | "PRODUCT_NOT_FOUND"
   | "PRODUCT_VERSION_CONFLICT"
   | "PRODUCT_SKU_NOT_FOUND"
@@ -24,6 +26,7 @@ export class TenantProductsError extends Error {
     readonly code: TenantProductsErrorCode,
     message: string,
     readonly status: 403 | 404 | 409 | 422 | 500,
+    readonly row?: number,
   ) {
     super(message);
     this.name = "TenantProductsError";
