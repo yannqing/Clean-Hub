@@ -137,6 +137,8 @@ data class NativeTicketItemDraft(
     val defectNotes: String?,
     val specialRequest: String?,
     val remark: String?,
+    val chargedUnitAmountMinor: Long? = null,
+    val overrideReason: String? = null,
 )
 
 /** Editable item fields available to every operator; sensitive price changes stay server-authorized. */
@@ -153,6 +155,8 @@ data class NativeTicketItemUpdate(
     val defectNotes: String?,
     val specialRequest: String?,
     val remark: String?,
+    val chargedUnitAmountMinor: Long? = null,
+    val overrideReason: String? = null,
 )
 
 data class NativeTicketDetail(
@@ -165,6 +169,13 @@ data class NativeTicketDetail(
     /** IDs already held by this cashier's active POS cart. */
     val cartTicketItemIds: Set<String> = emptySet(),
     val hasPendingCashCheckout: Boolean = false,
+    val information: org.json.JSONObject? = null,
+    val relatedOrders: org.json.JSONArray? = null,
+    val unsentIntakeIds: Set<String> = emptySet(),
+    val intakeFailed: Boolean = false,
+    val intakeError: String? = null,
+    val needsOriginalOperator: Boolean = false,
+    val discardableIntakeIds: Set<String> = emptySet(),
 )
 
 data class NativeCashState(
@@ -273,6 +284,8 @@ data class NativePosSnapshot(
     val failedSales: Int,
     /** A fresh catalogue may legitimately contain no retail products. */
     val catalogIsFresh: Boolean,
+    val pendingIntakes: Int = 0,
+    val failedIntakes: Int = 0,
 )
 
 data class NativeCheckoutResult(

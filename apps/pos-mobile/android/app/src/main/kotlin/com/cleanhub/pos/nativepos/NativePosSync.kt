@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class NativeSyncResult(val replayedSales: Int, val failedSales: Int)
+data class NativeSyncResult(val replayedSales: Int, val failedSales: Int, val intakeSyncError: NativePosApiException? = null)
 
 internal data class NativeCheckoutSubmission(
     val queueStatus: String?,
@@ -22,6 +22,11 @@ internal data class NativeCheckoutSubmission(
     val error: NativePosApiException? = null,
     val order: JSONObject? = null,
 )
+
+internal interface NativeIntakeGateway {
+    fun prepare(terminal: NativeTerminal): Boolean
+    fun submit(path: String, payload: JSONObject): JSONObject
+}
 
 internal interface NativeCheckoutGateway {
     fun submit(payload: JSONObject): JSONObject
@@ -55,6 +60,7 @@ internal fun isTransientReplayFailure(error: NativePosApiException): Boolean =
 class NativePosSyncEngine(context: Context) {
     private val brandingCache = NativeBrandLogoCache(context.applicationContext)
     private val database = NativePosDatabase(context.applicationContext)
+    private val intakeStore = database.intakeStore
     private val session = NativePosSession(context.applicationContext)
     private val api = NativePosApiClient(session)
     private var checkoutGateway: NativeCheckoutGateway = object : NativeCheckoutGateway {
@@ -64,6 +70,43 @@ class NativePosSyncEngine(context: Context) {
 
     internal constructor(context: Context, gateway: NativeCheckoutGateway) : this(context) {
         checkoutGateway = gateway
+    }
+
+    private var intakeGateway: NativeIntakeGateway =
+        object : NativeIntakeGateway {
+            override fun prepare(terminal: NativeTerminal): Boolean {
+                val capability =
+                    try {
+                        api.get("/pos/service-tickets/intake-capabilities")
+                    } catch (error: NativePosApiException) {
+                        if (error.status in setOf(400, 404, 422))
+                            throw NativePosApiException(
+                                409,
+                                "INTAKE_SYNC_UNAVAILABLE",
+                                nativePosCopy(session.pinLanguageCode()).intakeServerUpgradeRequired,
+                            )
+                        throw error
+                    }
+                if (!capability.optBoolean("stableClientIds"))
+                    throw NativePosApiException(
+                        409,
+                        "INTAKE_SYNC_UNAVAILABLE",
+                        nativePosCopy(session.pinLanguageCode()).intakeServerUpgradeRequired,
+                    )
+                val auth = api.get("/auth/me")
+                val branch = api.get("/pos/branches/me")
+                return auth.optString("tenantId") == terminal.tenantId &&
+                    auth.optString("terminalId") == terminal.terminalId &&
+                    auth.optString("userId") == terminal.userId &&
+                    branch.optString("id") == terminal.branchId
+            }
+
+            override fun submit(path: String, payload: JSONObject): JSONObject =
+                api.post(path, payload)
+        }
+
+    internal constructor(context: Context, gateway: NativeIntakeGateway) : this(context) {
+        intakeGateway = gateway
     }
 
     /** Refreshes store-owned checkout and receipt rules without replaying sales. */
@@ -77,7 +120,16 @@ class NativePosSyncEngine(context: Context) {
         return branch to settings
     }
 
-    fun synchronize(): NativeSyncResult {
+    fun synchronize(includeIntakes: Boolean = true): NativeSyncResult {
+        val intakeFailure =
+            if (includeIntakes)
+                try {
+                    synchronizeIntakes()
+                    null
+                } catch (error: NativePosApiException) {
+                    error
+                }
+            else null
         refreshSnapshot()
         var replayed = 0
         var failed = 0
@@ -100,7 +152,7 @@ class NativePosSyncEngine(context: Context) {
         // Surfaced after the successful work is recorded, so the caller still
         // sees the connection problem and WorkManager still retries.
         deferred?.let { throw it }
-        return NativeSyncResult(replayed, failed)
+        return NativeSyncResult(replayed, failed, intakeFailure)
     }
 
     /** Interactive checkout submits only this durable command, never the catalogue or older sales. */
@@ -140,16 +192,76 @@ class NativePosSyncEngine(context: Context) {
 
 
 
-    /** Refreshes one ticket's operational items without downloading every ticket detail. */
+    /** Authenticate before replay: a PIN handover must never upload another employee's work. */
+    fun synchronizeIntakes(ticketId: String? = null, retryFailed: Boolean = false) =
+        synchronized(NATIVE_INTAKE_REPLAY_LOCK) {
+            val t = database.intakeTerminal() ?: return@synchronized
+            if (intakeStore.operations(t, ticketId).none { it.status != "synced" }) return@synchronized
+            try {
+                if (!intakeGateway.prepare(t)) return@synchronized
+            } catch (error: NativePosApiException) {
+                intakeStore
+                    .operations(t, ticketId)
+                    .filter { it.status == "pending" && it.userId == t.userId }
+                    .forEach { intakeStore.failed(it.id, error.message.orEmpty(), false, error.status) }
+                throw error
+            }
+            if (retryFailed && ticketId != null) intakeStore.retry(t, ticketId)
+            for (op in
+                intakeStore.operations(t, ticketId).filter {
+                    it.status == "pending" && it.userId == t.userId
+                }) {
+                if (op.kind == "item" && intakeStore.unsent(t, op.ticketId).any { it.kind == "ticket" })
+                    continue
+                intakeStore.attempt(op.id)
+                try {
+                    val path =
+                        if (op.kind == "ticket") "/pos/service-tickets"
+                        else "/pos/service-tickets/${op.ticketId}/items"
+                    val response = intakeGateway.submit(path, JSONObject(op.payload))
+                    if (
+                        response.optString("id") != op.id ||
+                            (op.kind == "item" && response.optString("ticketId") != op.ticketId) ||
+                            (op.kind == "ticket" &&
+                                (response.optString("branchId") != t.branchId ||
+                                    response.optString("customerId") !=
+                                        JSONObject(op.payload).optString("customerId")))
+                    ) {
+                        throw NativePosApiException(
+                            0,
+                            "INVALID_INTAKE_RESPONSE",
+                            nativePosCopy(session.pinLanguageCode()).intakeConfirmationMissing,
+                        )
+                    }
+                    intakeStore.acknowledge(op.id, response)
+                    if (op.kind == "ticket") intakeStore.cache(t, "ticket", op.ticketId, response)
+                } catch (error: NativePosApiException) {
+                    val transient = isTransientReplayFailure(error) || error.status == 429
+                    intakeStore.failed(
+                        op.id,
+                        error.message.orEmpty(),
+                        !transient || op.attempt + 1 >= NATIVE_REPLAY_MAX_ATTEMPTS,
+                        error.status,
+                    )
+                    if (transient) throw error
+                }
+            }
+        }
+
+    /** Detail refresh owns metadata, item rows and related orders, independently of catalogue sync. */
     fun refreshTicketItems(ticketId: String, currency: String): List<NativeTicketItem> {
+        val t = database.snapshot().terminal ?: return database.ticketItems(ticketId)
+        if (intakeStore.unsent(t, ticketId).any { it.kind == "ticket" })
+            return database.ticketItems(ticketId)
         val detail = api.get("/pos/service-tickets/$ticketId")
         val items = detail.optJSONArray("items").toNativeTicketItems(ticketId, currency)
         database.replaceTicketItems(ticketId, items)
-        val billedItemIds = api.get("/pos/service-tickets/$ticketId/orders")
-            .optJSONArray("data")
-            .toBilledTicketItemIds()
-        database.replaceTicketBilledItems(ticketId, billedItemIds)
-        return items
+        intakeStore.cache(t, "ticket", ticketId, detail)
+        intakeStore.confirmItems(t, ticketId)
+        val orders = api.get("/pos/service-tickets/$ticketId/orders")
+        intakeStore.cache(t, "ticket-orders", ticketId, orders)
+        database.replaceTicketBilledItems(ticketId, orders.optJSONArray("data").toBilledTicketItemIds())
+        return database.ticketItems(ticketId)
     }
 
     private fun refreshSnapshot() {
@@ -492,8 +604,9 @@ class NativePosSyncEngine(context: Context) {
 
 class NativePosSyncWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result = try {
-        NativePosSyncEngine(applicationContext).synchronize()
-        Result.success()
+        val result=NativePosSyncEngine(applicationContext).synchronize()
+        val intakeError=result.intakeSyncError
+        if(intakeError!=null && intakeError.status!=401 && intakeError.status!=403) Result.retry() else Result.success()
     } catch (error: NativePosApiException) {
         // An expired staff session needs an explicit online PIN login. The
         // durable queue remains unchanged; a future login schedules it again.
@@ -503,7 +616,7 @@ class NativePosSyncWorker(appContext: Context, params: WorkerParameters) : Corou
     }
 
     companion object {
-        private const val UNIQUE_WORK = "cleanhub-native-pos-sync"
+        internal const val UNIQUE_WORK = "cleanhub-native-pos-sync"
 
         fun schedule(context: Context) {
             val request = OneTimeWorkRequestBuilder<NativePosSyncWorker>()

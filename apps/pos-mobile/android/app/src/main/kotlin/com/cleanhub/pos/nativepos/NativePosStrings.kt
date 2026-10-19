@@ -37,6 +37,70 @@ internal class NativePosCopy(
     /** Keys every language must define; the test reads this. */
     internal fun keys(): Set<String> = values.keys
 
+    val detailEmail: String get() = get("detailEmail")
+    val detailCustomerDisabled: String get() = get("detailCustomerDisabled")
+    val intakeServerUpgradeRequired: String get() = get("intakeServerUpgradeRequired")
+    val detailPhone: String get() = get("detailPhone")
+    val detailCustomerActive: String get() = get("detailCustomerActive")
+    val intakeRemoveRejected: String get() = get("intakeRemoveRejected")
+    val intakeRemoveRejectedHint: String get() = get("intakeRemoveRejectedHint")
+    val intakeRejectedRemoved: String get() = get("intakeRejectedRemoved")
+    val detailTicketSaved: String get() = get("detailTicketSaved")
+    val intakeSaving: String get() = get("intakeSaving")
+    val intakeSavedLocally: String get() = get("intakeSavedLocally")
+    val intakeOfflineHint: String get() = get("intakeOfflineHint")
+    val intakePending: String get() = get("intakePending")
+    val intakeFailed: String get() = get("intakeFailed")
+    val intakeSyncBeforeCheckout: String get() = get("intakeSyncBeforeCheckout")
+    val intakeOriginalOperator: String get() = get("intakeOriginalOperator")
+    val intakeRebindBlocked: String get() = get("intakeRebindBlocked")
+    val intakeConfirmationMissing: String get() = get("intakeConfirmationMissing")
+    val intakeQueueCount: String get() = get("intakeQueueCount")
+    val detailBasicInformation: String get() = get("detailBasicInformation")
+    val detailEditInformation: String get() = get("detailEditInformation")
+    val detailSource: String get() = get("detailSource")
+    val detailSourcePos: String get() = get("detailSourcePos")
+    val detailSourceApp: String get() = get("detailSourceApp")
+    val detailSourcePhone: String get() = get("detailSourcePhone")
+    val detailSourceWhatsapp: String get() = get("detailSourceWhatsapp")
+    val detailCompletedAt: String get() = get("detailCompletedAt")
+    val detailCancelledAt: String get() = get("detailCancelledAt")
+    val detailRelatedOrders: String get() = get("detailRelatedOrders")
+    val detailNoRelatedOrders: String get() = get("detailNoRelatedOrders")
+    val detailNotCached: String get() = get("detailNotCached")
+    val detailStandardPrice: String get() = get("detailStandardPrice")
+    val detailChargedPrice: String get() = get("detailChargedPrice")
+    val detailPriceReason: String get() = get("detailPriceReason")
+    val detailEstimatedAmount: String get() = get("detailEstimatedAmount")
+    val detailLabelCode: String get() = get("detailLabelCode")
+    val detailServiceSearch: String get() = get("detailServiceSearch")
+    val detailMeasurementInvalid: String get() = get("detailMeasurementInvalid")
+    val detailRetry: String get() = get("detailRetry")
+    val detailRefresh: String get() = get("detailRefresh")
+    val detailOverview: String get() = get("detailOverview")
+    val detailCustomerTickets: String get() = get("detailCustomerTickets")
+    val detailCustomerOrders: String get() = get("detailCustomerOrders")
+    val detailCustomerItems: String get() = get("detailCustomerItems")
+    val detailCustomerNotes: String get() = get("detailCustomerNotes")
+    val detailAddress: String get() = get("detailAddress")
+    val detailRelationship: String get() = get("detailRelationship")
+    val detailAccount: String get() = get("detailAccount")
+    val detailOrderCount: String get() = get("detailOrderCount")
+    val detailTicketCount: String get() = get("detailTicketCount")
+    val detailNoRecords: String get() = get("detailNoRecords")
+    val detailCachedNotice: String get() = get("detailCachedNotice")
+    val detailLoadFailed: String get() = get("detailLoadFailed")
+    val detailPrevious: String get() = get("detailPrevious")
+    val detailNext: String get() = get("detailNext")
+    val detailPage: String get() = get("detailPage")
+    val detailCustomerSaved: String get() = get("detailCustomerSaved")
+    val detailItemCategory: String get() = get("detailItemCategory")
+    val detailItemColor: String get() = get("detailItemColor")
+    val detailItemBrand: String get() = get("detailItemBrand")
+    val detailItemMaterial: String get() = get("detailItemMaterial")
+    val detailPickupHint: String get() = get("detailPickupHint")
+    val detailNewTicket: String get() = get("detailNewTicket")
+
     val checkoutConfirmationMissing: String get() = get("checkoutConfirmationMissing")
     val checkoutPaidTitle: String get() = get("checkoutPaidTitle")
     val checkoutSavedTitle: String get() = get("checkoutSavedTitle")
@@ -274,7 +338,6 @@ internal class NativePosCopy(
     val synchronizing: String get() = get("synchronizing")
     val intakeTitle: String get() = get("intakeTitle")
     val intakeOnlineHint: String get() = get("intakeOnlineHint")
-    val intakeOfflineHint: String get() = get("intakeOfflineHint")
     val newCustomer: String get() = get("newCustomer")
     val newCustomerShort: String get() = get("newCustomerShort")
     val lookupTitle: String get() = get("lookupTitle")
@@ -958,6 +1021,69 @@ internal class NativePosCopy(
 }
 
 private val COPY_ZH_VALUES: Map<String, String> = mapOf(
+    "detailTicketSaved" to "工单资料已保存",
+    "detailPhone" to "联系电话",
+    "detailCustomerActive" to "正常",
+    "intakeRemoveRejected" to "移除被拒绝的本机资料",
+    "intakeRemoveRejectedHint" to "该资料已被服务器明确拒绝，尚未创建成功。移除后可重新填写；若移除工单，其未上传项目也会一并移除。已确认的工单和订单不受影响。",
+    "intakeRejectedRemoved" to "已移除被拒绝的本机资料，可以重新填写。",
+    "intakeServerUpgradeRequired" to "服务端尚不支持安全同步工单，请管理员更新服务端后重试。本机资料已保留。",
+    "detailEmail" to "邮箱",
+    "detailCustomerDisabled" to "已停用",
+    "intakeSaving" to "正在保存到本机…",
+    "intakeSavedLocally" to "已保存到本机，正在后台同步。",
+    "intakeOfflineHint" to "可为已缓存的客户创建工单和项目；联网后自动同步，确认价格后才能结款。",
+    "intakePending" to "工单资料待同步",
+    "intakeFailed" to "工单同步需要处理",
+    "intakeSyncBeforeCheckout" to "工单或项目尚未同步确认，金额为预估。请先同步成功，再加入收银。",
+    "intakeOriginalOperator" to "请由创建该资料的员工登录后同步，避免归属到其他员工。",
+    "intakeRebindBlocked" to "本机还有未同步工单或项目。请先同步或处理失败记录，再切换门店。",
+    "intakeConfirmationMissing" to "未收到有效的创建确认，资料已保留在本机，将使用同一标识重试。",
+    "intakeQueueCount" to "待同步工单资料：%d · 需处理：%d",
+    "detailBasicInformation" to "基本资料",
+    "detailEditInformation" to "编辑资料",
+    "detailSource" to "来源渠道",
+    "detailSourcePos" to "门店 POS",
+    "detailSourceApp" to "客户应用",
+    "detailSourcePhone" to "电话",
+    "detailSourceWhatsapp" to "WhatsApp",
+    "detailCompletedAt" to "完成时间",
+    "detailCancelledAt" to "取消时间",
+    "detailRelatedOrders" to "关联订单",
+    "detailNoRelatedOrders" to "暂无关联订单",
+    "detailNotCached" to "完整资料尚未缓存，请联网刷新。",
+    "detailStandardPrice" to "标准单价",
+    "detailChargedPrice" to "实际单价",
+    "detailPriceReason" to "改价原因（必填）",
+    "detailEstimatedAmount" to "预估金额",
+    "detailLabelCode" to "标签编号",
+    "detailServiceSearch" to "搜索服务名称",
+    "detailMeasurementInvalid" to "数量或袋数须为 1–9999；重量须大于 0，最多 3 位小数。",
+    "detailRetry" to "重新同步",
+    "detailRefresh" to "刷新资料",
+    "detailOverview" to "概览",
+    "detailCustomerTickets" to "服务工单",
+    "detailCustomerOrders" to "消费订单",
+    "detailCustomerItems" to "服务项目",
+    "detailCustomerNotes" to "客户备注",
+    "detailAddress" to "地址",
+    "detailRelationship" to "与客户账户关系",
+    "detailAccount" to "所属客户账户",
+    "detailOrderCount" to "消费订单数",
+    "detailTicketCount" to "服务工单数",
+    "detailNoRecords" to "暂无记录",
+    "detailCachedNotice" to "正在显示本机缓存，可能不是最新资料。",
+    "detailLoadFailed" to "部分资料加载失败，已保留可用内容，请重试。",
+    "detailPrevious" to "上一页",
+    "detailNext" to "下一页",
+    "detailPage" to "第 %d 页 · 共 %d 条",
+    "detailCustomerSaved" to "客户资料已保存",
+    "detailItemCategory" to "类别",
+    "detailItemColor" to "颜色",
+    "detailItemBrand" to "品牌",
+    "detailItemMaterial" to "材质",
+    "detailPickupHint" to "YYYY-MM-DD HH:mm（门店时区）",
+    "detailNewTicket" to "新增工单",
     "checkoutConfirmationMissing" to "未收到完整的结款确认，交易已保留并将安全重试，请勿重复收款。",
     "orderLineCount" to "条目数量",
     "assistantLabel" to "接待员工",
@@ -1552,7 +1678,6 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
     "synchronizing" to "正在同步…",
     "intakeTitle" to "客户接待",
     "intakeOnlineHint" to "查询客户档案，选择客户后创建服务工单。",
-    "intakeOfflineHint" to "离线时可查询已缓存客户；创建客户和工单需要联网。",
     "newCustomer" to "＋ 新建客户",
     "newCustomerShort" to "新建客户",
     "lookupTitle" to "查询客户档案",
@@ -1872,6 +1997,69 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_EN_VALUES: Map<String, String> = mapOf(
+    "detailTicketSaved" to "Ticket information saved",
+    "detailPhone" to "Phone",
+    "detailCustomerActive" to "Active",
+    "intakeRemoveRejected" to "Remove rejected local work",
+    "intakeRemoveRejectedHint" to "The server explicitly rejected this creation. You can remove it and enter it again. Removing a ticket also removes its unsent items. Confirmed tickets and orders are preserved.",
+    "intakeRejectedRemoved" to "Rejected local work removed. You can enter it again.",
+    "intakeServerUpgradeRequired" to "The server needs an intake sync update. Ask an administrator to update it, then retry. Local work is retained.",
+    "detailEmail" to "Email",
+    "detailCustomerDisabled" to "Disabled",
+    "intakeSaving" to "Saving on this terminal…",
+    "intakeSavedLocally" to "Saved on this terminal. Sync continues in the background.",
+    "intakeOfflineHint" to "Create tickets and items for cached customers. They sync when online; checkout requires confirmed prices.",
+    "intakePending" to "Intake awaiting sync",
+    "intakeFailed" to "Intake sync needs attention",
+    "intakeSyncBeforeCheckout" to "The ticket or items are not confirmed yet. Amounts are estimates. Sync successfully before checkout.",
+    "intakeOriginalOperator" to "Sign in as the employee who created this work to synchronize it.",
+    "intakeRebindBlocked" to "This terminal has unsynced tickets or items. Resolve them before switching stores.",
+    "intakeConfirmationMissing" to "No valid creation confirmation was received. Work is saved locally and will retry with the same ID.",
+    "intakeQueueCount" to "Pending intake records: %d · Needs attention: %d",
+    "detailBasicInformation" to "Basic information",
+    "detailEditInformation" to "Edit information",
+    "detailSource" to "Source",
+    "detailSourcePos" to "In-store POS",
+    "detailSourceApp" to "Customer app",
+    "detailSourcePhone" to "Phone",
+    "detailSourceWhatsapp" to "WhatsApp",
+    "detailCompletedAt" to "Completed at",
+    "detailCancelledAt" to "Cancelled at",
+    "detailRelatedOrders" to "Related orders",
+    "detailNoRelatedOrders" to "No related orders",
+    "detailNotCached" to "Full details are not cached yet. Connect and refresh.",
+    "detailStandardPrice" to "Standard unit price",
+    "detailChargedPrice" to "Charged unit price",
+    "detailPriceReason" to "Price override reason (required)",
+    "detailEstimatedAmount" to "Estimated amount",
+    "detailLabelCode" to "Label code",
+    "detailServiceSearch" to "Search services",
+    "detailMeasurementInvalid" to "Quantity and bags: 1–9999. Weight must be positive with up to 3 decimal places.",
+    "detailRetry" to "Retry sync",
+    "detailRefresh" to "Refresh details",
+    "detailOverview" to "Overview",
+    "detailCustomerTickets" to "Service tickets",
+    "detailCustomerOrders" to "Orders",
+    "detailCustomerItems" to "Service items",
+    "detailCustomerNotes" to "Customer notes",
+    "detailAddress" to "Address",
+    "detailRelationship" to "Account relationship",
+    "detailAccount" to "Customer account",
+    "detailOrderCount" to "Order count",
+    "detailTicketCount" to "Ticket count",
+    "detailNoRecords" to "No records",
+    "detailCachedNotice" to "Showing cached information; it may be out of date.",
+    "detailLoadFailed" to "Some details could not be loaded. Available information is retained; please retry.",
+    "detailPrevious" to "Previous",
+    "detailNext" to "Next",
+    "detailPage" to "Page %d · %d records",
+    "detailCustomerSaved" to "Customer details saved",
+    "detailItemCategory" to "Category",
+    "detailItemColor" to "Colour",
+    "detailItemBrand" to "Brand",
+    "detailItemMaterial" to "Material",
+    "detailPickupHint" to "YYYY-MM-DD HH:mm (store time zone)",
+    "detailNewTicket" to "New service ticket",
     "checkoutConfirmationMissing" to "Checkout confirmation was incomplete. The sale is retained for a safe retry; do not charge again.",
     "orderLineCount" to "Line items",
     "assistantLabel" to "Assistant",
@@ -2466,7 +2654,6 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
     "synchronizing" to "Syncing…",
     "intakeTitle" to "Customer intake",
     "intakeOnlineHint" to "Look up a customer, then create a service ticket.",
-    "intakeOfflineHint" to "Offline you can search cached customers; creating a customer or ticket needs a connection.",
     "newCustomer" to "＋ New customer",
     "newCustomerShort" to "New customer",
     "lookupTitle" to "Find a customer",
@@ -2786,6 +2973,69 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_FR_VALUES: Map<String, String> = mapOf(
+    "detailTicketSaved" to "Informations du bon enregistrées",
+    "detailPhone" to "Téléphone",
+    "detailCustomerActive" to "Actif",
+    "intakeRemoveRejected" to "Supprimer les données locales rejetées",
+    "intakeRemoveRejectedHint" to "Le serveur a explicitement rejeté cette création. Vous pouvez la supprimer et la ressaisir. Supprimer un bon retire aussi ses articles non envoyés. Les bons et commandes confirmés sont conservés.",
+    "intakeRejectedRemoved" to "Données locales rejetées supprimées. Vous pouvez les ressaisir.",
+    "intakeServerUpgradeRequired" to "Le serveur doit être mis à jour pour synchroniser les bons. Contactez un administrateur puis réessayez. Données locales conservées.",
+    "detailEmail" to "E-mail",
+    "detailCustomerDisabled" to "Désactivé",
+    "intakeSaving" to "Enregistrement sur cette caisse…",
+    "intakeSavedLocally" to "Enregistré sur cette caisse. Synchronisation en arrière-plan.",
+    "intakeOfflineHint" to "Créez des bons et articles pour les clients en cache. Synchronisation au retour du réseau ; prix confirmés requis avant encaissement.",
+    "intakePending" to "Réception en attente de synchronisation",
+    "intakeFailed" to "Synchronisation de la réception à vérifier",
+    "intakeSyncBeforeCheckout" to "Bon ou articles non confirmés. Montants estimatifs. Synchronisez avant encaissement.",
+    "intakeOriginalOperator" to "Connectez-vous avec l’employé ayant créé ces données pour les synchroniser.",
+    "intakeRebindBlocked" to "Cette caisse contient des bons ou articles non synchronisés. Résolvez-les avant de changer de magasin.",
+    "intakeConfirmationMissing" to "Confirmation de création invalide. Les données locales seront renvoyées avec le même identifiant.",
+    "intakeQueueCount" to "Réceptions en attente : %d · À vérifier : %d",
+    "detailBasicInformation" to "Informations générales",
+    "detailEditInformation" to "Modifier les informations",
+    "detailSource" to "Origine",
+    "detailSourcePos" to "Caisse en magasin",
+    "detailSourceApp" to "Application client",
+    "detailSourcePhone" to "Téléphone",
+    "detailSourceWhatsapp" to "WhatsApp",
+    "detailCompletedAt" to "Terminé le",
+    "detailCancelledAt" to "Annulé le",
+    "detailRelatedOrders" to "Commandes associées",
+    "detailNoRelatedOrders" to "Aucune commande associée",
+    "detailNotCached" to "Informations complètes non disponibles en cache. Connectez-vous et actualisez.",
+    "detailStandardPrice" to "Prix unitaire standard",
+    "detailChargedPrice" to "Prix unitaire facturé",
+    "detailPriceReason" to "Motif du changement de prix (obligatoire)",
+    "detailEstimatedAmount" to "Montant estimé",
+    "detailLabelCode" to "Code étiquette",
+    "detailServiceSearch" to "Rechercher un service",
+    "detailMeasurementInvalid" to "Quantité et sacs : 1–9999. Poids positif, 3 décimales maximum.",
+    "detailRetry" to "Réessayer la synchronisation",
+    "detailRefresh" to "Actualiser les informations",
+    "detailOverview" to "Vue d’ensemble",
+    "detailCustomerTickets" to "Bons de service",
+    "detailCustomerOrders" to "Commandes",
+    "detailCustomerItems" to "Articles de service",
+    "detailCustomerNotes" to "Notes client",
+    "detailAddress" to "Adresse",
+    "detailRelationship" to "Relation avec le compte",
+    "detailAccount" to "Compte client",
+    "detailOrderCount" to "Nombre de commandes",
+    "detailTicketCount" to "Nombre de bons",
+    "detailNoRecords" to "Aucun résultat",
+    "detailCachedNotice" to "Informations en cache ; elles peuvent ne pas être à jour.",
+    "detailLoadFailed" to "Certaines informations n’ont pas pu être chargées. Les données disponibles sont conservées ; réessayez.",
+    "detailPrevious" to "Précédent",
+    "detailNext" to "Suivant",
+    "detailPage" to "Page %d · %d résultats",
+    "detailCustomerSaved" to "Informations client enregistrées",
+    "detailItemCategory" to "Catégorie",
+    "detailItemColor" to "Couleur",
+    "detailItemBrand" to "Marque",
+    "detailItemMaterial" to "Matière",
+    "detailPickupHint" to "YYYY-MM-DD HH:mm (fuseau du magasin)",
+    "detailNewTicket" to "Nouveau bon de service",
     "checkoutConfirmationMissing" to "La confirmation du règlement est incomplète. La vente est conservée pour un nouvel envoi sécurisé ; ne facturez pas à nouveau.",
     "orderLineCount" to "Lignes",
     "assistantLabel" to "Employé",
@@ -3380,7 +3630,6 @@ private val COPY_FR_VALUES: Map<String, String> = mapOf(
     "synchronizing" to "Synchronisation…",
     "intakeTitle" to "Accueil client",
     "intakeOnlineHint" to "Recherchez un client, puis créez un bon de service.",
-    "intakeOfflineHint" to "Hors ligne vous pouvez chercher les clients en cache ; créer un client ou un bon demande une connexion.",
     "newCustomer" to "＋ Nouveau client",
     "newCustomerShort" to "Nouveau client",
     "lookupTitle" to "Rechercher un client",

@@ -284,14 +284,8 @@ internal enum class NativePinLanguage(val code: String, val label: String) {
 }
 
 private const val BLUETOOTH_PERMISSION_REQUEST_CODE = 3_208
-/**
- * Ticket and customer work is server-owned: unlike a cash sale there is no
- * local queue to replay it from, so the app refuses it up front rather than
- * letting the cashier fill in a whole form and fail on submit.
- */
-
-
-private val TICKET_STATUS_TRANSITIONS: Map<String, List<String>> = mapOf(
+/** Intake creation uses a durable local outbox; processing and profile edits remain online. */
+internal val TICKET_STATUS_TRANSITIONS: Map<String, List<String>> = mapOf(
     "draft" to listOf("pending", "cancelled"),
     "pending" to listOf("in_progress", "cancelled"),
     "in_progress" to listOf("ready_to_pick", "exception"),
@@ -300,7 +294,7 @@ private val TICKET_STATUS_TRANSITIONS: Map<String, List<String>> = mapOf(
     "picked_up" to emptyList(),
     "cancelled" to emptyList(),
 )
-private val TICKET_ITEM_STATUS_TRANSITIONS: Map<String, List<String>> = mapOf(
+internal val TICKET_ITEM_STATUS_TRANSITIONS: Map<String, List<String>> = mapOf(
     "pending_wash" to listOf("washing"),
     "washing" to listOf("done", "exception"),
     "done" to listOf("ready_to_pick", "washing"),
@@ -539,25 +533,74 @@ fun NativePosApp(applicationContext: Context) {
         hardwareStatus = withContext(Dispatchers.IO) { hardware.status() }
     }
 
-    suspend fun reload() {
-        val refreshed = withContext(Dispatchers.IO) {
-            database.importLegacySnapshotIfNeeded(applicationContext)
-            val nextSnapshot = database.snapshot()
-            Triple(
-                nextSnapshot,
-                nextSnapshot.terminal?.let(database::cart) ?: NativePosCart.empty("XOF"),
-                database.receiptPrintQueueState(),
-            )
+    suspend fun reload(refreshCart: Boolean = true) {
+        val cartGenerationBefore = cartWriteGeneration.get()
+        val refreshed =
+            withContext(Dispatchers.IO) {
+                database.importLegacySnapshotIfNeeded(applicationContext)
+                val nextSnapshot = database.snapshot()
+                Triple(
+                    nextSnapshot,
+                    nextSnapshot.terminal?.let(database::cart) ?: NativePosCart.empty("XOF"),
+                    database.receiptPrintQueueState(),
+                )
+            }
+        val previousTerminal = snapshot?.terminal
+        val nextTerminal = refreshed.first.terminal
+        if (
+            previousTerminal != null &&
+                (nextTerminal == null ||
+                    previousTerminal.tenantId != nextTerminal.tenantId ||
+                    previousTerminal.branchId != nextTerminal.branchId ||
+                    previousTerminal.terminalId != nextTerminal.terminalId)
+        ) {
+            selectedTicketDetail = null
+            intakeCustomer = null
         }
         snapshot = refreshed.first
-        cart = refreshed.second
+        if (refreshCart && cartWriteGeneration.get() == cartGenerationBefore)
+            cart = refreshed.second
         receiptPrintQueue = refreshed.third
-        val checkoutState = withContext(Dispatchers.IO) {
-            Triple(database.checkoutSettings(), database.receiptPrinterId() != null, database.receiptPrintSettings())
-        }
+        val checkoutState =
+            withContext(Dispatchers.IO) {
+                Triple(
+                    database.checkoutSettings(),
+                    database.receiptPrinterId() != null,
+                    database.receiptPrintSettings(),
+                )
+            }
         checkoutSettings = checkoutState.first
         receiptPrinterConfigured = checkoutState.second
         receiptPrintPreferences = checkoutState.third
+        selectedTicketDetail?.let { previous ->
+            val updated = refreshed.first.tickets.firstOrNull { it.id == previous.ticket.id }
+            if (updated != null) {
+                val next =
+                    withContext(Dispatchers.IO) {
+                        database.decorateTicket(
+                            previous.copy(
+                                ticket = updated,
+                                items = database.ticketItems(updated.id),
+                                billedTicketItemIds = database.ticketBilledItemIds(updated.id),
+                                pendingTicketItemIds = database.pendingTicketItemIds(updated.id),
+                            )
+                        )
+                    }
+                if (selectedTicketDetail?.ticket?.id == updated.id) selectedTicketDetail = next
+            }
+        }
+    }
+
+    DisposableEffect(applicationContext) {
+        val work =
+            androidx.work.WorkManager.getInstance(applicationContext)
+                .getWorkInfosForUniqueWorkLiveData(NativePosSyncWorker.UNIQUE_WORK)
+        val observer =
+            androidx.lifecycle.Observer<List<androidx.work.WorkInfo>> { infos ->
+                if (infos.any { it.state.isFinished }) scope.launch { reload(refreshCart = false) }
+            }
+        work.observeForever(observer)
+        onDispose { work.removeObserver(observer) }
     }
 
     /**
@@ -693,24 +736,35 @@ fun NativePosApp(applicationContext: Context) {
     }
 
     suspend fun refreshSelectedTicket(ticketId: String, currency: String) {
-        val items = withContext(Dispatchers.IO) {
-            NativePosSyncEngine(applicationContext).refreshTicketItems(ticketId, currency)
-        }
-        reload()
-        val billing = withContext(Dispatchers.IO) {
-            database.ticketBilledItemIds(ticketId) to database.pendingTicketItemIds(ticketId)
-        }
-        selectedTicketDetail = snapshot?.tickets?.firstOrNull { it.id == ticketId }
-            ?.let {
-                NativeTicketDetail(
-                    ticket = it,
-                    items = items,
-                    billedTicketItemIds = billing.first,
-                    pendingTicketItemIds = billing.second,
-                    cartTicketItemIds = cart.ticketItems.filter { it.ticketId == ticketId }.mapTo(linkedSetOf()) { it.ticketItemId },
-                    hasPendingCashCheckout = billing.second.isNotEmpty(),
-                )
+        val items =
+            withContext(Dispatchers.IO) {
+                NativePosSyncEngine(applicationContext).refreshTicketItems(ticketId, currency)
             }
+        reload(refreshCart = false)
+        val billing =
+            withContext(Dispatchers.IO) {
+                database.ticketBilledItemIds(ticketId) to database.pendingTicketItemIds(ticketId)
+            }
+        if (selectedTicketDetail?.ticket?.id != ticketId) return
+        selectedTicketDetail =
+            snapshot
+                ?.tickets
+                ?.firstOrNull { it.id == ticketId }
+                ?.let {
+                    database.decorateTicket(
+                        NativeTicketDetail(
+                            ticket = it,
+                            items = items,
+                            billedTicketItemIds = billing.first,
+                            pendingTicketItemIds = billing.second,
+                            cartTicketItemIds =
+                                cart.ticketItems
+                                    .filter { it.ticketId == ticketId }
+                                    .mapTo(linkedSetOf()) { it.ticketItemId },
+                            hasPendingCashCheckout = billing.second.isNotEmpty(),
+                        )
+                    )
+                }
     }
 
     fun synchronize() {
@@ -725,6 +779,8 @@ fun NativePosApp(applicationContext: Context) {
                 }
                 message = when {
                     result.failedSales > 0 -> copy.failedSalesNeedManager.format(result.failedSales)
+                    result.intakeSyncError != null -> result.intakeSyncError.userMessage(copy)
+                    (snapshot?.failedIntakes ?: 0) > 0 -> copy.intakeQueueCount.format(snapshot?.pendingIntakes ?: 0,snapshot?.failedIntakes ?: 0)
                     result.replayedSales > 0 -> copy.replayedSales.format(result.replayedSales)
                     else -> copy.syncedCatalogShift
                 }
@@ -1501,7 +1557,7 @@ fun NativePosApp(applicationContext: Context) {
                     val auth = api.loginWithPin(pin).getJSONObject("authContext")
                     session.saveTenantDefaultLanguageCode(auth.optString("language"))
                     session.saveOfflinePin(auth.getString("userId"), pin)
-                    NativePosSyncEngine(applicationContext).synchronize()
+                    NativePosSyncEngine(applicationContext).synchronize(includeIntakes = false)
                     session.pinLanguageCode()
                 }
                 NativePosSyncWorker.schedule(applicationContext)
@@ -1680,6 +1736,29 @@ fun NativePosApp(applicationContext: Context) {
         }
     }
 
+    fun syncIntakeInBackground(ticketId: String, currency: String, retry: Boolean = false) {
+        NativePosSyncWorker.schedule(applicationContext)
+        if (!internetAvailable) return
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    NativePosSyncEngine(applicationContext).synchronizeIntakes(ticketId, retry)
+                }
+                if (selectedTicketDetail?.ticket?.id == ticketId)
+                    refreshSelectedTicket(ticketId, currency)
+                else reload(refreshCart = false)
+            } catch (error: Exception) {
+                reload(refreshCart = false)
+                selectedTicketDetail
+                    ?.takeIf { it.ticket.id == ticketId }
+                    ?.let {
+                        selectedTicketDetail =
+                            database.decorateTicket(it.copy(items = database.ticketItems(ticketId)))
+                    }
+            }
+        }
+    }
+
     fun createServiceTicket(
         customer: NativeCustomer,
         ticketType: String,
@@ -1687,39 +1766,43 @@ fun NativePosApp(applicationContext: Context) {
         remark: String,
         expectedPickupText: String,
     ) {
-        if (!internetAvailable) {
-            message = copy.requiresNetwork
-            return
-        }
+        if (busy) return
+        busy = true
+        message = null
         scope.launch {
-            busy = true
             try {
-                val ticketId = withContext(Dispatchers.IO) {
-                    val terminal = database.snapshot().terminal
-                        ?: throw NativePosValidationException(copy.localBranchNotFound)
-                    val ticket = api.post("/pos/service-tickets", JSONObject().apply {
-                        put("customerId", customer.id)
-                        put("branchId", terminal.branchId)
-                        put("ticketType", ticketType)
-                        put("priority", priority)
-                        put("sourceChannel", "pos")
-                        expectedPickupText.trim().takeIf { it.isNotEmpty() }?.let { value ->
-                            put(
-                                "expectedPickupAt",
-                                localTicketDateTimeToIso(value, terminal.timeZone)
-                                    ?: throw NativePosValidationException(copy.pickupTimeInvalid),
-                            )
-                        }
-                        if (remark.isNotBlank()) put("remark", remark.trim())
-                    })
-                    NativePosSyncEngine(applicationContext).synchronize()
-                    ticket.getString("id")
-                }
-                reload()
+                val (ticketId, currency) =
+                    withContext(Dispatchers.IO) {
+                        val terminal =
+                            database.snapshot().terminal
+                                ?: throw NativePosValidationException(copy.localBranchNotFound)
+                        val pickup =
+                            expectedPickupText
+                                .trim()
+                                .takeIf { it.isNotEmpty() }
+                                ?.let {
+                                    localTicketDateTimeToIso(it, terminal.timeZone)
+                                        ?: throw NativePosValidationException(copy.pickupTimeInvalid)
+                                }
+                        require(remark.length <= 2000)
+                        database.intakeStore.createTicket(
+                            terminal,
+                            customer,
+                            ticketType,
+                            priority,
+                            remark,
+                            pickup,
+                        ) to terminal.currency
+                    }
+                reload(refreshCart = false)
                 activeTab = NativePosTab.Tickets
-                selectedTicketDetail = snapshot?.tickets?.firstOrNull { it.id == ticketId }
-                    ?.let { NativeTicketDetail(it, emptyList()) }
-                message = copy.ticketCreated
+                selectedTicketDetail =
+                    snapshot
+                        ?.tickets
+                        ?.firstOrNull { it.id == ticketId }
+                        ?.let { database.decorateTicket(NativeTicketDetail(it, emptyList())) }
+                message = copy.intakeSavedLocally
+                syncIntakeInBackground(ticketId, currency)
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1730,24 +1813,34 @@ fun NativePosApp(applicationContext: Context) {
 
     fun openTicket(ticket: NativeServiceTicket) {
         scope.launch {
-            val cached = withContext(Dispatchers.IO) {
-                Triple(
-                    database.ticketItems(ticket.id),
-                    database.ticketBilledItemIds(ticket.id),
-                    database.pendingTicketItemIds(ticket.id),
+            val cached =
+                withContext(Dispatchers.IO) {
+                    Triple(
+                        database.ticketItems(ticket.id),
+                        database.ticketBilledItemIds(ticket.id),
+                        database.pendingTicketItemIds(ticket.id),
+                    )
+                }
+            selectedTicketDetail =
+                database.decorateTicket(
+                    NativeTicketDetail(
+                        ticket = ticket,
+                        items = cached.first,
+                        billedTicketItemIds = cached.second,
+                        pendingTicketItemIds = cached.third,
+                        cartTicketItemIds =
+                            cart.ticketItems
+                                .filter { it.ticketId == ticket.id }
+                                .mapTo(linkedSetOf()) { it.ticketItemId },
+                        hasPendingCashCheckout = cached.third.isNotEmpty(),
+                    )
                 )
-            }
-            selectedTicketDetail = NativeTicketDetail(
-                ticket = ticket,
-                items = cached.first,
-                billedTicketItemIds = cached.second,
-                pendingTicketItemIds = cached.third,
-                cartTicketItemIds = cart.ticketItems.filter { it.ticketId == ticket.id }.mapTo(linkedSetOf()) { it.ticketItemId },
-                hasPendingCashCheckout = cached.third.isNotEmpty(),
-            )
             if (!internetAvailable) return@launch
             busy = true
             try {
+                withContext(Dispatchers.IO) {
+                    NativePosSyncEngine(applicationContext).synchronizeIntakes(ticket.id)
+                }
                 refreshSelectedTicket(ticket.id, ticket.currency)
                 message = null
             } catch (error: Exception) {
@@ -1758,39 +1851,76 @@ fun NativePosApp(applicationContext: Context) {
         }
     }
 
-    fun addServiceTicketItem(
-        ticket: NativeServiceTicket,
-        draft: NativeTicketItemDraft,
-    ) {
-        if (!internetAvailable) {
-            message = copy.requiresNetwork
-            return
-        }
+    fun addServiceTicketItem(ticket: NativeServiceTicket, draft: NativeTicketItemDraft) {
+        if (busy) return
+        busy = true
         scope.launch {
-            busy = true
             try {
                 withContext(Dispatchers.IO) {
-                    api.post("/pos/service-tickets/${ticket.id}/items", JSONObject().apply {
-                        put("serviceId", draft.service.id)
-                        put("itemType", draft.itemType)
-                        if (draft.service.pricingUnit == "per_kg") {
-                            put("weight", draft.weight ?: throw NativePosValidationException(copy.weightRequired))
-                            put("bagCount", draft.bagCount ?: throw NativePosValidationException(copy.bagCountRequired))
-                        } else {
-                            put("quantity", draft.quantity)
-                        }
-                        draft.itemCategory?.trim()?.takeIf(String::isNotBlank)?.let { put("itemCategory", it) }
-                        draft.itemColor?.trim()?.takeIf(String::isNotBlank)?.let { put("itemColor", it) }
-                        draft.itemBrand?.trim()?.takeIf(String::isNotBlank)?.let { put("itemBrand", it) }
-                        draft.itemMaterial?.trim()?.takeIf(String::isNotBlank)?.let { put("itemMaterial", it) }
-                        draft.defectNotes?.trim()?.takeIf(String::isNotBlank)?.let { put("defectNotes", it) }
-                        draft.specialRequest?.trim()?.takeIf(String::isNotBlank)?.let { put("specialRequest", it) }
-                        draft.remark?.trim()?.takeIf(String::isNotBlank)?.let { put("remark", it) }
-                    })
-                    NativePosSyncEngine(applicationContext).synchronize()
+                    val terminal =
+                        database.snapshot().terminal
+                            ?: throw NativePosValidationException(copy.localBranchNotFound)
+                    database.intakeStore.createItem(terminal, ticket, draft)
+                }
+                reload(refreshCart = false)
+                selectedTicketDetail
+                    ?.takeIf { it.ticket.id == ticket.id }
+                    ?.let { current ->
+                        selectedTicketDetail =
+                            database.decorateTicket(
+                                current.copy(
+                                    ticket =
+                                        snapshot?.tickets?.firstOrNull { it.id == ticket.id } ?: ticket,
+                                    items = database.ticketItems(ticket.id),
+                                )
+                            )
+                    }
+                message = copy.intakeSavedLocally
+                syncIntakeInBackground(ticket.id, ticket.currency)
+            } catch (error: Exception) {
+                message = error.userMessage(copy)
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    fun discardRejectedIntake(ticket: NativeServiceTicket, id: String) {
+        if (busy) return
+        busy = true
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val t =
+                        database.snapshot().terminal
+                            ?: throw NativePosValidationException(copy.localBranchNotFound)
+                    database.intakeStore.discardRejected(t, id)
+                }
+                if (id == ticket.id) selectedTicketDetail = null
+                reload(refreshCart = false)
+                message = copy.intakeRejectedRemoved
+            } catch (error: Exception) {
+                message = error.userMessage(copy)
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    fun updateTicketInformation(ticket: NativeServiceTicket, payload: JSONObject) {
+        if (busy || !internetAvailable) return
+        busy = true
+        scope.launch {
+            try {
+                val response =
+                    withContext(Dispatchers.IO) {
+                        api.patch("/pos/service-tickets/${ticket.id}", payload)
+                    }
+                database.snapshot().terminal?.let {
+                    database.intakeStore.cache(it, "ticket", ticket.id, response)
                 }
                 refreshSelectedTicket(ticket.id, ticket.currency)
-                message = copy.itemAddedToTicket
+                message = copy.detailTicketSaved
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1815,6 +1945,7 @@ fun NativePosApp(applicationContext: Context) {
                     api.patch("/pos/service-tickets/${ticket.id}/items/${item.id}", JSONObject().apply {
                         put("serviceId", update.service.id)
                         put("itemType", update.itemType)
+                        update.chargedUnitAmountMinor?.let { put("chargedUnitAmount", java.math.BigDecimal(it).movePointLeft(2).toPlainString()); put("overrideReason", update.overrideReason) }
                         if (update.service.pricingUnit == "per_kg") {
                             put("weight", update.weight ?: throw NativePosValidationException(copy.weightRequired))
                             put("bagCount", update.bagCount ?: throw NativePosValidationException(copy.bagCountRequired))
@@ -1829,7 +1960,6 @@ fun NativePosApp(applicationContext: Context) {
                         put("specialRequest", update.specialRequest?.trim()?.takeIf(String::isNotBlank))
                         put("remark", update.remark?.trim()?.takeIf(String::isNotBlank))
                     })
-                    NativePosSyncEngine(applicationContext).synchronize()
                 }
                 refreshSelectedTicket(ticket.id, ticket.currency)
                 message = copy.itemUpdated
@@ -1856,7 +1986,6 @@ fun NativePosApp(applicationContext: Context) {
                 withContext(Dispatchers.IO) {
                     val encodedReason = java.net.URLEncoder.encode(reason.trim(), Charsets.UTF_8.name())
                     api.delete("/pos/service-tickets/${ticket.id}/items/${item.id}?reason=$encodedReason")
-                    NativePosSyncEngine(applicationContext).synchronize()
                 }
                 refreshSelectedTicket(ticket.id, ticket.currency)
                 message = copy.itemDeleted
@@ -1882,7 +2011,6 @@ fun NativePosApp(applicationContext: Context) {
             try {
                 withContext(Dispatchers.IO) {
                     api.post("/pos/service-tickets/${ticket.id}/items/${item.id}/status-changes", JSONObject().put("to", nextStatus))
-                    NativePosSyncEngine(applicationContext).synchronize()
                 }
                 refreshSelectedTicket(ticket.id, ticket.currency)
                 message = copy.itemStatusUpdated
@@ -1895,6 +2023,12 @@ fun NativePosApp(applicationContext: Context) {
     }
 
     fun addTicketItemsToCart(ticket: NativeServiceTicket, items: List<NativeTicketItem>) {
+        val terminal=database.snapshot().terminal ?: return
+        val unsent=database.intakeStore.unsent(terminal,ticket.id)
+        if(unsent.any { it.kind=="ticket" || items.any { item -> item.id==it.id } }) {
+            message=copy.intakeSyncBeforeCheckout
+            return
+        }
         if (ticket.currency != cart.currency) {
             message = copy.ticketCurrencyMismatch
             return
@@ -1964,7 +2098,6 @@ fun NativePosApp(applicationContext: Context) {
                         put("version", ticket.version)
                         if (nextStatus == "cancelled") put("reason", reason?.trim())
                     })
-                    NativePosSyncEngine(applicationContext).synchronize()
                 }
                 refreshSelectedTicket(ticket.id, ticket.currency)
                 message = copy.ticketStatusUpdated.format(ticketStatusLabel(nextStatus, copy))
@@ -2135,6 +2268,7 @@ fun NativePosApp(applicationContext: Context) {
                                     busy = true
                                     try {
                                         withContext(Dispatchers.IO) {
+                                            if (database.intakeStore.hasUnsentWork()) throw NativePosValidationException(copy.intakeRebindBlocked)
                                             if (setupAdministrator!!.requiresReenrollment) {
                                                 api.post(
                                                     "/pos/auth/devices/${session.deviceId()}/revocation",
@@ -2232,6 +2366,10 @@ fun NativePosApp(applicationContext: Context) {
                     onSynchronize = ::synchronize,
                     onCreateCustomer = ::createCustomer,
                     onCreateServiceTicket = ::createServiceTicket,
+                    onUpdateTicketInformation = ::updateTicketInformation,
+                    onRetryIntake = { syncIntakeInBackground(it.id,it.currency,true) },
+                    onViewOrder = ::openMoreOrder,
+                    onDiscardIntake = ::discardRejectedIntake,
                     intakeCustomer = intakeCustomer,
                     onChangeTicketStatus = ::changeTicketStatus,
                     selectedTicketDetail = selectedTicketDetail,
@@ -2762,6 +2900,10 @@ internal fun NativePosShell(
     saleContent: @Composable () -> Unit,
     moreContent: @Composable (List<NativeNavigationDestination>, (NativeNavigationDestination) -> Unit) -> Unit,
     checkoutSettings: NativeCheckoutSettings = NativeCheckoutSettings(),
+    onUpdateTicketInformation: (NativeServiceTicket, JSONObject) -> Unit = { _, _ -> },
+    onRetryIntake: (NativeServiceTicket) -> Unit = {},
+    onViewOrder: (String) -> Unit = {},
+    onDiscardIntake: (NativeServiceTicket,String) -> Unit = { _, _ -> },
 ) {
     val terminal = current.terminal ?: return
     val canManageSensitiveOperations = terminal.role == "owner" || terminal.role == "manager"
@@ -2841,6 +2983,7 @@ internal fun NativePosShell(
                             customers = current.customers,
                             tickets = current.tickets,
                             preselectedCustomer = intakeCustomer,
+                            onViewOrder = onViewOrder,
                             internetAvailable = internetAvailable,
                             busy = busy,
                             message = message,
@@ -2872,6 +3015,10 @@ internal fun NativePosShell(
                             canManageSensitiveOperations = canManageSensitiveOperations,
                             onChangeItemStatus = onChangeTicketItemStatus,
                             onAddTicketItemsToCart = onAddTicketItemsToCart,
+                            onUpdateInformation = onUpdateTicketInformation,
+                            onRetryIntake = onRetryIntake,
+                            onDiscardIntake = onDiscardIntake,
+                            onViewOrder = onViewOrder,
                         )
                         NativePosTab.More -> moreContent(navigation.overflow, ::navigate)
                     }
@@ -2905,7 +3052,8 @@ private fun NativeWorkspaceView(
         Text(if (internetAvailable) copy.workspaceOnlineHint else copy.workspaceOfflineHint, color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
         NativeTaxReadinessNotice(copy, checkoutSettings, current.terminal?.role, busy, onSynchronize, onOpenSettings)
         if (expanded) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (current.pendingIntakes > 0 || current.failedIntakes > 0) Text(copy.intakeQueueCount.format(current.pendingIntakes,current.failedIntakes), color=if(current.failedIntakes>0) POS_ERROR else POS_MUTED)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 WorkspaceMetric(copy.metricCatalog, current.products.size.toString(), Modifier.weight(1f))
                 WorkspaceMetric(copy.metricPendingOrders, current.pendingSales.toString(), Modifier.weight(1f))
                 WorkspaceMetric(copy.metricFailedOrders, current.failedSales.toString(), Modifier.weight(1f), warning = current.failedSales > 0)
@@ -2977,6 +3125,7 @@ private fun NativeIntakeView(
     onCreateCustomer: (String, String) -> Unit,
     onCreateTicket: (NativeCustomer, String, String, String, String) -> Unit,
     onOpenTicket: (NativeServiceTicket) -> Unit,
+    onViewOrder: (String) -> Unit,
 ) {
     var draftQuery by remember { mutableStateOf("") }
     var submittedQuery by remember { mutableStateOf("") }
@@ -3057,74 +3206,9 @@ private fun NativeIntakeView(
         }
 
         selectedCustomer?.let { customer ->
-            // The API and SQLite cache both retain ISO timestamps. Sort here
-            // as well so a client-side refresh can never reverse the customer
-            // history shown to the clerk.
-            val recentTickets = tickets
-                .asSequence()
-                .filter { it.customerId == customer.id }
-                .sortedByDescending { ticket -> ticket.updatedAt.ifBlank { ticket.createdAt } }
-                .take(6)
-                .toList()
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFF1EDF7)),
-            ) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Box(
-                                modifier = Modifier.size(38.dp).clip(CircleShape).background(POS_ACCENT),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(customer.fullName.trim().take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
-                            }
-                            Column {
-                                Text(copy.customerRecord, color = POS_ACCENT, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
-                                Text(customer.fullName, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                                Text(customer.accountName, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                        TextButton(onClick = { selectedCustomer = null }, enabled = !busy) { Text(copy.change) }
-                    }
-                    HorizontalDivider(color = Color(0xFFDCD3E9))
-                    Text(copy.contactDetails, color = POS_MUTED, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        listOfNotNull(customer.phone, customer.email).joinToString("  ·  ").ifBlank { copy.noContactDetails },
-                        color = POS_INK,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Text(
-                        if (customer.status == "active") copy.customerStatusActive else copy.customerStatusPrefix.format(customer.status),
-                        color = POS_MUTED,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    HorizontalDivider(color = Color(0xFFDCD3E9))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(copy.recentWork, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text(copy.newestFirst, color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
-                    }
-                    if (recentTickets.isEmpty()) {
-                        Text(copy.noCachedTickets, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                    } else {
-                        recentTickets.forEach { ticket ->
-                            NativeIntakeRecentTicketRow(copy, ticket = ticket, onOpen = { onOpenTicket(ticket) })
-                        }
-                    }
-                    Button(
-                        onClick = { ticketDialogOpen = true },
-                        enabled = internetAvailable && !busy,
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                    ) { Text(copy.newOrder) }
-                }
-            }
+            NativeCustomerDetailPanel(copy,customer,tickets,busy,internetAvailable,
+                onChange={selectedCustomer=null},onNewTicket={ticketDialogOpen=true},onOpenTicket=onOpenTicket,
+                onOpenOrder=onViewOrder,onUpdated={selectedCustomer=it})
         } ?: when {
             submittedQuery.isBlank() -> NativeIntakeEmptyState(
                 title = copy.intakeEmptyTitle,
@@ -3180,9 +3264,9 @@ private fun NativeIntakeView(
             customer = ticketCustomer,
             busy = busy,
             internetAvailable = internetAvailable,
+            message = message,
             onDismiss = { ticketDialogOpen = false },
             onCreate = { type, priority, remark, pickupAt ->
-                ticketDialogOpen = false
                 onCreateTicket(ticketCustomer, type, priority, remark, pickupAt)
             },
         )
@@ -3328,11 +3412,12 @@ private fun NativeCreateCustomerDialog(
 }
 
 @Composable
-private fun NativeCreateTicketDialog(
+internal fun NativeCreateTicketDialog(
     copy: NativePosCopy,
     customer: NativeCustomer,
     busy: Boolean,
     internetAvailable: Boolean,
+    message: String? = null,
     onDismiss: () -> Unit,
     onCreate: (String, String, String, String) -> Unit,
 ) {
@@ -3372,16 +3457,16 @@ private fun NativeCreateTicketDialog(
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     Text(copy.ticketType, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        NativeIntakeChoiceButton(copy.typeLaundry, ticketType == "laundry", !busy && internetAvailable, { ticketType = "laundry" }, Modifier.weight(1f))
-                        NativeIntakeChoiceButton(copy.typeCarWash, ticketType == "car_wash", !busy && internetAvailable, { ticketType = "car_wash" }, Modifier.weight(1f))
+                        NativeIntakeChoiceButton(copy.typeLaundry, ticketType == "laundry", !busy, { ticketType = "laundry" }, Modifier.weight(1f))
+                        NativeIntakeChoiceButton(copy.typeCarWash, ticketType == "car_wash", !busy, { ticketType = "car_wash" }, Modifier.weight(1f))
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     Text(copy.priorityTitle, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        NativeIntakeChoiceButton(copy.priorityNormal, priority == "normal", !busy && internetAvailable, { priority = "normal" }, Modifier.weight(1f))
-                        NativeIntakeChoiceButton(copy.priorityUrgent, priority == "urgent", !busy && internetAvailable, { priority = "urgent" }, Modifier.weight(1f))
-                        NativeIntakeChoiceButton(copy.priorityCritical, priority == "critical", !busy && internetAvailable, { priority = "critical" }, Modifier.weight(1f))
+                        NativeIntakeChoiceButton(copy.priorityNormal, priority == "normal", !busy, { priority = "normal" }, Modifier.weight(1f))
+                        NativeIntakeChoiceButton(copy.priorityUrgent, priority == "urgent", !busy, { priority = "urgent" }, Modifier.weight(1f))
+                        NativeIntakeChoiceButton(copy.priorityCritical, priority == "critical", !busy, { priority = "critical" }, Modifier.weight(1f))
                     }
                 }
                 Card(
@@ -3390,18 +3475,19 @@ private fun NativeCreateTicketDialog(
                     colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
                 ) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        NativePosInput(value = expectedPickupText, onValueChange = { expectedPickupText = it }, label = { Text(copy.expectedPickupField) }, placeholder = { Text("YYYY-MM-DD HH:mm") }, singleLine = true, enabled = !busy && internetAvailable, modifier = Modifier.fillMaxWidth())
-                        NativePosInput(value = remark, onValueChange = { remark = it }, label = { Text(copy.remarkOptional) }, placeholder = { Text(copy.remarkPlaceholder) }, enabled = !busy && internetAvailable, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = expectedPickupText, onValueChange = { expectedPickupText = it }, label = { Text(copy.expectedPickupField) }, placeholder = { Text(copy.detailPickupHint) }, singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth())
+                        NativePosInput(value = remark, onValueChange = { remark = it.take(2000) }, label = { Text(copy.remarkOptional) }, placeholder = { Text(copy.remarkPlaceholder) }, enabled = !busy, modifier = Modifier.fillMaxWidth())
                     }
                 }
-                if (!internetAvailable) Text(copy.ticketNeedsNetwork, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                if (!internetAvailable) Text(copy.intakeOfflineHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                message?.let { Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
                 Button(
                     onClick = { onCreate(ticketType, priority, remark.trim(), expectedPickupText.trim()) },
-                    enabled = !busy && internetAvailable,
+                    enabled = !busy,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                ) { Text(if (busy) copy.creating else copy.createTicket) }
+                ) { NativeBusyLabel(busy,copy.intakeSaving,copy.createTicket) }
             }
         }
     }
@@ -3483,6 +3569,10 @@ private fun NativeTicketsView(
     canManageSensitiveOperations: Boolean,
     onChangeItemStatus: (NativeServiceTicket, NativeTicketItem, String) -> Unit,
     onAddTicketItemsToCart: (NativeServiceTicket, List<NativeTicketItem>) -> Unit,
+    onUpdateInformation: (NativeServiceTicket, JSONObject) -> Unit,
+    onRetryIntake: (NativeServiceTicket) -> Unit,
+    onViewOrder: (String) -> Unit,
+    onDiscardIntake: (NativeServiceTicket,String) -> Unit,
 ) {
     if (selectedDetail != null) {
         NativeTicketDetailView(copy,
@@ -3499,505 +3589,15 @@ private fun NativeTicketsView(
             canManageSensitiveOperations = canManageSensitiveOperations,
             onChangeItemStatus = { item, target -> onChangeItemStatus(selectedDetail.ticket, item, target) },
             onAddToCart = { items -> onAddTicketItemsToCart(selectedDetail.ticket, items) },
+            onUpdateInformation = { onUpdateInformation(selectedDetail.ticket,it) },
+            onRetryIntake = { onRetryIntake(selectedDetail.ticket) },
+            onDiscardIntake = { onDiscardIntake(selectedDetail.ticket,it) },
+            onViewOrder = onViewOrder,
+            timeZone = timeZone,
         )
         return
     }
     NativeTicketList(copy, tickets, customers, timeZone, language, busy, internetAvailable, message, onOpenTicket, onCreate, onRefresh)
-}
-
-@Composable
-private fun NativeTicketDetailView(
-    copy: NativePosCopy,
-    detail: NativeTicketDetail,
-    services: List<NativeService>,
-    internetAvailable: Boolean,
-    busy: Boolean,
-    message: String?,
-    onBack: () -> Unit,
-    onChangeTicketStatus: (String, String?) -> Unit,
-    onAddService: (NativeTicketItemDraft) -> Unit,
-    onUpdateItem: (NativeTicketItem, NativeTicketItemUpdate) -> Unit,
-    onDeleteItem: (NativeTicketItem, String) -> Unit,
-    canManageSensitiveOperations: Boolean,
-    onChangeItemStatus: (NativeTicketItem, String) -> Unit,
-    onAddToCart: (List<NativeTicketItem>) -> Unit,
-) {
-    val ticket = detail.ticket
-    var appendServiceId by remember(ticket.id) { mutableStateOf<String?>(null) }
-    var appendItemType by remember(ticket.id) { mutableStateOf("") }
-    var appendQuantityText by remember(ticket.id) { mutableStateOf("1") }
-    var appendWeightText by remember(ticket.id) { mutableStateOf("") }
-    var appendBagCountText by remember(ticket.id) { mutableStateOf("1") }
-    var appendCategory by remember(ticket.id) { mutableStateOf("") }
-    var appendColor by remember(ticket.id) { mutableStateOf("") }
-    var appendBrand by remember(ticket.id) { mutableStateOf("") }
-    var appendMaterial by remember(ticket.id) { mutableStateOf("") }
-    var appendDefectNotes by remember(ticket.id) { mutableStateOf("") }
-    var appendSpecialRequest by remember(ticket.id) { mutableStateOf("") }
-    var appendRemark by remember(ticket.id) { mutableStateOf("") }
-    var editingItemId by remember(ticket.id) { mutableStateOf<String?>(null) }
-    var cancelReason by remember(ticket.id) { mutableStateOf("") }
-    val totalMinor = detail.items.sumOf { it.lineAmountMinor }
-    val canEdit = ticket.ticketStatus != "cancelled" && ticket.ticketStatus != "picked_up"
-    val appendService = services.firstOrNull { it.id == appendServiceId }
-    // Keep the same picker dependency as POS Web: choose an item type first, then
-    // restrict the catalog to services compatible with both the ticket line and type.
-    val ticketServices = services.filter { it.businessLine == ticket.ticketType }
-    val appendItemTypes = ticketServices.flatMap { it.applicableItemTypes }.distinct()
-    val compatibleServices = ticketServices.filter { appendItemType in it.applicableItemTypes }
-    val billableItems = detail.items.filter {
-        it.id !in detail.billedTicketItemIds &&
-            it.id !in detail.pendingTicketItemIds &&
-            it.id !in detail.cartTicketItemIds
-    }
-    val billableItemKey = billableItems.joinToString("|") { it.id }
-    var selectedCheckoutItemIds by remember(ticket.id, billableItemKey) {
-        mutableStateOf<Set<String>>(billableItems.mapTo(linkedSetOf()) { it.id })
-    }
-    val selectedCheckoutItems = billableItems.filter { it.id in selectedCheckoutItemIds }
-    val selectedCheckoutTotalMinor = selectedCheckoutItems.sumOf { it.lineAmountMinor }
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text(copy.backToTickets) }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Column(Modifier.weight(1f)) {
-                Text(ticket.ticketNo ?: copy.serviceTicket, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text(ticket.customerName, color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
-            }
-            Text(ticketStatusLabel(ticket.ticketStatus, copy), color = POS_ACCENT, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-        }
-        Text("${ticket.priorityLabel(copy)} · ${copy.serviceItemsCount.format(detail.items.size)} · ${formatMoney(totalMinor, ticket.currency)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-        if (!internetAvailable) {
-            Text(copy.ticketOfflineNotice, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-        }
-        TICKET_STATUS_TRANSITIONS[ticket.ticketStatus].orEmpty().takeIf { it.isNotEmpty() }?.let { targets ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
-            ) {
-                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(copy.ticketFlow, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    if ("cancelled" in targets) {
-                        NativePosInput(
-                            value = cancelReason,
-                            onValueChange = { cancelReason = it },
-                            label = { Text(copy.cancelReasonRequired) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    targets.forEach { target ->
-                        val needsReason = target == "cancelled"
-                        OutlinedButton(
-                            onClick = { onChangeTicketStatus(target, cancelReason.takeIf { needsReason }) },
-                            enabled = internetAvailable && !busy && (!needsReason || cancelReason.isNotBlank()),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(
-                                when (target) {
-                                    "picked_up" -> copy.confirmPickedUp
-                                    else -> copy.updateToStatus.format(ticketStatusLabel(target, copy))
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
-        ) {
-            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(copy.serviceItems, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                if (detail.items.isEmpty()) {
-                    Text(copy.noServiceItems, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                }
-                detail.items.forEach { item ->
-                    TicketItemCard(copy,
-                        ticketStatus = ticket.ticketStatus,
-                        item = item,
-                        busy = busy,
-                        internetAvailable = internetAvailable,
-                        onEdit = { editingItemId = item.id },
-                        canManageSensitiveOperations = canManageSensitiveOperations,
-                        onDelete = onDeleteItem,
-                        settlementState = when {
-                            item.id in detail.billedTicketItemIds -> copy.alreadyBilled
-                            item.id in detail.pendingTicketItemIds -> copy.pendingSyncNoBill
-                            else -> null
-                        },
-                        onChangeStatus = { target -> onChangeItemStatus(item, target) },
-                    )
-                }
-                detail.items.firstOrNull { it.id == editingItemId }?.let { item ->
-                    NativeTicketItemEditView(copy,
-                        ticket = ticket,
-                        item = item,
-                        services = services,
-                        internetAvailable = internetAvailable,
-                        busy = busy,
-                        onCancel = { editingItemId = null },
-                        onSave = { update ->
-                            editingItemId = null
-                            onUpdateItem(item, update)
-                        },
-                    )
-                }
-            }
-        }
-
-        if (canEdit) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
-            ) {
-                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(copy.appendServiceItem, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    if (services.isEmpty()) {
-                        Text(copy.noCachedServices, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                    } else if (ticketServices.isEmpty()) {
-                        Text(copy.noServicesForType, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                    } else if (appendService != null) {
-                        SelectedReferenceCard(copy,
-                            copy.pendingService,
-                            appendService.name,
-                            formatMoney(appendService.amountMinor, appendService.currency),
-                        ) {
-                            appendServiceId = null
-                        }
-                        Text(copy.itemTypePrefix.format(ticketItemTypeLabel(appendItemType, copy)), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                        TextButton(onClick = {
-                            appendServiceId = null
-                            appendItemType = ""
-                        }) { Text(copy.changeItemType) }
-                        if (appendService.pricingUnit == "per_kg") {
-                            NativePosInput(
-                                value = appendWeightText,
-                                onValueChange = { appendWeightText = it.filter { char -> char.isDigit() || char == '.' } },
-                                label = { Text(copy.weightKg) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            NativePosInput(
-                                value = appendBagCountText,
-                                onValueChange = { appendBagCountText = it.filter(Char::isDigit) },
-                                label = { Text(copy.bagCount) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        } else {
-                            NativePosInput(
-                                value = appendQuantityText,
-                                onValueChange = { appendQuantityText = it.filter(Char::isDigit) },
-                                label = { Text(copy.quantityPieces) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                        NativePosInput(value = appendCategory, onValueChange = { appendCategory = it }, label = { Text(copy.categoryOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        NativePosInput(value = appendColor, onValueChange = { appendColor = it }, label = { Text(copy.colorOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        NativePosInput(value = appendBrand, onValueChange = { appendBrand = it }, label = { Text(copy.brandOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        NativePosInput(value = appendMaterial, onValueChange = { appendMaterial = it }, label = { Text(copy.materialOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        NativePosInput(value = appendDefectNotes, onValueChange = { appendDefectNotes = it }, label = { Text(copy.defectsOptional) }, modifier = Modifier.fillMaxWidth())
-                        NativePosInput(value = appendSpecialRequest, onValueChange = { appendSpecialRequest = it }, label = { Text(copy.specialRequestOptional) }, modifier = Modifier.fillMaxWidth())
-                        NativePosInput(value = appendRemark, onValueChange = { appendRemark = it }, label = { Text(copy.itemNoteOptional) }, modifier = Modifier.fillMaxWidth())
-                        Button(
-                            onClick = {
-                                onAddService(
-                                    NativeTicketItemDraft(
-                                        service = appendService,
-                                        itemType = appendItemType,
-                                        quantity = appendQuantityText.toLongOrNull()?.takeIf { it > 0 } ?: 1,
-                                        weight = appendWeightText.takeIf(::isPositiveDecimal),
-                                        bagCount = appendBagCountText.toLongOrNull()?.takeIf { it > 0 },
-                                        itemCategory = appendCategory,
-                                        itemColor = appendColor,
-                                        itemBrand = appendBrand,
-                                        itemMaterial = appendMaterial,
-                                        defectNotes = appendDefectNotes,
-                                        specialRequest = appendSpecialRequest,
-                                        remark = appendRemark,
-                                    ),
-                                )
-                            },
-                            enabled = internetAvailable && !busy && appendItemType.isNotBlank() &&
-                                if (appendService.pricingUnit == "per_kg") isPositiveDecimal(appendWeightText) &&
-                                    appendBagCountText.toLongOrNull()?.let { it > 0 } == true
-                                else appendQuantityText.toLongOrNull()?.let { it > 0 } == true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                        ) { Text(if (busy) copy.adding else copy.confirmAddItem) }
-                    } else if (appendItemType.isBlank()) {
-                        Text(copy.pickTypeThenService, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                        appendItemTypes.forEach { itemType ->
-                            OutlinedButton(
-                                onClick = { appendItemType = itemType },
-                                enabled = internetAvailable && !busy,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) { Text(ticketItemTypeLabel(itemType, copy)) }
-                        }
-                    } else {
-                        Text(copy.pickedTypeNowService.format(ticketItemTypeLabel(appendItemType, copy)), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                        TextButton(onClick = { appendItemType = "" }) { Text(copy.changeItemType) }
-                        compatibleServices.forEach { service ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFFF8F7FB)).padding(10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(service.name, color = POS_INK, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                    Text(formatMoney(service.amountMinor, service.currency), color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
-                                }
-                                OutlinedButton(
-                                    onClick = { appendServiceId = service.id },
-                                    enabled = internetAvailable && !busy,
-                                ) { Text(copy.select) }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
-        ) {
-            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(copy.addToCartTitle, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(copy.addToCartHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                if (detail.items.isNotEmpty()) {
-                    detail.items.forEach { item ->
-                        val unavailable = item.id in detail.billedTicketItemIds ||
-                            item.id in detail.pendingTicketItemIds ||
-                            item.id in detail.cartTicketItemIds
-                        val selected = item.id in selectedCheckoutItemIds
-                        OutlinedButton(
-                            onClick = {
-                                selectedCheckoutItemIds = if (selected) selectedCheckoutItemIds - item.id else selectedCheckoutItemIds + item.id
-                            },
-                            enabled = !busy && !unavailable,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = when {
-                                    unavailable -> POS_MUTED
-                                    selected -> POS_ACCENT
-                                    else -> POS_INK
-                                },
-                            ),
-                        ) {
-                            val state = when {
-                                item.id in detail.billedTicketItemIds -> copy.linkedToOrder
-                                item.id in detail.pendingTicketItemIds -> copy.awaitingSync
-                                item.id in detail.cartTicketItemIds -> copy.inCart
-                                selected -> copy.selected
-                                else -> copy.notSelected
-                            }
-                            Text("$state · ${item.itemName} · ${formatMoney(item.lineAmountMinor, item.currency)}")
-                        }
-                    }
-                }
-                if (detail.hasPendingCashCheckout) {
-                    Text(copy.somePaymentsQueued, color = POS_ACCENT, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                }
-                if (selectedCheckoutItems.isNotEmpty()) {
-                    Text(copy.addingTotalHint.format(formatMoney(selectedCheckoutTotalMinor, ticket.currency)), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                    Button(
-                        onClick = { onAddToCart(selectedCheckoutItems) },
-                        enabled = !busy && selectedCheckoutItems.isNotEmpty(),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                    ) { Text(if (busy) copy.addingToCart else copy.addToCartTitle) }
-                } else if (detail.items.isNotEmpty()) {
-                    Text(copy.nothingToCharge, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        }
-        message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
-    }
-}
-
-@Composable
-private fun TicketItemCard(
-    copy: NativePosCopy,
-    ticketStatus: String,
-    item: NativeTicketItem,
-    busy: Boolean,
-    internetAvailable: Boolean,
-    onEdit: () -> Unit,
-    canManageSensitiveOperations: Boolean,
-    onDelete: (NativeTicketItem, String) -> Unit,
-    settlementState: String?,
-    onChangeStatus: (String) -> Unit,
-) {
-    val workable = ticketStatus in setOf("pending", "in_progress", "ready_to_pick", "exception")
-    val editable = ticketStatus != "picked_up" && ticketStatus != "cancelled"
-    val targets = if (workable) TICKET_ITEM_STATUS_TRANSITIONS[item.itemStatus].orEmpty() else emptyList()
-    var deletionOpen by remember(item.id) { mutableStateOf(false) }
-    var deletionReason by remember(item.id) { mutableStateOf("") }
-    Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color(0xFFF8F7FB)).padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(item.itemName, color = POS_INK, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-            Text(ticketItemStatusLabel(item.itemStatus, copy), color = POS_ACCENT, style = MaterialTheme.typography.labelMedium)
-        }
-        val meta = buildList {
-            if (item.pricingUnit == "per_kg") {
-                item.weight?.let { add("${it} kg") }
-                item.bagCount?.let { add(copy.bagsSuffix.format(it)) }
-            } else {
-                add(copy.piecesSuffix.format(item.quantity))
-            }
-            item.labelCode?.let { add(it) }
-            add(formatMoney(item.lineAmountMinor, item.currency))
-        }.joinToString(" · ")
-        Text(meta, color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
-        settlementState?.let { Text(it, color = POS_ACCENT, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold) }
-        listOf(item.itemCategory, item.itemColor, item.itemBrand, item.itemMaterial)
-            .filterNotNull()
-            .takeIf { it.isNotEmpty() }
-            ?.let { Text(it.joinToString(" · "), color = POS_MUTED, style = MaterialTheme.typography.labelSmall) }
-        item.defectNotes?.let { Text(copy.defectsPrefix.format(it), color = POS_MUTED, style = MaterialTheme.typography.labelSmall) }
-        item.specialRequest?.let { Text(copy.specialRequestPrefix.format(it), color = POS_MUTED, style = MaterialTheme.typography.labelSmall) }
-        item.remark?.let { Text(copy.notePrefix.format(it), color = POS_MUTED, style = MaterialTheme.typography.labelSmall) }
-        if (editable) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onEdit, enabled = internetAvailable && !busy, modifier = Modifier.weight(1f)) { Text(copy.editItem) }
-                if (canManageSensitiveOperations) {
-                    OutlinedButton(onClick = { deletionOpen = !deletionOpen }, enabled = internetAvailable && !busy, modifier = Modifier.weight(1f)) { Text(copy.deleteItem) }
-                }
-            }
-        }
-        if (deletionOpen) {
-            NativePosInput(
-                value = deletionReason,
-                onValueChange = { deletionReason = it },
-                label = { Text(copy.deleteReasonRequired) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Button(
-                onClick = { onDelete(item, deletionReason) },
-                enabled = internetAvailable && !busy && deletionReason.isNotBlank(),
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-            ) { Text(copy.confirmDeleteItem) }
-        }
-        targets.forEach { target ->
-            OutlinedButton(
-                onClick = { onChangeStatus(target) },
-                enabled = internetAvailable && !busy,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(copy.updateToStatus.format(ticketItemStatusLabel(target, copy))) }
-        }
-    }
-}
-
-/** Same editable fields and item-type-first service selection as the existing POS Web editor. */
-@Composable
-private fun NativeTicketItemEditView(
-    copy: NativePosCopy,
-    ticket: NativeServiceTicket,
-    item: NativeTicketItem,
-    services: List<NativeService>,
-    internetAvailable: Boolean,
-    busy: Boolean,
-    onCancel: () -> Unit,
-    onSave: (NativeTicketItemUpdate) -> Unit,
-) {
-    val ticketServices = services.filter { it.businessLine == ticket.ticketType }
-    val itemTypes = ticketServices.flatMap { it.applicableItemTypes }.distinct()
-    var itemType by remember(item.id) { mutableStateOf(item.itemType.orEmpty()) }
-    var serviceId by remember(item.id) { mutableStateOf(item.serviceId.orEmpty()) }
-    var quantityText by remember(item.id) { mutableStateOf(item.quantity.toString()) }
-    var weightText by remember(item.id) { mutableStateOf(item.weight.orEmpty()) }
-    var bagCountText by remember(item.id) { mutableStateOf((item.bagCount ?: 1).toString()) }
-    var category by remember(item.id) { mutableStateOf(item.itemCategory.orEmpty()) }
-    var color by remember(item.id) { mutableStateOf(item.itemColor.orEmpty()) }
-    var brand by remember(item.id) { mutableStateOf(item.itemBrand.orEmpty()) }
-    var material by remember(item.id) { mutableStateOf(item.itemMaterial.orEmpty()) }
-    var defectNotes by remember(item.id) { mutableStateOf(item.defectNotes.orEmpty()) }
-    var specialRequest by remember(item.id) { mutableStateOf(item.specialRequest.orEmpty()) }
-    var remark by remember(item.id) { mutableStateOf(item.remark.orEmpty()) }
-    val compatibleServices = ticketServices.filter { itemType in it.applicableItemTypes }
-    val selectedService = compatibleServices.firstOrNull { it.id == serviceId }
-    val validMeasurement = if (selectedService?.pricingUnit == "per_kg") {
-        isPositiveDecimal(weightText) && bagCountText.toLongOrNull()?.let { it > 0 } == true
-    } else quantityText.toLongOrNull()?.let { it > 0 } == true
-
-    Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color(0xFFF1EDF7)).padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(copy.editServiceItem, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-        Text(copy.editServiceItemHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-        if (itemType.isBlank()) {
-            itemTypes.forEach { type ->
-                OutlinedButton(onClick = { itemType = type }, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(ticketItemTypeLabel(type, copy)) }
-            }
-        } else {
-            Text(copy.itemTypePrefix.format(ticketItemTypeLabel(itemType, copy)), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-            TextButton(onClick = { itemType = ""; serviceId = "" }, enabled = internetAvailable && !busy) { Text(copy.changeItemType) }
-            compatibleServices.forEach { service ->
-                OutlinedButton(
-                    onClick = { serviceId = service.id },
-                    enabled = internetAvailable && !busy,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = if (service.id == serviceId) POS_ACCENT else POS_INK),
-                ) { Text("${service.name} · ${formatMoney(service.amountMinor, service.currency)}") }
-            }
-        }
-        selectedService?.let { service ->
-            if (service.pricingUnit == "per_kg") {
-                NativePosInput(value = weightText, onValueChange = { weightText = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text(copy.weightKg) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                NativePosInput(value = bagCountText, onValueChange = { bagCountText = it.filter(Char::isDigit) }, label = { Text(copy.bagCount) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            } else {
-                NativePosInput(value = quantityText, onValueChange = { quantityText = it.filter(Char::isDigit) }, label = { Text(copy.quantityPieces) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            }
-        }
-        NativePosInput(value = category, onValueChange = { category = it }, label = { Text(copy.categoryOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        NativePosInput(value = color, onValueChange = { color = it }, label = { Text(copy.colorOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        NativePosInput(value = brand, onValueChange = { brand = it }, label = { Text(copy.brandOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        NativePosInput(value = material, onValueChange = { material = it }, label = { Text(copy.materialOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        NativePosInput(value = defectNotes, onValueChange = { defectNotes = it }, label = { Text(copy.defectsOptional) }, modifier = Modifier.fillMaxWidth())
-        NativePosInput(value = specialRequest, onValueChange = { specialRequest = it }, label = { Text(copy.specialRequestOptional) }, modifier = Modifier.fillMaxWidth())
-        NativePosInput(value = remark, onValueChange = { remark = it }, label = { Text(copy.itemNoteOptional) }, modifier = Modifier.fillMaxWidth())
-        Button(
-            onClick = {
-                selectedService?.let { service ->
-                    onSave(NativeTicketItemUpdate(
-                        itemType = itemType,
-                        service = service,
-                        quantity = quantityText.toLongOrNull()?.takeIf { it > 0 } ?: 1,
-                        weight = weightText.takeIf(::isPositiveDecimal),
-                        bagCount = bagCountText.toLongOrNull()?.takeIf { it > 0 },
-                        itemCategory = category,
-                        itemColor = color,
-                        itemBrand = brand,
-                        itemMaterial = material,
-                        defectNotes = defectNotes,
-                        specialRequest = specialRequest,
-                        remark = remark,
-                    ))
-                }
-            },
-            enabled = internetAvailable && !busy && selectedService != null && validMeasurement,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-        ) { Text(if (busy) copy.saving else copy.saveItem) }
-        OutlinedButton(onClick = onCancel, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.cancelEdit) }
-    }
 }
 
 internal fun ticketStatusLabel(status: String, copy: NativePosCopy): String = when (status) {
@@ -4011,15 +3611,16 @@ internal fun ticketStatusLabel(status: String, copy: NativePosCopy): String = wh
     else -> copy.ticketUnknown
 }
 
-private fun ticketItemStatusLabel(status: String, copy: NativePosCopy): String = when (status) {
+internal fun ticketItemStatusLabel(status: String, copy: NativePosCopy): String = when (status) {
     "pending_wash" -> copy.itemPendingWash
     "washing" -> copy.itemWashing
     "done" -> copy.itemDone
     "ready_to_pick" -> copy.itemReadyToPick
+    "exception" -> copy.ticketException
     else -> copy.ticketUnknown
 }
 
-private fun ticketItemTypeLabel(type: String, copy: NativePosCopy): String = when (type) {
+internal fun ticketItemTypeLabel(type: String, copy: NativePosCopy): String = when (type) {
     "cloth" -> copy.typeCloth
     "car" -> copy.typeCar
     "shoe" -> copy.typeShoe
@@ -6861,7 +6462,7 @@ private fun outstandingAmount(total: String, paid: String): String = runCatching
 }.getOrDefault("0.00")
 
 /** Converts the clerk's local input in the tenant business timezone to the API's ISO timestamp. */
-private fun localTicketDateTimeToIso(value: String, timeZone: String): String? = runCatching {
+internal fun localTicketDateTimeToIso(value: String, timeZone: String): String? = runCatching {
     val local = java.time.LocalDateTime.parse(value.trim().replace(' ', 'T'))
     local.atZone(java.time.ZoneId.of(timeZone)).toInstant().toString()
 }.getOrNull()

@@ -41,7 +41,10 @@ class NativePosDatabase(
     /** Read per call so a language change reaches these refusals without a restart. */
     private val languageCode: () -> String? = { null },
 ) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+    internal val intakeStore = NativePosIntakeStore(context)
     private val copy: NativePosCopy get() = nativePosCopy(languageCode())
+
+    internal fun intakeTerminal(): NativeTerminal? = readTerminal()
 
     internal fun stockRevision(): Long = NATIVE_STOCK_REVISION.get()
 
@@ -239,10 +242,12 @@ class NativePosDatabase(
             products = if (catalogIsFresh) readProducts() else emptyList(),
             services = if (catalogIsFresh) readServices() else emptyList(),
             customers = if (terminal == null) emptyList() else readCustomers(),
-            tickets = if (terminal == null) emptyList() else readTickets(),
+            tickets = if (terminal == null) emptyList() else intakeStore.mergeTickets(terminal, readTickets()),
             pendingSales = countPendingSales(),
             failedSales = countFailedSales(),
             catalogIsFresh = catalogIsFresh,
+            pendingIntakes = terminal?.let { intakeStore.operations(it).count { op -> op.status == "pending" } } ?: 0,
+            failedIntakes = terminal?.let { intakeStore.operations(it).count { op -> op.status == "failed" } } ?: 0,
         )
     }
 
@@ -561,6 +566,10 @@ class NativePosDatabase(
             if (previous == null || previous.tenantId != terminal.tenantId || previous.branchId != terminal.branchId ||
                 previous.terminalId != terminal.terminalId || previous.credentialVersion != terminal.credentialVersion) {
                 writableDatabase.delete("checkout_settings", null, null)
+            }
+            if(previous!=null && (previous.tenantId!=terminal.tenantId || previous.branchId!=terminal.branchId || previous.terminalId!=terminal.terminalId)) {
+                // Reference caches have no per-row scope; never carry another store's details forward.
+                listOf("catalog_service","customer_profile","service_ticket","service_ticket_item","service_ticket_billed_item").forEach { writableDatabase.delete(it,null,null) }
             }
             val reservedBySku = reservedQuantitiesBySku()
             // A foreground sale may commit while this network snapshot is downloading.
@@ -1009,7 +1018,34 @@ class NativePosDatabase(
         }
     }
 
-    fun ticketItems(ticketId: String): List<NativeTicketItem> = readableDatabase.rawQuery(
+    internal fun decorateTicket(detail: NativeTicketDetail): NativeTicketDetail {
+        val t = readTerminal() ?: return detail
+        val pending = intakeStore.unsent(t, detail.ticket.id)
+        return detail.copy(
+            information = intakeStore.ticketJson(t, detail.ticket.id),
+            relatedOrders =
+                intakeStore.cached(t, "ticket-orders", detail.ticket.id)?.optJSONArray("data"),
+            unsentIntakeIds = pending.mapTo(linkedSetOf()) { it.id },
+            intakeFailed = pending.any { it.status == "failed" },
+            intakeError = pending.firstOrNull { it.error != null }?.error,
+            needsOriginalOperator = pending.any { it.userId != t.userId },
+            discardableIntakeIds =
+                pending
+                    .filter {
+                        it.userId == t.userId &&
+                            it.status == "failed" &&
+                            it.httpStatus in setOf(400, 404, 422)
+                    }
+                    .mapTo(linkedSetOf()) { it.id },
+        )
+    }
+
+    fun ticketItems(ticketId: String): List<NativeTicketItem> {
+        val base = readTicketItems(ticketId)
+        return readTerminal()?.let { intakeStore.mergeItems(it, ticketId, base) } ?: base
+    }
+
+    private fun readTicketItems(ticketId: String): List<NativeTicketItem> = readableDatabase.rawQuery(
         "SELECT id, ticket_id, service_id, item_name, item_type, item_category, item_color, item_brand, item_material, item_status, quantity, pricing_unit, standard_unit_amount_minor, charged_unit_amount_minor, line_amount_minor, currency, weight, bag_count, label_code, defect_notes, special_request, remark FROM service_ticket_item WHERE ticket_id = ? ORDER BY rowid ASC",
         arrayOf(ticketId),
     ).use { cursor ->
