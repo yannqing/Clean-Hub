@@ -94,6 +94,11 @@ jobs:
           cache: false
 
       - name: Verify tenant POS branding and logo upload
+        env:
+          OBJECT_STORAGE_ENDPOINT: http://127.0.0.1:9000
+          OBJECT_STORAGE_BUCKET: cleanhub-media
+          OBJECT_STORAGE_ACCESS_KEY: cleanhub
+          OBJECT_STORAGE_SECRET_KEY: cleanhub-minio-password
         run: |
           # MinIO community containers are no longer distributed. Build the
           # isolated CI fixture from a fixed official upstream release.
@@ -109,7 +114,7 @@ jobs:
             sleep 1
           done
           if [ "$ready" != 1 ]; then cat /tmp/cleanhub-ci-minio.log; exit 1; fi
-          pnpm --filter @cleanhub/storage exec node --env-file=../../.env --import tsx src/prepare-test-storage.ts
+          pnpm --filter @cleanhub/storage exec tsx src/prepare-test-storage.ts
           pnpm --filter @cleanhub/api test:integration:tenant-branding
           pnpm --filter @cleanhub/storage smoke
 
