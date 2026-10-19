@@ -87,11 +87,29 @@ jobs:
           pnpm --filter @cleanhub/api exec tsx src/modules/tenant/products/products.validation.smoke.ts
           pnpm --filter @cleanhub/web-admin smoke:product-import
 
+      - name: Set up Go for the local S3 test fixture
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+          cache: false
+
       - name: Verify tenant POS branding and logo upload
         run: |
-          trap 'docker compose rm -sf minio >/dev/null 2>&1 || true' EXIT
-          docker compose up -d --wait minio
-          docker compose run --rm minio-init
+          # MinIO community containers are no longer distributed. Build the
+          # isolated CI fixture from a fixed official upstream release.
+          mkdir -p /tmp/cleanhub-ci-bin /tmp/cleanhub-ci-media
+          GOBIN=/tmp/cleanhub-ci-bin go install github.com/minio/minio@RELEASE.2025-09-06T17-38-46Z
+          MINIO_ROOT_USER=cleanhub MINIO_ROOT_PASSWORD=cleanhub-minio-password \
+            /tmp/cleanhub-ci-bin/minio server /tmp/cleanhub-ci-media --address 127.0.0.1:9000 > /tmp/cleanhub-ci-minio.log 2>&1 &
+          media_pid=$!
+          trap 'kill "$media_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:9000/minio/health/ready > /dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" != 1 ]; then cat /tmp/cleanhub-ci-minio.log; exit 1; fi
+          pnpm --filter @cleanhub/storage exec node --env-file=../../.env --import tsx src/prepare-test-storage.ts
           pnpm --filter @cleanhub/api test:integration:tenant-branding
           pnpm --filter @cleanhub/storage smoke
 
