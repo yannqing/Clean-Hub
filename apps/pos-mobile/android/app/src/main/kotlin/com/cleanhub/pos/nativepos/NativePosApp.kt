@@ -2235,6 +2235,7 @@ fun NativePosApp(applicationContext: Context) {
                     language = pinLanguage,
                     onLanguageSelected = ::selectLanguage,
                     tenantName = current.terminal.merchantName,
+                    merchant = current.terminal,
                     branchName = current.terminal.branchName,
                     offlineAvailable = session.canUnlockOffline(current.terminal.userId),
                     internetAvailable = internetAvailable,
@@ -2825,13 +2826,13 @@ internal fun NativePosShell(
         }
         Row(Modifier.fillMaxSize().background(POS_PAGE_BACKGROUND)) {
             if (showNavigationRail && !(activeTab == NativePosTab.More && activeMoreDestination in listOf(NativeMoreDestination.Settings, NativeMoreDestination.Hardware))) {
-                NativeAdaptiveNavigation(copy, navigation, selectedNavigation, true, expanded, itemHeight, ::navigate)
+                NativeAdaptiveNavigation(copy, terminal, navigation, selectedNavigation, true, expanded, itemHeight, ::navigate)
             }
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 TopAppBar(
                     title = {
                         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text(terminal.merchantName, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            NativeMerchantBrand(terminal, compact = false, modifier = Modifier.fillMaxWidth())
                             Text(terminal.branchName, color = POS_MUTED, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     },
@@ -2897,7 +2898,7 @@ internal fun NativePosShell(
                     }
                 }
                 if (!showNavigationRail) {
-                    NativeAdaptiveNavigation(copy, navigation, selectedNavigation, false, false, itemHeight, ::navigate)
+                    NativeAdaptiveNavigation(copy, terminal, navigation, selectedNavigation, false, false, itemHeight, ::navigate)
                 }
             }
         }

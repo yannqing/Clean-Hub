@@ -9,7 +9,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private const val DATABASE_NAME = "cleanhub_native_pos.db"
-private const val DATABASE_VERSION = 22
+private const val DATABASE_VERSION = 23
 private const val MAX_RUNTIME_AGE_MS = 8 * 60 * 60 * 1_000L
 private const val MAX_CATALOG_AGE_MS = 24 * 60 * 60 * 1_000L
 private const val MAX_CASH_STATE_AGE_MS = 2 * 60 * 60 * 1_000L
@@ -55,6 +55,8 @@ class NativePosDatabase(
               credential_version INTEGER NOT NULL,
               currency TEXT NOT NULL,
               merchant_name TEXT NOT NULL,
+              pos_display_name TEXT,
+              pos_logo_path TEXT,
               branch_name TEXT NOT NULL,
               synced_at INTEGER NOT NULL
             )
@@ -216,6 +218,10 @@ class NativePosDatabase(
         if (oldVersion in 14..21) {
             db.execSQL("ALTER TABLE checkout_settings ADD COLUMN tax_ready INTEGER NOT NULL DEFAULT 0")
             db.execSQL("ALTER TABLE checkout_settings ADD COLUMN tax_readiness_code TEXT")
+        }
+        if (oldVersion < 23) {
+            db.execSQL("ALTER TABLE terminal_state ADD COLUMN pos_display_name TEXT")
+            db.execSQL("ALTER TABLE terminal_state ADD COLUMN pos_logo_path TEXT")
         }
     }
 
@@ -555,6 +561,8 @@ class NativePosDatabase(
                 put("credential_version", terminal.credentialVersion)
                 put("currency", terminal.currency)
                 put("merchant_name", terminal.merchantName)
+                put("pos_display_name", terminal.posDisplayName)
+                put("pos_logo_path", terminal.posLogoPath)
                 put("branch_name", terminal.branchName)
                 put("synced_at", terminal.lastSyncedAt)
             }, SQLiteDatabase.CONFLICT_REPLACE)
@@ -1551,10 +1559,10 @@ class NativePosDatabase(
     }
 
     private fun readTerminal(): NativeTerminal? = readableDatabase.rawQuery(
-        "SELECT tenant_id, branch_id, terminal_id, user_id, role, time_zone, credential_version, currency, merchant_name, branch_name, synced_at FROM terminal_state WHERE singleton = 1", null,
+        "SELECT tenant_id, branch_id, terminal_id, user_id, role, time_zone, credential_version, currency, merchant_name, branch_name, synced_at, pos_display_name, pos_logo_path FROM terminal_state WHERE singleton = 1", null,
     ).use { cursor ->
         if (!cursor.moveToFirst()) return null
-        NativeTerminal(cursor.getString(0), cursor.getString(1), cursor.getString(2), cursor.getString(3), cursor.getString(4), cursor.getString(5), cursor.getInt(6), cursor.getString(7), cursor.getString(8), cursor.getString(9), cursor.getLong(10))
+        NativeTerminal(cursor.getString(0), cursor.getString(1), cursor.getString(2), cursor.getString(3), cursor.getString(4), cursor.getString(5), cursor.getInt(6), cursor.getString(7), cursor.getString(8), cursor.getString(9), cursor.getLong(10), cursor.getString(11) ?: cursor.getString(8), cursor.getString(12))
     }
 
     private fun readCashState(): NativeCashState? = readableDatabase.rawQuery(

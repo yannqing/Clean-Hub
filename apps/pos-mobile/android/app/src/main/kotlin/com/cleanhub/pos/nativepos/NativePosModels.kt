@@ -31,6 +31,8 @@ data class NativeTerminal(
     val merchantName: String,
     val branchName: String,
     val lastSyncedAt: Long,
+    val posDisplayName: String = merchantName,
+    val posLogoPath: String? = null,
 )
 
 data class NativeProduct(

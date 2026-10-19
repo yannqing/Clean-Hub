@@ -41,6 +41,7 @@ internal fun isTransientReplayFailure(error: NativePosApiException): Boolean =
 
 /** Synchronizes immutable local cash commands before refreshing POS reference data. */
 class NativePosSyncEngine(context: Context) {
+    private val brandingCache = NativeBrandLogoCache(context.applicationContext)
     private val database = NativePosDatabase(context.applicationContext)
     private val session = NativePosSession(context.applicationContext)
     private val api = NativePosApiClient(session)
@@ -162,6 +163,11 @@ class NativePosSyncEngine(context: Context) {
             merchantName = branch.optString("merchantName").ifBlank { "CleanHub" },
             branchName = branch.requiredString("name"),
             lastSyncedAt = now,
+            posDisplayName = if (branch.has("posDisplayName") && !branch.isNull("posDisplayName")) branch.optString("posDisplayName").trim() else branch.optString("merchantName"),
+            posLogoPath = brandingCache.synchronize(
+                tenantId, branch.optString("posLogoObjectKey").takeIf { it.isNotBlank() && it != "null" },
+                branch.optString("posLogoUrl").takeIf { it.isNotBlank() && it != "null" },
+            ),
         )
         val cashState = if (cashMode == "none") null else NativeCashState(
             shiftId = shift?.optString("id")?.takeIf { it.isNotBlank() },

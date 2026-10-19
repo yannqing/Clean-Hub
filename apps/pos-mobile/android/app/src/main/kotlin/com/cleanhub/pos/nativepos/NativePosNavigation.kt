@@ -68,6 +68,7 @@ internal fun nativeNavigationLayout(availableDp: Float, itemExtentDp: Float, res
 @Composable
 internal fun NativeAdaptiveNavigation(
     copy: NativePosCopy,
+    terminal: NativeTerminal,
     layout: NativeNavigationLayout,
     current: NativeNavigationDestination,
     rail: Boolean,
@@ -80,8 +81,7 @@ internal fun NativeAdaptiveNavigation(
     if (rail) {
         Column(Modifier.width(if (expanded) 200.dp else 96.dp).fillMaxHeight().background(POS_PANEL_BACKGROUND).padding(horizontal = 8.dp)) {
             Box(Modifier.height(64.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text(if (expanded) copy.authBrandName else "CH", color = POS_INK, fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium)
+                NativeMerchantBrand(terminal, compact = !expanded, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp))
             }
             layout.displayed.forEach { item ->
                 key(item) {

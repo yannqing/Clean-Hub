@@ -131,6 +131,18 @@ Actions → Release POS APK → Run workflow，填版本号和 build number。
 
 租户可在管理端的 POS 设置中重新启用现金追踪，以及按需启用开箱金额、关箱盘点要求。员工班次独立保留，用于自选的考勤和交接，不再是现金结款条件。
 
+## POS 商家名称与图标
+
+在租户管理端「租户设置 → 常规 → POS 商家标识」设置显示名称，并上传 JPG、PNG 或 WebP 图标（最大 5 MB）。名称和图标至少保留一项，支持仅名称、仅图标或二者同时展示；移除最后一项时无法保存。仅租户 Owner 可以修改，Manager 可以查看。
+
+未单独配置的租户自动沿用租户名称。该设置只控制终端侧边栏与顶部商家标识，租户业务名称和小票抬头分别保留原有配置。长名称会截断，窄侧栏优先展示图标。
+
+生产环境还需配置 `OBJECT_STORAGE_PUBLIC_ENDPOINT` 为 API 的 HTTPS 公网源地址（例如 `https://api-clean.yannqing.ai`），并加载新版 Caddy 配置。MinIO 的校验和清理仍走内网；公网入口保留私有桶签名鉴权，不允许匿名读取。
+
+发布时需先执行 `0071_abnormal_nomad` 迁移，再更新 API、管理后台和 APK。设备联网同步后应用新标识；图标以像素文件保存在应用内部目录，签名下载链接过期不影响离线显示。图片暂时加载失败时保留商家名称，不阻塞收银；不会清除本地订单或离线队列。
+
+本地回归测试：启动 PostgreSQL 和 MinIO 后运行 `pnpm --filter @cleanhub/api test:integration:tenant-branding`，覆盖真实上传、归属校验和终端读取，测试记录回滚且清理上传的测试对象。
+
 ## 已知限制
 
 **T8 打印机未经真机验证。** 代码绑定 `com.incar.printerservice`，但用的是 NYX

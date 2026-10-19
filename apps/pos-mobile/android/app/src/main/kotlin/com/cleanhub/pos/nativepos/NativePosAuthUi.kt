@@ -84,6 +84,7 @@ private fun NativeEntryShell(
     step: Int? = null,
     cardWidth: Dp = 560.dp,
     footer: String = copy.authSetupFooter,
+    merchant: NativeTerminal? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     MaterialTheme(colorScheme = entryColors) {
@@ -102,12 +103,16 @@ private fun NativeEntryShell(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    if (merchant != null) {
+                        NativeMerchantBrand(merchant, compact = false, modifier = Modifier.weight(1f))
+                    } else {
                     Image(painterResource(R.drawable.cleanhub_brand_mark), contentDescription = null,
                         modifier = Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(copy.authBrandName, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold, color = ENTRY_INK)
                         Text(copy.authBrandSuffix, fontSize = 9.sp, lineHeight = 13.sp, letterSpacing = 0.8.sp, color = ENTRY_MUTED,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                     }
                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         PinLanguageMenu(language, onLanguageSelected, enabled = !busy)
@@ -375,6 +380,7 @@ internal fun StaffPinGate(
     tenantName: String?, branchName: String?, offlineAvailable: Boolean, internetAvailable: Boolean,
     busy: Boolean, message: String?, onPinEdited: () -> Unit,
     onUnlockOffline: (String) -> Unit, onOnlineLogin: (String) -> Unit,
+    merchant: NativeTerminal? = null,
     checkoutSettings: NativeCheckoutSettings? = null,
 ) {
     var pin by remember { mutableStateOf("") }
@@ -396,7 +402,7 @@ internal fun StaffPinGate(
         }
     }
     NativeEntryShell(copy, language, onLanguageSelected, busy, internetAvailable,
-        cardWidth = 860.dp, footer = copy.authPinFooter) {
+        cardWidth = 860.dp, footer = copy.authPinFooter, merchant = merchant) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val wide = maxWidth >= 600.dp
             val identity: @Composable () -> Unit = {
