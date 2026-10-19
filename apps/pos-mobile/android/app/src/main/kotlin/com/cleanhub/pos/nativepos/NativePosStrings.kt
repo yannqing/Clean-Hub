@@ -37,6 +37,22 @@ internal class NativePosCopy(
     /** Keys every language must define; the test reads this. */
     internal fun keys(): Set<String> = values.keys
 
+    val attributeSearch: String get() = get("attributeSearch")
+    val attributeUseCustom: String get() = get("attributeUseCustom")
+    val attributeClear: String get() = get("attributeClear")
+    val attributeNoMatches: String get() = get("attributeNoMatches")
+    val attributeQuickPhrases: String get() = get("attributeQuickPhrases")
+    val attributeSelect: String get() = get("attributeSelect")
+    val itemColorChoices: String get() = get("itemColorChoices")
+    val itemMaterialChoices: String get() = get("itemMaterialChoices")
+    val itemBrandChoices: String get() = get("itemBrandChoices")
+    val itemDefectPhrases: String get() = get("itemDefectPhrases")
+    val itemRequestPhrases: String get() = get("itemRequestPhrases")
+    val itemRemarkPhrases: String get() = get("itemRemarkPhrases")
+    val catalogArticle: String get() = get("catalogArticle")
+    val catalogChooseArticle: String get() = get("catalogChooseArticle")
+    val catalogNoArticles: String get() = get("catalogNoArticles")
+    val catalogSyncRequired: String get() = get("catalogSyncRequired")
     val detailEmail: String get() = get("detailEmail")
     val detailCustomerDisabled: String get() = get("detailCustomerDisabled")
     val intakeServerUpgradeRequired: String get() = get("intakeServerUpgradeRequired")
@@ -1021,6 +1037,22 @@ internal class NativePosCopy(
 }
 
 private val COPY_ZH_VALUES: Map<String, String> = mapOf(
+    "attributeSearch" to "搜索或输入自定义内容",
+    "attributeUseCustom" to "使用“%s”",
+    "attributeClear" to "清空选择",
+    "attributeNoMatches" to "没有匹配选项",
+    "attributeQuickPhrases" to "常用词条 · 点击添加或取消",
+    "attributeSelect" to "请选择",
+    "itemColorChoices" to "白色|黑色|灰色|米色|红色|蓝色|绿色|黄色|紫色|粉色|橙色|棕色|藏青|深灰|深蓝|深绿|酒红|驼色|浅蓝|浅粉|浅灰|奶白|杏色|花色|格子|条纹|迷彩",
+    "itemMaterialChoices" to "棉|麻|丝绸|羊毛|羊绒|驼绒|亚麻|聚酯纤维|尼龙|腈纶|氨纶|人造丝|天丝|棉混纺|毛混纺|丝混纺|涤棉混纺|皮革|麂皮|羽绒|针织|牛仔|蕾丝|雪纺",
+    "itemBrandChoices" to "ZARA|H&M|UNIQLO|GAP|Mango|COS|Nike|Adidas|Puma|New Balance|Under Armour|Gucci|Louis Vuitton|Chanel|Prada|Burberry|Hermès|Dior|Armani|Ralph Lauren|雅戈尔|七匹狼|海澜之家|利郎|柒牌|九牧王|太平鸟|拉夏贝尔|歌力思|地素|伊芙丽|VERO MODA|李宁|安踏|特步|361°|匹克|森马|美特斯邦威|以纯|GXG|JACK & JONES",
+    "itemDefectPhrases" to "明显污渍|顽固油渍|破损|开线|缺扣|拉链损坏|褪色|染色风险|起球|变形",
+    "itemRequestPhrases" to "加急处理|加强去渍|单独清洗|轻柔处理|低温清洗|不可烘干|自然晾干|无香处理|保持熨痕|独立包装",
+    "itemRemarkPhrases" to "顾客已确认风险|口袋已检查|贵重物品|附件单独保管|取件时当面检查|已拍照留档",
+    "catalogArticle" to "具体物品",
+    "catalogChooseArticle" to "选择具体物品",
+    "catalogNoArticles" to "此类型没有可用物品，请管理员配置目录后同步本终端。",
+    "catalogSyncRequired" to "请先同步物品目录，再追加项目。",
     "detailTicketSaved" to "工单资料已保存",
     "detailPhone" to "联系电话",
     "detailCustomerActive" to "正常",
@@ -1997,6 +2029,22 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_EN_VALUES: Map<String, String> = mapOf(
+    "attributeSearch" to "Search or enter a custom value",
+    "attributeUseCustom" to "Use “%s”",
+    "attributeClear" to "Clear selection",
+    "attributeNoMatches" to "No matching options",
+    "attributeQuickPhrases" to "Common phrases · tap to add or remove",
+    "attributeSelect" to "Choose an option",
+    "itemColorChoices" to "White|Black|Grey|Beige|Red|Blue|Green|Yellow|Purple|Pink|Orange|Brown|Navy|Dark grey|Dark blue|Dark green|Burgundy|Camel|Light blue|Light pink|Light grey|Ivory|Apricot|Multicoloured|Checked|Striped|Camouflage",
+    "itemMaterialChoices" to "Cotton|Hemp|Silk|Wool|Cashmere|Camel hair|Linen|Polyester|Nylon|Acrylic|Elastane|Viscose|Lyocell|Cotton blend|Wool blend|Silk blend|Polyester cotton|Leather|Suede|Down|Knit|Denim|Lace|Chiffon",
+    "itemBrandChoices" to "ZARA|H&M|UNIQLO|GAP|Mango|COS|Nike|Adidas|Puma|New Balance|Under Armour|Gucci|Louis Vuitton|Chanel|Prada|Burberry|Hermès|Dior|Armani|Ralph Lauren|雅戈尔|七匹狼|海澜之家|利郎|柒牌|九牧王|太平鸟|拉夏贝尔|歌力思|地素|伊芙丽|VERO MODA|李宁|安踏|特步|361°|匹克|森马|美特斯邦威|以纯|GXG|JACK & JONES",
+    "itemDefectPhrases" to "Visible stains|Stubborn grease|Torn fabric|Loose stitching|Missing button|Broken zip|Faded colour|Colour transfer risk|Pilling|Loss of shape",
+    "itemRequestPhrases" to "Express service|Extra stain removal|Wash separately|Handle gently|Low temperature wash|Do not tumble dry|Air dry|Fragrance free|Keep creases|Pack separately",
+    "itemRemarkPhrases" to "Customer accepted the risks|Pockets checked|Valuable item|Accessories stored separately|Inspect with customer at pickup|Photos recorded",
+    "catalogArticle" to "Article",
+    "catalogChooseArticle" to "Choose an article",
+    "catalogNoArticles" to "No enabled articles for this type. Ask an administrator to configure the catalog and sync this terminal.",
+    "catalogSyncRequired" to "Sync the item catalog before adding an article.",
     "detailTicketSaved" to "Ticket information saved",
     "detailPhone" to "Phone",
     "detailCustomerActive" to "Active",
@@ -2973,6 +3021,22 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_FR_VALUES: Map<String, String> = mapOf(
+    "attributeSearch" to "Rechercher ou saisir une valeur",
+    "attributeUseCustom" to "Utiliser « %s »",
+    "attributeClear" to "Effacer la sélection",
+    "attributeNoMatches" to "Aucune option correspondante",
+    "attributeQuickPhrases" to "Expressions courantes · toucher pour ajouter ou retirer",
+    "attributeSelect" to "Choisir une option",
+    "itemColorChoices" to "Blanc|Noir|Gris|Beige|Rouge|Bleu|Vert|Jaune|Violet|Rose|Orange|Marron|Bleu marine|Gris foncé|Bleu foncé|Vert foncé|Bordeaux|Camel|Bleu clair|Rose clair|Gris clair|Ivoire|Abricot|Multicolore|À carreaux|À rayures|Camouflage",
+    "itemMaterialChoices" to "Coton|Chanvre|Soie|Laine|Cachemire|Poil de chameau|Lin|Polyester|Nylon|Acrylique|Élasthanne|Viscose|Lyocell|Mélange coton|Mélange laine|Mélange soie|Polycoton|Cuir|Daim|Duvet|Maille|Jean|Dentelle|Mousseline",
+    "itemBrandChoices" to "ZARA|H&M|UNIQLO|GAP|Mango|COS|Nike|Adidas|Puma|New Balance|Under Armour|Gucci|Louis Vuitton|Chanel|Prada|Burberry|Hermès|Dior|Armani|Ralph Lauren|雅戈尔|七匹狼|海澜之家|利郎|柒牌|九牧王|太平鸟|拉夏贝尔|歌力思|地素|伊芙丽|VERO MODA|李宁|安踏|特步|361°|匹克|森马|美特斯邦威|以纯|GXG|JACK & JONES",
+    "itemDefectPhrases" to "Taches visibles|Graisse tenace|Déchirure|Couture défaite|Bouton manquant|Fermeture cassée|Couleur passée|Risque de dégorgement|Bouloches|Déformation",
+    "itemRequestPhrases" to "Traitement urgent|Détachage renforcé|Laver séparément|Manipuler délicatement|Lavage basse température|Ne pas sécher en machine|Séchage à l’air|Sans parfum|Conserver les plis|Emballer séparément",
+    "itemRemarkPhrases" to "Risques acceptés par le client|Poches vérifiées|Article de valeur|Accessoires conservés séparément|Contrôle avec le client au retrait|Photos enregistrées",
+    "catalogArticle" to "Article",
+    "catalogChooseArticle" to "Choisir un article",
+    "catalogNoArticles" to "Aucun article actif pour ce type. Demandez à un administrateur de configurer le catalogue puis synchronisez ce terminal.",
+    "catalogSyncRequired" to "Synchronisez le catalogue avant d’ajouter un article.",
     "detailTicketSaved" to "Informations du bon enregistrées",
     "detailPhone" to "Téléphone",
     "detailCustomerActive" to "Actif",

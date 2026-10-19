@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -115,6 +116,8 @@ internal fun NativeTicketDetailView(
     onViewOrder: (String) -> Unit,
     timeZone: String,
     onDiscardIntake: (String) -> Unit = {},
+    tenantId: String? = null,
+    itemCatalog: NativeItemCatalog? = null,
 ) {
     val ticket = detail.ticket
     val editable = ticket.ticketStatus !in setOf("cancelled", "picked_up")
@@ -343,7 +346,9 @@ internal fun NativeTicketDetailView(
                             item.id in detail.billedTicketItemIds -> copy.alreadyBilled
                             item.id in detail.pendingTicketItemIds -> copy.pendingSyncNoBill
                             item.id in detail.cartTicketItemIds -> copy.inCart
-                            else -> ticketItemTypeLabel(item.itemType.orEmpty(), copy)
+                            else ->
+                                item.itemTypeName
+                                    ?: ticketItemTypeLabel(item.itemType.orEmpty(), copy)
                         },
                         color = POS_ACCENT,
                         style = MaterialTheme.typography.labelMedium,
@@ -492,6 +497,8 @@ internal fun NativeTicketDetailView(
                     editingItem = null
                 }
             },
+            tenantId = tenantId,
+            itemCatalog = itemCatalog,
         ) { draft ->
             val item = editingItem
             if (item == null) onAddService(draft)
@@ -513,6 +520,8 @@ internal fun NativeTicketDetailView(
                         draft.remark,
                         draft.chargedUnitAmountMinor,
                         draft.overrideReason,
+                        draft.catalogItemId,
+                        draft.itemTypeName,
                     ),
                 )
         }
@@ -772,6 +781,8 @@ internal fun NativeTicketItemForm(
     canOverride: Boolean,
     message: String?,
     onDismiss: () -> Unit,
+    tenantId: String? = null,
+    itemCatalog: NativeItemCatalog? = null,
     onSave: (NativeTicketItemDraft) -> Unit,
 ) {
     var type by remember { mutableStateOf(item?.itemType.orEmpty()) }
@@ -781,12 +792,16 @@ internal fun NativeTicketItemForm(
     var weight by remember { mutableStateOf(item?.weight.orEmpty()) }
     var bags by remember { mutableStateOf((item?.bagCount ?: 1).toString()) }
     var category by remember { mutableStateOf(item?.itemCategory.orEmpty()) }
+    var articleId by remember { mutableStateOf(item?.catalogItemId.orEmpty()) }
     var colour by remember { mutableStateOf(item?.itemColor.orEmpty()) }
     var brand by remember { mutableStateOf(item?.itemBrand.orEmpty()) }
     var material by remember { mutableStateOf(item?.itemMaterial.orEmpty()) }
     var defects by remember { mutableStateOf(item?.defectNotes.orEmpty()) }
     var request by remember { mutableStateOf(item?.specialRequest.orEmpty()) }
     var remark by remember { mutableStateOf(item?.remark.orEmpty()) }
+    val context = LocalContext.current
+    val brandHistory = remember(context, tenantId) { NativeItemBrandHistory(context, tenantId) }
+    var recentBrands by remember(tenantId) { mutableStateOf(brandHistory.load()) }
     var overridePrice by remember { mutableStateOf(false) }
     var price by remember {
         mutableStateOf(
@@ -799,6 +814,18 @@ internal fun NativeTicketItemForm(
     var reason by remember { mutableStateOf("") }
     val ticketServices =
         services.filter { it.businessLine == ticket.ticketType && it.currency == ticket.currency }
+    val groups =
+        itemCatalog?.groups.orEmpty().filter { group ->
+            ticketServices.any { group.itemType in it.applicableItemTypes }
+        }
+    val group = groups.firstOrNull { it.itemType == type }
+    val article = group?.items?.firstOrNull { it.id == articleId }
+    val originalArticleUnchanged =
+        item != null &&
+            type == item.itemType &&
+            articleId == item.catalogItemId.orEmpty() &&
+            category == item.itemCategory.orEmpty()
+    val validArticle = article != null || originalArticleUnchanged
     val service =
         ticketServices.firstOrNull { it.id == serviceId && type in it.applicableItemTypes }
     val standard =
@@ -864,18 +891,58 @@ internal fun NativeTicketItemForm(
                         }
                         Text(copy.pickTypeThenService, color = POS_MUTED)
                         NativeDetailChoices(
-                            ticketServices.flatMap { it.applicableItemTypes }.distinct(),
+                            groups.map { it.itemType },
                             type,
                             !busy,
-                            { ticketItemTypeLabel(it, copy) },
+                            { code ->
+                                groups
+                                    .firstOrNull { it.itemType == code }
+                                    ?.let { nativeCatalogText(it.names, copy.localeCode()) }
+                                    ?: ticketItemTypeLabel(code, copy)
+                            },
                             {
+                                articleId = ""
+                                category = ""
                                 type = it
                                 serviceId = ""
                                 query = ""
                                 overridePrice = false
                             },
                         )
+                        if (itemCatalog == null)
+                            Text(copy.catalogSyncRequired, color = MaterialTheme.colorScheme.error)
                         if (type.isNotBlank()) {
+                            NativeItemAttributePicker(
+                                copy,
+                                copy.catalogArticle,
+                                category,
+                                group?.items.orEmpty().map {
+                                    nativeCatalogText(it.names, copy.localeCode())
+                                },
+                                !busy,
+                                80,
+                                allowCustom = false,
+                            ) { value ->
+                                val chosenArticle =
+                                    group?.items?.firstOrNull {
+                                        nativeCatalogText(it.names, copy.localeCode()) == value
+                                    }
+                                articleId = chosenArticle?.id.orEmpty()
+                                category = value
+                            }
+                            article?.let { selected ->
+                                nativeCatalogText(selected.descriptions, copy.localeCode())
+                                    .takeIf { it.isNotBlank() }
+                                    ?.let {
+                                        Text(
+                                            it,
+                                            color = POS_MUTED,
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                    }
+                            }
+                            if (group?.items.isNullOrEmpty())
+                                Text(copy.catalogNoArticles, color = POS_MUTED)
                             NativePosInput(
                                 value = query,
                                 onValueChange = { query = it },
@@ -979,38 +1046,45 @@ internal fun NativeTicketItemForm(
                                 },
                             )
                         }
-                        NativePosInput(
-                            value = category,
-                            onValueChange = { category = it.take(80) },
-                            label = { Text(copy.categoryOptional) },
-                            enabled = !busy,
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        NativePosInput(
-                            value = colour,
-                            onValueChange = { colour = it.take(40) },
-                            label = { Text(copy.colorOptional) },
-                            enabled = !busy,
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        NativePosInput(
-                            value = brand,
-                            onValueChange = { brand = it.take(80) },
-                            label = { Text(copy.brandOptional) },
-                            enabled = !busy,
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        NativePosInput(
-                            value = material,
-                            onValueChange = { material = it.take(80) },
-                            label = { Text(copy.materialOptional) },
-                            enabled = !busy,
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        NativeItemAttributePicker(
+                            copy,
+                            copy.colorOptional,
+                            colour,
+                            copy.itemColorChoices.split('|'),
+                            !busy,
+                            40,
+                            colours = true,
+                        ) {
+                            colour = it
+                        }
+                        NativeItemAttributePicker(
+                            copy,
+                            copy.brandOptional,
+                            brand,
+                            copy.itemBrandChoices.split('|'),
+                            !busy,
+                            80,
+                            recent = recentBrands,
+                        ) {
+                            brand = it
+                            if (
+                                it.isNotBlank() &&
+                                    copy.itemBrandChoices.split('|').none { preset ->
+                                        preset.equals(it, true)
+                                    }
+                            )
+                                recentBrands = brandHistory.remember(it)
+                        }
+                        NativeItemAttributePicker(
+                            copy,
+                            copy.materialOptional,
+                            material,
+                            copy.itemMaterialChoices.split('|'),
+                            !busy,
+                            80,
+                        ) {
+                            material = it
+                        }
                         NativePosInput(
                             value = defects,
                             onValueChange = { defects = it.take(2000) },
@@ -1018,6 +1092,9 @@ internal fun NativeTicketItemForm(
                             enabled = !busy,
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        NativeItemQuickPhrases(copy, defects, copy.itemDefectPhrases, !busy) {
+                            defects = it
+                        }
                         NativePosInput(
                             value = request,
                             onValueChange = { request = it.take(2000) },
@@ -1025,6 +1102,9 @@ internal fun NativeTicketItemForm(
                             enabled = !busy,
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        NativeItemQuickPhrases(copy, request, copy.itemRequestPhrases, !busy) {
+                            request = it
+                        }
                         NativePosInput(
                             value = remark,
                             onValueChange = { remark = it.take(2000) },
@@ -1032,6 +1112,9 @@ internal fun NativeTicketItemForm(
                             enabled = !busy,
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        NativeItemQuickPhrases(copy, remark, copy.itemRemarkPhrases, !busy) {
+                            remark = it
+                        }
                         message?.let { Text(it, color = POS_MUTED) }
                     }
                     Button(
@@ -1053,6 +1136,12 @@ internal fun NativeTicketItemForm(
                                         remark,
                                         if (overridePrice) unit else null,
                                         reason.takeIf { overridePrice },
+                                        articleId.takeIf { it.isNotBlank() },
+                                        if (originalArticleUnchanged) item?.itemTypeName
+                                        else
+                                            group?.let {
+                                                nativeCatalogText(it.names, copy.localeCode())
+                                            },
                                     )
                                 )
                             }
@@ -1060,6 +1149,7 @@ internal fun NativeTicketItemForm(
                         enabled =
                             !busy &&
                                 validMeasurement &&
+                                validArticle &&
                                 unit != null &&
                                 estimate != null &&
                                 (!overridePrice || reason.isNotBlank()),

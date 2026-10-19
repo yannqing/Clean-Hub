@@ -16,6 +16,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import org.json.JSONObject
 
 @RunWith(AndroidJUnit4::class)
 class NativeCatalogSnapshotInstrumentedTest {
@@ -166,4 +167,48 @@ class NativeCatalogSnapshotInstrumentedTest {
         assertNull(database.claimReceiptPrint(failedOnly = true))
         assertEquals("failed", database.receiptPrintStatus("failed"))
     }
+    private fun articleCatalog() = JSONObject("""{"selection":{"itemTypes":["cloth"],"itemIds":["article-1"]},"groups":[{"id":"group-1","itemType":"cloth","enabled":true,"names":{"en":"Fabric care","fr":"Textiles","zh-CN":"衣物护理"},"descriptions":{},"items":[{"id":"article-1","enabled":true,"names":{"en":"Shirt","fr":"Chemise","zh-CN":"衬衫"},"descriptions":{}}]}]}""")
+
+    @Test fun articleCatalogSurvivesRestartAndCannotLeakAfterTenantSwitch() {
+        synchronize()
+        val terminal = database.snapshot(now).terminal!!
+        database.replaceSnapshot(terminal, emptyList(), null, itemCatalogJson = articleCatalog())
+        database.intakeStore.close(); database.close()
+        database = NativePosDatabase(context)
+        val catalog = database.snapshot(now).itemCatalog!!
+        assertTrue(catalog.configured)
+        assertEquals("Chemise", nativeCatalogText(catalog.groups.single().items.single().names, "fr"))
+        database.replaceSnapshot(terminal.copy(tenantId = "other-tenant"), emptyList(), null)
+        assertNull(database.snapshot(now).itemCatalog)
+    }
+
+    @Test fun version23UpgradePreservesPendingSalesAndAddsCatalogCache() {
+        synchronize()
+        database.writableDatabase.execSQL("INSERT INTO pending_operation (operation_id,sequence,entity_id,idempotency_key,payload_json,status,created_at) VALUES ('catalog-upgrade-pending',1,'order-upgrade','upgrade-key','{}','pending',?)", arrayOf(now))
+        database.intakeStore.close(); database.close()
+        SQLiteDatabase.openDatabase(context.getDatabasePath("cleanhub_native_pos.db").absolutePath, null, SQLiteDatabase.OPEN_READWRITE).use { old ->
+            old.execSQL("DROP TABLE service_item_catalog")
+            old.execSQL("ALTER TABLE service_ticket_item DROP COLUMN catalog_item_id")
+            old.execSQL("ALTER TABLE service_ticket_item DROP COLUMN item_type_name")
+            old.version = 23
+        }
+        database = NativePosDatabase(context)
+        assertEquals(1, database.snapshot(now).pendingSales)
+        val terminal = database.snapshot(now).terminal!!
+        database.replaceSnapshot(terminal, emptyList(), null, itemCatalogJson = articleCatalog())
+        assertEquals("article-1", database.snapshot(now).itemCatalog!!.groups.single().items.single().id)
+    }
+
+    @Test fun customBrandHistoryIsTenantScopedAndBounded() {
+        val scope = "catalog-brand-${NativeUlid.create()}"
+        val first = NativeItemBrandHistory(context, scope)
+        repeat(55) { first.remember("Brand $it") }
+        assertEquals(50, first.load().size)
+        assertEquals("Brand 54", first.load().first())
+        first.remember("brand 54")
+        assertEquals(1, first.load().count { it.equals("Brand 54", true) })
+        assertTrue(NativeItemBrandHistory(context, "$scope-other").load().isEmpty())
+        context.getSharedPreferences("cleanhub_item_brand_history", Context.MODE_PRIVATE).edit().remove(scope).commit()
+    }
+
 }

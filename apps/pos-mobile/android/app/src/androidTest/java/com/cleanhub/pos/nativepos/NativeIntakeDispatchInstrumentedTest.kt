@@ -113,6 +113,8 @@ class NativeIntakeDispatchInstrumentedTest {
                 "Stain",
                 "No starch",
                 "Note",
+                catalogItemId = "01M4D63YHY2FMC9WS6RFHRRCXM",
+                itemTypeName = "Clothing",
             ),
         )
 
@@ -128,6 +130,7 @@ class NativeIntakeDispatchInstrumentedTest {
             JSONObject(payload.toString())
                 .put("ticketId", path.split('/')[3])
                 .put("itemName", "Wash")
+                .put("itemTypeName", "Clothing")
                 .put("lineAmount", "3000.00")
                 .put("standardUnitAmount", "1500.00")
                 .put("chargedUnitAmount", "1500.00")
@@ -159,6 +162,8 @@ class NativeIntakeDispatchInstrumentedTest {
             )
         assertEquals(id, detail.ticket.id)
         assertEquals(itemId, detail.items.single().id)
+        assertEquals("01M4D63YHY2FMC9WS6RFHRRCXM", detail.items.single().catalogItemId)
+        assertEquals("Clothing", detail.items.single().itemTypeName)
         assertEquals(300000L, detail.items.single().lineAmountMinor)
         assertEquals(setOf(id, itemId), detail.unsentIntakeIds)
         assertEquals(2, db.snapshot().pendingIntakes)

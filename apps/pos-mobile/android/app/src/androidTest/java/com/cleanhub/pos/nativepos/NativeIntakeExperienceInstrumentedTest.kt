@@ -66,6 +66,27 @@ class NativeIntakeExperienceInstrumentedTest {
             listOf("cloth"),
             null,
         )
+    private val uiBrandScope = NativeUlid.create()
+    private val testArticleId = "01M4D63YHY2FMC9WS6RFHRRCXM"
+    private val itemCatalog =
+        NativeItemCatalog(
+            true,
+            listOf(
+                NativeCatalogItemGroup(
+                    "group",
+                    "cloth",
+                    mapOf("en" to "Clothing", "fr" to "Vêtements", "zh-CN" to "衣物"),
+                    emptyMap(),
+                    listOf(
+                        NativeCatalogArticle(
+                            testArticleId,
+                            mapOf("en" to "Shirt", "fr" to "Chemise", "zh-CN" to "衬衫"),
+                            emptyMap(),
+                        )
+                    ),
+                )
+            ),
+        )
     private var testContext: Context? = null
 
     private fun screenshot(name: String) {
@@ -198,7 +219,9 @@ class NativeIntakeExperienceInstrumentedTest {
                     true,
                     null,
                     {},
-                    {
+                    itemCatalog = itemCatalog,
+                    tenantId = uiBrandScope,
+                    onSave = {
                         accepted = it
                         busy = true
                     },
@@ -206,6 +229,9 @@ class NativeIntakeExperienceInstrumentedTest {
             }
         }
         compose.onNodeWithText(copy.typeCloth).performClick()
+        compose.onNodeWithText(copy.catalogArticle).performScrollTo()
+        compose.onNodeWithContentDescription(copy.catalogArticle).performScrollTo().performClick()
+        compose.onNodeWithText("Shirt").performClick()
         compose
             .onNodeWithText(
                 "${service.name} · ${nativeMinorMoney(service.amountMinor,service.currency)}"
@@ -218,20 +244,29 @@ class NativeIntakeExperienceInstrumentedTest {
             )
             .performScrollTo()
             .performTextInput("1.125")
+        compose.onNodeWithText(copy.colorOptional).performScrollTo()
+        compose.onNodeWithContentDescription(copy.colorOptional).performScrollTo().performClick()
+        try {
+            compose
+                .onNode(
+                    hasSetTextAction() and hasAnySibling(hasText(copy.attributeSearch)),
+                    useUnmergedTree = true,
+                )
+                .performTextInput("blu")
+        } catch (error: Throwable) {
+            screenshot("attribute-color-picker-failure")
+            throw error
+        }
+        compose.onNodeWithText("Blue").performClick()
+        compose.onNodeWithText(copy.brandOptional).performScrollTo()
+        compose.onNodeWithContentDescription(copy.brandOptional).performScrollTo().performClick()
         compose
             .onNode(
-                hasSetTextAction() and hasAnySibling(hasText(copy.colorOptional)),
+                hasSetTextAction() and hasAnySibling(hasText(copy.attributeSearch)),
                 useUnmergedTree = true,
             )
-            .performScrollTo()
-            .performTextInput("Blue")
-        compose
-            .onNode(
-                hasSetTextAction() and hasAnySibling(hasText(copy.brandOptional)),
-                useUnmergedTree = true,
-            )
-            .performScrollTo()
             .performTextInput("Brand")
+        compose.onNodeWithText(copy.attributeUseCustom.replace("%s", "Brand")).performClick()
         compose
             .onNode(
                 hasSetTextAction() and hasAnySibling(hasText(copy.defectsOptional)),
@@ -241,10 +276,34 @@ class NativeIntakeExperienceInstrumentedTest {
             .performTextInput("Stain")
         compose.onNodeWithText(copy.confirmAddItem).assertIsDisplayed().performClick()
         assertEquals("1.125", accepted?.weight)
+        assertEquals(testArticleId, accepted?.catalogItemId)
+        assertEquals("Shirt", accepted?.itemCategory)
+        assertEquals("Brand", accepted?.itemBrand)
         assertEquals("Blue", accepted?.itemColor)
         assertEquals("Stain", accepted?.defectNotes)
         compose.onNodeWithText(copy.intakeSaving).assertIsDisplayed()
         screenshot("ticket-item-editor")
+    }
+
+    @Test
+    fun quickPhrasesToggleAndPreserveHandwrittenNotes() {
+        var notes by mutableStateOf("Customer note")
+        compose.setContent {
+            MaterialTheme(colorScheme = nativePosColors) {
+                Column(
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)
+                ) {
+                    NativeItemQuickPhrases(copy, notes, copy.itemRequestPhrases, true) {
+                        notes = it
+                    }
+                }
+            }
+        }
+        val phrase = copy.itemRequestPhrases.split('|').first()
+        compose.onNodeWithText(phrase).performClick()
+        assertEquals("Customer note; $phrase", notes)
+        compose.onNodeWithText(phrase).performClick()
+        assertEquals("Customer note", notes)
     }
 
     @Test

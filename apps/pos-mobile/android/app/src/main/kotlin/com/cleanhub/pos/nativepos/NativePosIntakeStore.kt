@@ -355,6 +355,7 @@ internal class NativePosIntakeStore(context: Context) :
                 .put("bagCount", draft.bagCount)
         else payload.put("quantity", draft.quantity)
         listOf(
+                "catalogItemId" to draft.catalogItemId,
                 "itemCategory" to draft.itemCategory,
                 "itemColor" to draft.itemColor,
                 "itemBrand" to draft.itemBrand,
@@ -374,6 +375,7 @@ internal class NativePosIntakeStore(context: Context) :
             JSONObject(payload.toString())
                 .put("id", id)
                 .put("itemName", draft.service.name)
+                .put("itemTypeName", draft.itemTypeName)
                 .put("currency", draft.service.currency)
                 .put("itemStatus", "pending_wash")
                 .put("pricingUnit", draft.service.pricingUnit)
@@ -419,6 +421,8 @@ internal fun JSONObject.nativeItem(ticketId: String, currency: String): NativeTi
         serviceId = nativeText("serviceId"),
         itemName = optString("itemName"),
         itemType = nativeText("itemType"),
+        catalogItemId = nativeText("catalogItemId"),
+        itemTypeName = nativeText("itemTypeName"),
         itemCategory = nativeText("itemCategory"),
         itemColor = nativeText("itemColor"),
         itemBrand = nativeText("itemBrand"),

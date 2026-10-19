@@ -10,7 +10,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private const val DATABASE_NAME = "cleanhub_native_pos.db"
-private const val DATABASE_VERSION = 23
+private const val DATABASE_VERSION = 24
 private const val MAX_RUNTIME_AGE_MS = 8 * 60 * 60 * 1_000L
 private const val MAX_CATALOG_AGE_MS = 24 * 60 * 60 * 1_000L
 private const val MAX_CASH_STATE_AGE_MS = 2 * 60 * 60 * 1_000L
@@ -132,6 +132,7 @@ class NativePosDatabase(
         createReceiptPrintTables(db)
         createReceiptPrinterBindingTable(db)
         createCheckoutSettingsTable(db)
+        createItemCatalogTable(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -230,7 +231,23 @@ class NativePosDatabase(
             db.execSQL("ALTER TABLE terminal_state ADD COLUMN pos_display_name TEXT")
             db.execSQL("ALTER TABLE terminal_state ADD COLUMN pos_logo_path TEXT")
         }
+        if (oldVersion < 24) {
+            createItemCatalogTable(db)
+            val columns = db.rawQuery("PRAGMA table_info(service_ticket_item)", null).use { cursor ->
+                buildSet { while (cursor.moveToNext()) add(cursor.getString(1)) }
+            }
+            if ("catalog_item_id" !in columns) db.execSQL("ALTER TABLE service_ticket_item ADD COLUMN catalog_item_id TEXT")
+            if ("item_type_name" !in columns) db.execSQL("ALTER TABLE service_ticket_item ADD COLUMN item_type_name TEXT")
+        }
     }
+
+    private fun createItemCatalogTable(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE service_item_catalog (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), tenant_id TEXT NOT NULL, payload_json TEXT NOT NULL)")
+    }
+
+    private fun readItemCatalog(tenantId: String): NativeItemCatalog? = readableDatabase.rawQuery(
+        "SELECT payload_json FROM service_item_catalog WHERE singleton = 1 AND tenant_id = ?", arrayOf(tenantId),
+    ).use { cursor -> if (cursor.moveToFirst()) runCatching { JSONObject(cursor.getString(0)).toNativeItemCatalog() }.getOrNull() else null }
 
     fun snapshot(now: Long = System.currentTimeMillis()): NativePosSnapshot {
         val terminal = readTerminal()?.takeIf { now - it.lastSyncedAt in 0..MAX_RUNTIME_AGE_MS }
@@ -246,6 +263,7 @@ class NativePosDatabase(
             pendingSales = countPendingSales(),
             failedSales = countFailedSales(),
             catalogIsFresh = catalogIsFresh,
+            itemCatalog = if (catalogIsFresh && terminal != null) readItemCatalog(terminal.tenantId) else null,
             pendingIntakes = terminal?.let { intakeStore.operations(it).count { op -> op.status == "pending" } } ?: 0,
             failedIntakes = terminal?.let { intakeStore.operations(it).count { op -> op.status == "failed" } } ?: 0,
         )
@@ -559,6 +577,7 @@ class NativePosDatabase(
         customers: List<NativeCustomer>? = null,
         tickets: List<NativeServiceTicket>? = null,
         expectedStockRevision: Long? = null,
+        itemCatalogJson: JSONObject? = null,
     ) {
         writableDatabase.beginTransaction()
         try {
@@ -569,7 +588,7 @@ class NativePosDatabase(
             }
             if(previous!=null && (previous.tenantId!=terminal.tenantId || previous.branchId!=terminal.branchId || previous.terminalId!=terminal.terminalId)) {
                 // Reference caches have no per-row scope; never carry another store's details forward.
-                listOf("catalog_service","customer_profile","service_ticket","service_ticket_item","service_ticket_billed_item").forEach { writableDatabase.delete(it,null,null) }
+                listOf("catalog_service","customer_profile","service_ticket","service_ticket_item","service_ticket_billed_item","service_item_catalog").forEach { writableDatabase.delete(it,null,null) }
             }
             val reservedBySku = reservedQuantitiesBySku()
             // A foreground sale may commit while this network snapshot is downloading.
@@ -611,6 +630,11 @@ class NativePosDatabase(
             tickets?.let { rows ->
                 writableDatabase.delete("service_ticket", null, null)
                 rows.forEach(::insertTicket)
+            }
+            itemCatalogJson?.let { payload ->
+                writableDatabase.insertWithOnConflict("service_item_catalog", null, ContentValues().apply {
+                    put("singleton", 1); put("tenant_id", terminal.tenantId); put("payload_json", payload.toString())
+                }, SQLiteDatabase.CONFLICT_REPLACE)
             }
             writableDatabase.insertWithOnConflict("catalog_state", null, ContentValues().apply {
                 put("singleton", 1)
@@ -1046,7 +1070,7 @@ class NativePosDatabase(
     }
 
     private fun readTicketItems(ticketId: String): List<NativeTicketItem> = readableDatabase.rawQuery(
-        "SELECT id, ticket_id, service_id, item_name, item_type, item_category, item_color, item_brand, item_material, item_status, quantity, pricing_unit, standard_unit_amount_minor, charged_unit_amount_minor, line_amount_minor, currency, weight, bag_count, label_code, defect_notes, special_request, remark FROM service_ticket_item WHERE ticket_id = ? ORDER BY rowid ASC",
+        "SELECT id, ticket_id, service_id, item_name, item_type, item_category, item_color, item_brand, item_material, item_status, quantity, pricing_unit, standard_unit_amount_minor, charged_unit_amount_minor, line_amount_minor, currency, weight, bag_count, label_code, defect_notes, special_request, remark, catalog_item_id, item_type_name FROM service_ticket_item WHERE ticket_id = ? ORDER BY rowid ASC",
         arrayOf(ticketId),
     ).use { cursor ->
         buildList {
@@ -1073,6 +1097,8 @@ class NativePosDatabase(
                 defectNotes = cursor.getStringOrNull(19),
                 specialRequest = cursor.getStringOrNull(20),
                 remark = cursor.getStringOrNull(21),
+                catalogItemId = cursor.getStringOrNull(22),
+                itemTypeName = cursor.getStringOrNull(23),
             ))
         }
     }
@@ -1244,6 +1270,8 @@ class NativePosDatabase(
               label_code TEXT,
               defect_notes TEXT,
               special_request TEXT,
+              catalog_item_id TEXT,
+              item_type_name TEXT,
               remark TEXT
             )
             """.trimIndent(),
@@ -1593,6 +1621,8 @@ class NativePosDatabase(
             put("ticket_id", item.ticketId)
             if (item.serviceId == null) putNull("service_id") else put("service_id", item.serviceId)
             put("item_name", item.itemName)
+            put("catalog_item_id", item.catalogItemId)
+            put("item_type_name", item.itemTypeName)
             if (item.itemType == null) putNull("item_type") else put("item_type", item.itemType)
             if (item.itemCategory == null) putNull("item_category") else put("item_category", item.itemCategory)
             if (item.itemColor == null) putNull("item_color") else put("item_color", item.itemColor)

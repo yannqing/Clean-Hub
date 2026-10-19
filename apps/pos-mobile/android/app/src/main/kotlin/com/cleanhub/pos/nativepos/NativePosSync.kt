@@ -331,6 +331,7 @@ class NativePosSyncEngine(context: Context) {
             customers = customers?.optJSONArray("data")?.toNativeCustomers(),
             tickets = tickets?.optJSONArray("data")?.toNativeTickets(terminal.currency),
             expectedStockRevision = stockRevision,
+            itemCatalogJson = catalog.optJSONObject("itemCatalog"),
         )
         cacheCheckoutSettings(branch, printSettings)
         hardwareDevices?.let { devices ->
@@ -556,6 +557,8 @@ class NativePosSyncEngine(context: Context) {
                 serviceId = item.optString("serviceId").takeIf { it.isNotBlank() && it != "null" },
                 itemName = item.optString("itemName").ifBlank { nativePosCopy(null).serviceItemFallback },
                 itemType = item.optString("itemType").takeIf { it.isNotBlank() && it != "null" },
+                catalogItemId = item.nativeText("catalogItemId"),
+                itemTypeName = item.nativeText("itemTypeName"),
                 itemCategory = item.optString("itemCategory").takeIf { it.isNotBlank() && it != "null" },
                 itemColor = item.optString("itemColor").takeIf { it.isNotBlank() && it != "null" },
                 itemBrand = item.optString("itemBrand").takeIf { it.isNotBlank() && it != "null" },

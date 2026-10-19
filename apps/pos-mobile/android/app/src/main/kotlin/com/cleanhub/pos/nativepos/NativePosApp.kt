@@ -1952,6 +1952,7 @@ fun NativePosApp(applicationContext: Context) {
                         } else {
                             put("quantity", update.quantity)
                         }
+                        update.catalogItemId?.let { put("catalogItemId", it) }
                         put("itemCategory", update.itemCategory?.trim()?.takeIf(String::isNotBlank))
                         put("itemColor", update.itemColor?.trim()?.takeIf(String::isNotBlank))
                         put("itemBrand", update.itemBrand?.trim()?.takeIf(String::isNotBlank))
@@ -2995,6 +2996,8 @@ internal fun NativePosShell(
                             },
                         )
                         NativePosTab.Tickets -> NativeTicketsView(copy,
+                            tenantId = terminal.tenantId,
+                            itemCatalog = current.itemCatalog,
                             customers = current.customers,
                             timeZone = terminal.timeZone,
                             language = languageCode,
@@ -3573,9 +3576,13 @@ private fun NativeTicketsView(
     onRetryIntake: (NativeServiceTicket) -> Unit,
     onViewOrder: (String) -> Unit,
     onDiscardIntake: (NativeServiceTicket,String) -> Unit,
+    tenantId: String,
+    itemCatalog: NativeItemCatalog?,
 ) {
     if (selectedDetail != null) {
         NativeTicketDetailView(copy,
+            tenantId = tenantId,
+            itemCatalog = itemCatalog,
             detail = selectedDetail,
             services = services,
             internetAvailable = internetAvailable,

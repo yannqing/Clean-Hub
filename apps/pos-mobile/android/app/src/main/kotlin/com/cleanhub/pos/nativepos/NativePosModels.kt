@@ -121,6 +121,8 @@ data class NativeTicketItem(
     val defectNotes: String?,
     val specialRequest: String?,
     val remark: String?,
+    val catalogItemId: String? = null,
+    val itemTypeName: String? = null,
 )
 
 /** Mirrors the regular POS Web item-create request; the server remains the pricing authority. */
@@ -139,6 +141,8 @@ data class NativeTicketItemDraft(
     val remark: String?,
     val chargedUnitAmountMinor: Long? = null,
     val overrideReason: String? = null,
+    val catalogItemId: String? = null,
+    val itemTypeName: String? = null,
 )
 
 /** Editable item fields available to every operator; sensitive price changes stay server-authorized. */
@@ -157,6 +161,8 @@ data class NativeTicketItemUpdate(
     val remark: String?,
     val chargedUnitAmountMinor: Long? = null,
     val overrideReason: String? = null,
+    val catalogItemId: String? = null,
+    val itemTypeName: String? = null,
 )
 
 data class NativeTicketDetail(
@@ -286,6 +292,7 @@ data class NativePosSnapshot(
     val catalogIsFresh: Boolean,
     val pendingIntakes: Int = 0,
     val failedIntakes: Int = 0,
+    val itemCatalog: NativeItemCatalog? = null,
 )
 
 data class NativeCheckoutResult(
