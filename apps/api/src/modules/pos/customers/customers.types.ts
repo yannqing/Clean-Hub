@@ -159,6 +159,8 @@ export type PosCustomerServiceItemSummary = {
   itemType: ServiceTicketItemType | null;
   itemName: string;
   itemCategory: string | null;
+  itemTypeName?: string | null;
+  catalogItemId?: string | null;
   itemStatus: ServiceTicketItemStatus;
   itemColor: string | null;
   itemBrand: string | null;

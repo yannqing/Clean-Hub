@@ -1,4 +1,5 @@
 import type { TenantCheckoutReadiness } from "../../tenant/checkout-readiness.types";
+import type { TenantItemCatalogSelection } from "../../service-item-catalog";
 export type TenantStatus = "active" | "suspended" | "disabled";
 export type TenantLanguage = "en" | "fr" | "zh-CN";
 
@@ -106,6 +107,7 @@ export type CreateTenantRequest = {
   contactEmail?: string;
   status?: TenantStatus;
   featureFlags?: UpdateTenantFeatureFlagsRequest;
+  itemCatalogSelection?: TenantItemCatalogSelection;
   initialOwner?: {
     displayName: string;
     email: string;

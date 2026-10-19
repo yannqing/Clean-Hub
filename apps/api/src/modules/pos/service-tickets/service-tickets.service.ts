@@ -1,3 +1,4 @@
+import { resolveTicketArticle } from "./service-ticket-catalog.js";
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { customers, getDb, type Database } from "@cleanhub/db";
@@ -765,7 +766,7 @@ export async function createPosServiceTicketItem(
   input: ServiceTicketItemListInput & {
     data: CreateServiceTicketItemRequest;
   },
-  requestMeta: AuthRequestMeta = {},
+  requestMeta: AuthRequestMeta & { locale?: string } = {},
   db: Database = getDb(),
 ): Promise<ServiceTicketItem> {
   const tenantId = requirePosTenantId(authContext);
@@ -830,8 +831,10 @@ export async function createPosServiceTicketItem(
       ...operationalData
     } = data;
 
+    const article = await resolveTicketArticle(tx, tenantId, data.itemType, data.catalogItemId, requestMeta.locale ?? authContext.language ?? "en");
     const item = await createServiceTicketItemRecord(tx, {
       ...operationalData,
+      ...article,
       ...pricing,
       tenantId,
       ticketId,
@@ -873,7 +876,7 @@ export async function updatePosServiceTicketItem(
     itemId: string;
     data: UpdateServiceTicketItemRequest;
   },
-  requestMeta: AuthRequestMeta = {},
+  requestMeta: AuthRequestMeta & { locale?: string } = {},
   db: Database = getDb(),
 ): Promise<ServiceTicketItem> {
   const tenantId = requirePosTenantId(authContext);
@@ -932,8 +935,13 @@ export async function updatePosServiceTicketItem(
       ...operationalData
     } = data;
 
+    const articleChanged = (data.catalogItemId !== undefined && data.catalogItemId !== existing.catalogItemId) ||
+      (data.itemType !== undefined && data.itemType !== existing.itemType) ||
+      (data.itemCategory !== undefined && data.itemCategory !== existing.itemCategory);
+    const article = articleChanged ? await resolveTicketArticle(tx, tenantId, data.itemType ?? existing.itemType ?? "", data.catalogItemId ?? existing.catalogItemId ?? undefined, requestMeta.locale ?? authContext.language ?? "en") : { itemTypeName: existing.itemTypeName, catalogItemId: existing.catalogItemId ?? undefined, itemCategory: existing.itemCategory };
     const item = await updateServiceTicketItemRecord(tx, {
       ...operationalData,
+      ...article,
       ...pricing,
       tenantId,
       ticketId,

@@ -22,6 +22,7 @@ import { users } from "../identity/users.js";
 import { branches } from "../tenancy/branches.js";
 import { tenants } from "../tenancy/tenants.js";
 import { customers } from "../commerce/customer.js";
+import { platformServiceArticles } from "../platform/service-item-catalog.js";
 
 export const ticketStatusEnum = pgEnum("ticket_status", [
   "draft",
@@ -146,6 +147,8 @@ export const ticketItems = pgTable(
       .references(() => branches.id),
     serviceId: ulidColumn("service_id").references(() => services.id),
     itemType: ticketItemTypeEnum("item_type"),
+    itemTypeName: varchar("item_type_name", { length: 80 }),
+    catalogItemId: ulidColumn("catalog_item_id").references(() => platformServiceArticles.id, { onDelete: "restrict" }),
     itemName: varchar("item_name", { length: 200 }).notNull(),
     itemCategory: varchar("item_category", { length: 80 }),
     itemStatus: ticketItemStatusEnum("item_status").notNull().default("pending_wash"),

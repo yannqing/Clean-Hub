@@ -106,6 +106,8 @@ export type PosCustomerServiceItemSummary = {
   itemType: import("./service-tickets.types").ServiceTicketItemType | null;
   itemName: string;
   itemCategory: string | null;
+  itemTypeName?: string | null;
+  catalogItemId?: string | null;
   itemStatus: import("./service-tickets.types").ServiceTicketItemStatus;
   itemColor: string | null;
   itemBrand: string | null;

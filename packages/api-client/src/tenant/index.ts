@@ -1,4 +1,5 @@
 import type { ApiClient } from "../types";
+import type { TenantItemCatalogResponse } from "../service-item-catalog";
 // Resources grouped by domain. The insights/ folder holds operation-data
 // resources (overview, reports, audit-logs) that share no cross-type deps but
 // belong to the same "tenant observability" concern.
@@ -75,6 +76,7 @@ export function createTenantApi(client: ApiClient) {
   const taxRates = createTenantTaxRatesApi(client);
 
   return {
+    itemCatalog: { get: () => client.get<TenantItemCatalogResponse>("/tenant/item-catalog") },
     auditLogs,
     backups,
     branches,

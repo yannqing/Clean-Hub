@@ -94,6 +94,7 @@ export async function createServiceTicketItemRecord(
     tenantId: string;
     ticketId: string;
     actorUserId: string;
+    itemTypeName?: string | null;
     itemName: string;
     pricingUnit: "per_item" | "per_kg";
     standardUnitAmount: string;
@@ -129,6 +130,8 @@ export async function createServiceTicketItemRecord(
       branchId: ticket.branchId,
       serviceId: input.serviceId,
       itemType: input.itemType ?? null,
+      itemTypeName: input.itemTypeName ?? null,
+      catalogItemId: input.catalogItemId ?? null,
       itemName: input.itemName.trim(),
       itemCategory: normalizeNullable(input.itemCategory ?? null),
       itemStatus: "pending_wash",
@@ -203,6 +206,7 @@ export async function updateServiceTicketItemRecord(
     ticketId: string;
     itemId: string;
     actorUserId: string;
+    itemTypeName?: string | null;
     serviceId: string;
     itemName: string;
     pricingUnit: "per_item" | "per_kg";
@@ -230,6 +234,8 @@ export async function updateServiceTicketItemRecord(
     .set({
       itemName: input.itemName.trim(),
       itemType: input.itemType ?? existing.itemType,
+      itemTypeName: input.itemTypeName === undefined ? existing.itemTypeName : input.itemTypeName,
+      catalogItemId: input.catalogItemId === undefined ? existing.catalogItemId : input.catalogItemId,
       itemCategory:
         input.itemCategory === undefined
           ? existing.itemCategory

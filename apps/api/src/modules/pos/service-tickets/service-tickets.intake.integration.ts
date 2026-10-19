@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import "../../../config/env.js";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   auditLogs,
   branches,
@@ -14,6 +14,9 @@ import {
   serviceTickets,
   services,
   tenantFeatureFlags,
+  tenantSettings,
+  platformServiceItemGroups,
+  platformServiceArticles,
   tenants,
   ticketItems,
   users,
@@ -23,12 +26,24 @@ import type { AuthContext } from "../../auth/auth.types.js";
 import {
   createPosServiceTicket,
   createPosServiceTicketItem,
+  updatePosServiceTicketItem,
 } from "./service-tickets.service.js";
 import {
   createServiceTicketBodySchema,
   createServiceTicketItemBodySchema,
 } from "./service-tickets.validation.js";
 import { createPosServiceTicketsRoutes } from "./service-tickets.routes.js";
+
+import {
+  findPlatformItemCatalog,
+  findTenantItemCatalog,
+} from "../../service-item-catalog/service-item-catalog.repository.js";
+import {
+  savePlatformItemGroup,
+  saveTenantItemSelection,
+} from "../../service-item-catalog/service-item-catalog.service.js";
+import { resolveTicketArticle } from "./service-ticket-catalog.js";
+import { selectedServiceItemGroups } from "@cleanhub/domain/service-item-catalog";
 
 const rollback = new Error("INTAKE_TEST_ROLLBACK");
 async function run() {
@@ -199,6 +214,240 @@ async function run() {
             2,
             "each new entity has one audit event, retries have none",
           );
+          // SaaS catalog → tenant opt-in → authoritative POS validation and immutable names.
+          await tx.insert(tenantSettings).values({ id: createId(), tenantId });
+          const catalogBefore = await findPlatformItemCatalog(tx);
+          assert.equal(catalogBefore.length, 4);
+          const clothing = catalogBefore.find(
+            (group) => group.itemType === "cloth",
+          )!;
+          const articleId = clothing.items[0]!.id;
+          const saasAuth: AuthContext = {
+            ...auth,
+            tenantId: null,
+            role: "super_admin",
+            roles: ["super_admin"],
+          };
+          const selection = {
+            itemTypes: ["cloth" as const],
+            itemIds: [articleId],
+          };
+          await assert.rejects(
+            saveTenantItemSelection(tx, auth, tenantId, selection, 1),
+          );
+          const configured = await saveTenantItemSelection(
+            tx,
+            saasAuth,
+            tenantId,
+            selection,
+            1,
+          );
+          assert.equal(configured.version, 2);
+          assert.equal(selectedServiceItemGroups(configured).length, 1);
+          assert.equal(
+            selectedServiceItemGroups(configured)[0]?.items.length,
+            1,
+          );
+          await assert.rejects(
+            saveTenantItemSelection(tx, saasAuth, tenantId, selection, 1),
+            /catalog has changed/,
+          );
+          await assert.rejects(
+            saveTenantItemSelection(
+              tx,
+              saasAuth,
+              tenantId,
+              { itemTypes: ["cloth"], itemIds: [createId()] },
+              2,
+            ),
+            /no longer available/,
+          );
+          await assert.rejects(
+            resolveTicketArticle(tx, tenantId, "shoe", undefined, "en"),
+            /not enabled/,
+          );
+          await assert.rejects(
+            resolveTicketArticle(tx, tenantId, "cloth", undefined, "en"),
+            /Choose an enabled article/,
+          );
+          await assert.rejects(
+            savePlatformItemGroup(tx, auth, clothing.id, clothing),
+          );
+          const renamed = await savePlatformItemGroup(
+            tx,
+            saasAuth,
+            clothing.id,
+            { ...clothing, names: { ...clothing.names, en: "Fabric care" } },
+          );
+          await assert.rejects(
+            savePlatformItemGroup(tx, saasAuth, clothing.id, clothing),
+            /catalog has changed/,
+          );
+          const catalogBody = {
+            ...itemBody,
+            id: createId(),
+            catalogItemId: articleId,
+            itemCategory: "Forged name",
+          };
+          const catalogItem = await createPosServiceTicketItem(
+            auth,
+            { ticketId, data: catalogBody },
+            { locale: "en" },
+            tx,
+          );
+          assert.equal(catalogItem.catalogItemId, articleId);
+          assert.equal(catalogItem.itemCategory, clothing.items[0]!.names.en);
+          assert.equal(catalogItem.itemTypeName, "Fabric care");
+          const disabled = await savePlatformItemGroup(
+            tx,
+            saasAuth,
+            clothing.id,
+            {
+              ...renamed,
+              names: { ...renamed.names, en: "New name" },
+              items: renamed.items.map((item) => ({
+                ...item,
+                enabled: item.id === articleId ? false : item.enabled,
+              })),
+            },
+          );
+          await assert.rejects(
+            createPosServiceTicketItem(
+              auth,
+              { ticketId, data: { ...catalogBody, id: createId() } },
+              {},
+              tx,
+            ),
+            /Choose an enabled article/,
+          );
+          assert.equal(
+            (
+              await createPosServiceTicketItem(
+                auth,
+                { ticketId, data: catalogBody },
+                {},
+                tx,
+              )
+            ).id,
+            catalogItem.id,
+            "idempotent retries survive a catalog change",
+          );
+          const edited = await updatePosServiceTicketItem(
+            auth,
+            {
+              ticketId,
+              itemId: catalogItem.id,
+              data: { itemColor: "Green", catalogItemId: articleId },
+            },
+            {},
+            tx,
+          );
+          assert.equal(
+            edited.itemTypeName,
+            "Fabric care",
+            "editing attributes does not rewrite historical names",
+          );
+          assert.equal(edited.itemCategory, clothing.items[0]!.names.en);
+          assert.equal(
+            selectedServiceItemGroups(
+              await findTenantItemCatalog(tx, tenantId),
+            )[0]?.items.length,
+            0,
+          );
+          await savePlatformItemGroup(tx, saasAuth, clothing.id, {
+            ...clothing,
+            version: disabled.version,
+          });
+          const otherCatalogTenant = createId();
+          await tx
+            .insert(tenants)
+            .values({
+              id: otherCatalogTenant,
+              name: "Catalog isolation",
+              pressingCode: `CAT-${otherCatalogTenant}`,
+            });
+          await tx
+            .insert(tenantSettings)
+            .values({ id: createId(), tenantId: otherCatalogTenant });
+          assert.equal(
+            (await findTenantItemCatalog(tx, otherCatalogTenant)).selection,
+            null,
+            "tenant selection never leaks to another tenant",
+          );
+          const policyRole = `catalog_test_${process.pid}`;
+          await tx.execute(
+            sql.raw(
+              `CREATE ROLE ${policyRole} NOLOGIN NOSUPERUSER NOBYPASSRLS`,
+            ),
+          );
+          await tx.execute(
+            sql.raw(`GRANT USAGE ON SCHEMA public TO ${policyRole}`),
+          );
+          await tx.execute(
+            sql.raw(
+              `GRANT SELECT,INSERT,UPDATE,DELETE ON platform_service_item_groups, platform_service_articles, tenant_settings TO ${policyRole}`,
+            ),
+          );
+          await tx.execute(sql.raw(`SET LOCAL ROLE ${policyRole}`));
+          await tx.execute(
+            sql`select set_config('app.current_tenant_id', ${tenantId}, true), set_config('app.rls_bypass', 'off', true)`,
+          );
+          assert.equal(
+            (await tx.select().from(platformServiceItemGroups)).length,
+            4,
+          );
+          assert.equal(
+            (
+              await tx
+                .update(platformServiceArticles)
+                .set({ enabled: false })
+                .where(eq(platformServiceArticles.id, articleId))
+                .returning()
+            ).length,
+            0,
+            "tenant DB role cannot mutate the platform catalog",
+          );
+          assert.equal(
+            (
+              await tx
+                .select()
+                .from(tenantSettings)
+                .where(eq(tenantSettings.tenantId, otherCatalogTenant))
+            ).length,
+            0,
+          );
+          await tx.execute(sql.raw("RESET ROLE"));
+          await tx.execute(
+            sql`select set_config('app.rls_bypass', 'on', true)`,
+          );
+          await tx.execute(
+            sql.raw(
+              `REVOKE ALL ON platform_service_item_groups, platform_service_articles, tenant_settings FROM ${policyRole}`,
+            ),
+          );
+          await tx.execute(
+            sql.raw(`REVOKE USAGE ON SCHEMA public FROM ${policyRole}`),
+          );
+          await tx.execute(sql.raw(`DROP ROLE ${policyRole}`));
+          await tx
+            .update(tenants)
+            .set({ deletedAt: new Date() })
+            .where(eq(tenants.id, otherCatalogTenant));
+          assert.equal(
+            (await findTenantItemCatalog(tx, otherCatalogTenant)).version,
+            0,
+            "deleted tenants cannot expose catalog settings",
+          );
+          await assert.rejects(
+            saveTenantItemSelection(
+              tx,
+              saasAuth,
+              otherCatalogTenant,
+              selection,
+              1,
+            ),
+            /settings were not found/,
+          );
           // Retry must return the existing result even after later staff edits / feature changes.
           await tx
             .update(serviceTickets)
@@ -345,7 +594,7 @@ async function run() {
     assert.equal(capability.status, 200);
     assert.deepEqual(await capability.json(), { stableClientIds: true });
     console.log(
-      "POS intake idempotency integration passed (ticket/item retries, handover, branch/tenant isolation, deletion, capability). No fixture data retained.",
+      "POS intake idempotency integration passed (ticket/item retries, handover, branch/tenant isolation, deletion, capability, SaaS catalog, tenant selection, historical names, catalog permissions and RLS). No fixture data retained.",
     );
   } finally {
     await closeDbConnection();

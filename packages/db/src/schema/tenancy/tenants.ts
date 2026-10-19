@@ -1,9 +1,11 @@
+import type { TenantItemCatalogSelection } from "@cleanhub/domain/service-item-catalog";
 import { sql } from "drizzle-orm";
 import {
   check,
   boolean,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -94,6 +96,7 @@ export const tenantSettings = pgTable(
     // Null inherits the tenant name; an empty name intentionally shows only the logo.
     posDisplayName: varchar("pos_display_name", { length: 160 }),
     posLogoObjectKey: text("pos_logo_object_key"),
+    serviceItemCatalog: jsonb("service_item_catalog").$type<TenantItemCatalogSelection>(),
     pilotStatus: tenantPilotStatusEnum("pilot_status")
       .notNull()
       .default("pilot"),

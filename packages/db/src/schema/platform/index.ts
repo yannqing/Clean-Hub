@@ -5,4 +5,5 @@ export * from "./media.js";
 export * from "./notifications.js";
 export * from "./security.js";
 export * from "./settings.js";
+export * from "./service-item-catalog.js";
 export * from "./support.js";

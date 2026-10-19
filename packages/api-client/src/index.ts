@@ -14,3 +14,4 @@ export * from "./tenant-client";
 export * from "./types";
 
 export type { TenantCheckoutReadiness, PosTaxReadiness } from "./tenant/checkout-readiness.types";
+export * from "./service-item-catalog";

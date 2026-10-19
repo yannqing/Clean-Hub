@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { catalogSelectionSchema } from "../../service-item-catalog/service-item-catalog.validation.js";
 
 export const saasTenantStatusSchema = z.enum([
   "active",
@@ -89,6 +90,7 @@ export const createSaasTenantBodySchema = z.object({
     ),
   status: saasTenantStatusSchema.default("active"),
   featureFlags: tenantFeatureFlagsSchema.optional(),
+  itemCatalogSelection: catalogSelectionSchema.optional(),
   initialOwner: initialOwnerSchema.optional(),
 });
 

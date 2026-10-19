@@ -1,3 +1,5 @@
+import { findPlatformItemCatalog } from "../../service-item-catalog/service-item-catalog.repository.js";
+import { validateCatalogSelection, ServiceItemCatalogError } from "../../service-item-catalog/service-item-catalog.service.js";
 import { getDb, posChannelSettings, type Database } from "@cleanhub/db";
 import { RESET_USER_PASSWORD } from "@cleanhub/domain/initial-owner-credentials";
 import { eq } from "drizzle-orm";
@@ -230,6 +232,13 @@ export async function createSaasTenant(
           throw createPressingCodeConflictError();
         }
 
+        if (input.data.itemCatalogSelection) {
+          try { validateCatalogSelection(await findPlatformItemCatalog(tx), input.data.itemCatalogSelection); }
+          catch (error) {
+            if (error instanceof ServiceItemCatalogError) throw new SaasTenantsError("SAAS_TENANT_CATALOG_INVALID", error.message, 422);
+            throw error;
+          }
+        }
         const platformDefaults = await findPlatformSettings(tx);
         const taxTemplate = await findPlatformTaxTemplateForCountry(tx, input.data.country);
         if (!taxTemplate || !isReadyTaxTemplate(taxTemplate) || !taxTemplate.taxEnabled) {

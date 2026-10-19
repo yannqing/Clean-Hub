@@ -237,7 +237,7 @@ export async function createServiceTicketItemController(
     const item = await createPosServiceTicketItem(
       c.get("authContext"),
       { ticketId: params.ticketId, data },
-      getRequestMeta(c),
+      { ...getRequestMeta(c), locale: c.get("locale") },
     );
     return c.json(item, 201);
   } catch (error) {
@@ -259,7 +259,7 @@ export async function updateServiceTicketItemController(
     const item = await updatePosServiceTicketItem(
       c.get("authContext"),
       { ticketId: params.ticketId, itemId: params.itemId, data },
-      getRequestMeta(c),
+      { ...getRequestMeta(c), locale: c.get("locale") },
     );
     return c.json(item);
   } catch (error) {

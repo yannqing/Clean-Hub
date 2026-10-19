@@ -1,4 +1,5 @@
 import type { ApiClient } from "../types";
+import { createSaasItemCatalogApi } from "../service-item-catalog";
 // Resources are grouped into subdirectories by domain. Some factories live in a
 // sibling resource's folder because they share types (e.g. restore-requests
 // belongs under backups/ since backups.ts imports RestoreRequest).
@@ -40,6 +41,7 @@ export function createSaasApi(client: ApiClient) {
   const securitySettings = createSaasSecuritySettingsApi(client);
 
   return {
+    itemCatalog: createSaasItemCatalogApi(client),
     tenants,
     users,
     roles,

@@ -78,6 +78,8 @@ export type PosCatalogQuery = {
 };
 
 export type PosCatalogResponse = {
+  itemCatalog?: TenantItemCatalogResponse;
   data: PosCatalogService[];
   products: PosCatalogProduct[];
 };
+import type { TenantItemCatalogResponse } from "../service-item-catalog";

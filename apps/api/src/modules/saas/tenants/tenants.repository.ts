@@ -367,6 +367,7 @@ export async function createSaasTenantRecord(
     defaultLanguage: input.defaultLanguage,
     defaultCurrency: input.defaultCurrency,
     timezone: input.timezone,
+    serviceItemCatalog: input.itemCatalogSelection ?? null,
     updatedBy: input.actorUserId,
   });
 

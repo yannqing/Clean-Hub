@@ -60,6 +60,8 @@ export function toTicketItem(
     itemType: row.itemType,
     itemName: row.itemName,
     itemCategory: row.itemCategory,
+    catalogItemId: row.catalogItemId,
+    itemTypeName: row.itemTypeName,
     itemStatus: row.itemStatus,
     itemColor: row.itemColor,
     itemBrand: row.itemBrand,

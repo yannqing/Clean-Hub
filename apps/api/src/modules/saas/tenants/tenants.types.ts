@@ -1,4 +1,5 @@
 import type { TenantCheckoutReadiness } from "../../tax/tenant-checkout-readiness.repository.js";
+import type { TenantItemCatalogSelection } from "@cleanhub/domain/service-item-catalog";
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 
 export type SaasTenantStatus = "active" | "suspended" | "disabled";
@@ -41,6 +42,7 @@ export type CreateSaasTenantRequest = {
   contactEmail?: string;
   status?: SaasTenantStatus;
   featureFlags?: UpdateSaasTenantFeatureFlagsRequest;
+  itemCatalogSelection?: TenantItemCatalogSelection;
   initialOwner?: {
     displayName: string;
     email: string;

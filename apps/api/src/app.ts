@@ -38,6 +38,7 @@ import { createSaasFeedbackTicketRoutes } from "./modules/saas/feedback/feedback
 import { createSaasOperationLogRoutes } from "./modules/saas/ops/operation-logs.routes.js";
 import { createSaasOverviewRoutes } from "./modules/saas/overview/overview.routes.js";
 import { createSaasPlatformSettingsRoutes } from "./modules/saas/platform-settings/platform-settings.routes.js";
+import { createSaasItemCatalogRoutes, createTenantItemSelectionRoutes, createEffectiveItemCatalogRoutes } from "./modules/service-item-catalog/service-item-catalog.routes.js";
 import { createSaasSecurityRoutes } from "./modules/saas/security/security.routes.js";
 import { createSaasTenantsRoutes } from "./modules/saas/tenants/tenants.routes.js";
 import { createSaasRolesRoutes } from "./modules/saas/users/saas-roles.routes.js";
@@ -263,6 +264,10 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   app.route("/saas/overview", createSaasOverviewRoutes());
   app.route("/saas/audit-logs", createSaasAuditRoutes());
   app.route("/saas/platform-settings", createSaasPlatformSettingsRoutes());
+  app.route("/saas/item-catalog", createSaasItemCatalogRoutes());
+  app.route("/saas/tenants", createTenantItemSelectionRoutes());
+  app.route("/pos/item-catalog", createEffectiveItemCatalogRoutes(true));
+  app.route("/tenant/item-catalog", createEffectiveItemCatalogRoutes(false));
 
   // SaaS 平台 - 租户管理
   app.route("/saas/tenants", createSaasTenantsRoutes());

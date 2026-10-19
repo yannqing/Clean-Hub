@@ -39,6 +39,8 @@ export type ServiceTicketItem = {
   itemType: ServiceTicketItemType | null;
   itemName: string;
   itemCategory: string | null;
+  catalogItemId?: string | null;
+  itemTypeName?: string | null;
   itemStatus: ServiceTicketItemStatus;
   itemColor: string | null;
   itemBrand: string | null;
@@ -173,6 +175,7 @@ export type CreateServiceTicketItemRequest = {
   operatorUserId?: string;
   serviceId: string;
   itemType: ServiceTicketItemType;
+  catalogItemId?: string;
   itemCategory?: string;
   itemColor?: string;
   itemBrand?: string;
@@ -191,6 +194,7 @@ export type CreateServiceTicketItemRequest = {
 export type UpdateServiceTicketItemRequest = {
   serviceId?: string;
   itemType?: ServiceTicketItemType;
+  catalogItemId?: string;
   itemCategory?: string | null;
   itemColor?: string | null;
   itemBrand?: string | null;

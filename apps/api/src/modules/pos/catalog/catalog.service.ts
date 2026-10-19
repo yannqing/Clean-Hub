@@ -1,4 +1,6 @@
 import { getDb, type Database } from "@cleanhub/db";
+import { selectedServiceItemGroups } from "@cleanhub/domain/service-item-catalog";
+import { findTenantItemCatalog } from "../../service-item-catalog/service-item-catalog.repository.js";
 import { MediaService } from "../../media/media.service.js";
 
 import {
@@ -101,7 +103,11 @@ export async function listPosCatalogServices(
     tenantId,
     ...input.query,
   });
-  return hydrateServiceCatalog(tenantId, records, mediaService);
+  const itemCatalog = await findTenantItemCatalog(db, tenantId);
+  const enabledTypes = new Set(selectedServiceItemGroups(itemCatalog).map((group) => group.itemType));
+  return hydrateServiceCatalog(tenantId, records.map((record) => ({ ...record,
+    applicableItemTypes: record.applicableItemTypes.filter((type) => enabledTypes.has(type)),
+  })).filter((record) => record.applicableItemTypes.length > 0), mediaService);
 }
 
 export async function listPosCatalogProducts(

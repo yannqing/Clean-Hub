@@ -21,7 +21,8 @@
     "./pos-terminal-status": "./src/pos-terminal-status.ts",
     "./receipt": "./src/receipt.ts",
     "./tax": "./src/tax.ts",
-    "./timezone": "./src/timezone.ts"
+    "./timezone": "./src/timezone.ts",
+    "./service-item-catalog": "./src/service-item-catalog.ts"
   },
   "devDependencies": {
     "tsx": "^4.21.0"

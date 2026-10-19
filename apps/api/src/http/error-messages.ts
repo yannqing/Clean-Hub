@@ -21,6 +21,16 @@ import type { SupportedLocale } from "@cleanhub/i18n/locales";
 const POS_ERROR_MESSAGES: Readonly<
   Record<string, Readonly<Record<SupportedLocale, string>>>
 > = {
+  "This item type is not enabled for this tenant. Ask an administrator to update the item catalog.": {
+    en: "This item type is not enabled for this tenant. Ask an administrator to update the item catalog.",
+    fr: "Ce type d’article n’est pas activé pour ce locataire. Demandez à un administrateur de mettre à jour le catalogue.",
+    "zh-CN": "此租户未开通该物品类型，请管理员调整可用物品目录后同步终端。",
+  },
+  "Choose an enabled article from the tenant item catalog. Update the POS app if the item selector is missing.": {
+    en: "Choose an enabled article from the tenant item catalog. Update the POS app if the item selector is missing.",
+    fr: "Choisissez un article actif du catalogue du locataire. Mettez le POS à jour si le sélecteur d’articles est absent.",
+    "zh-CN": "请选择租户已开通的具体物品；如果没有物品选择器，请更新 POS 应用。",
+  },
   "The intake creation identifier is already in use.": {
     en: "The intake creation identifier is already in use.",
     fr: "Cet identifiant de création du bon de service est déjà utilisé.",

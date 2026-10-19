@@ -148,6 +148,7 @@ export const createServiceTicketItemBodySchema = z.object({
   operatorUserId: optionalUlid.optional(),
   serviceId: z.string().regex(ULID_PATTERN),
   itemType: serviceTicketItemTypeSchema,
+  catalogItemId: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/).optional(),
   itemCategory: z.string().trim().max(80).optional(),
   itemColor: z.string().trim().max(40).optional(),
   itemBrand: z.string().trim().max(80).optional(),
@@ -167,6 +168,7 @@ export const updateServiceTicketItemBodySchema = z
   .object({
     serviceId: z.string().regex(ULID_PATTERN).optional(),
     itemType: serviceTicketItemTypeSchema.optional(),
+    catalogItemId: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/).optional(),
     itemCategory: z.string().trim().max(80).nullable().optional(),
     itemColor: z.string().trim().max(40).nullable().optional(),
     itemBrand: z.string().trim().max(80).nullable().optional(),
