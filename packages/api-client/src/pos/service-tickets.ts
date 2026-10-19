@@ -6,6 +6,7 @@ import type {
   CreateServiceTicketRequest,
   RelatedOrderListResponse,
   ServiceTicketDetail,
+  ServiceTicketIntakeCapabilities,
   ServiceTicketItem,
   ServiceTicketListQuery,
   ServiceTicketListResponse,
@@ -33,6 +34,12 @@ type RequestOptions = Omit<ApiRequestOptions, "method" | "body">;
  */
 export function createPosServiceTicketsApi(client: ApiClient) {
   return {
+    getIntakeCapabilities: (options?: RequestOptions) =>
+      client.get<ServiceTicketIntakeCapabilities>(
+        `${BASE}/intake-capabilities`,
+        options,
+      ),
+
     list: (query?: ServiceTicketListQuery, options?: RequestOptions) =>
       client.get<ServiceTicketListResponse>(BASE, { ...options, query }),
 

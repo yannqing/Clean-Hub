@@ -168,6 +168,9 @@ jobs:
           pnpm --filter @cleanhub/mobile smoke:release-validation
           pnpm --filter @cleanhub/pos-mobile smoke:native-release-validation
 
+      - name: Verify durable POS intake retries
+        run: pnpm --filter @cleanhub/api test:integration:pos-intake
+
       - name: Run realtime smoke tests
         run: |
           pnpm --filter @cleanhub/api-client smoke:realtime-url

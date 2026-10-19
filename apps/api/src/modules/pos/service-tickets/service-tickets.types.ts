@@ -137,6 +137,10 @@ export type ServiceTicketListResponse = {
 };
 
 export type CreateServiceTicketRequest = {
+  /** Stable client ID for durable POS intake retries. */
+  id?: string;
+  /** Reject replay after a staff handover rather than misattribute the work. */
+  operatorUserId?: string;
   customerId: string;
   branchId: string;
   ticketType: ServiceTicketType;
@@ -163,6 +167,10 @@ export type ChangeServiceTicketStatusRequest = {
 };
 
 export type CreateServiceTicketItemRequest = {
+  /** Stable client ID for durable POS intake retries. */
+  id?: string;
+  /** Reject replay after a staff handover rather than misattribute the work. */
+  operatorUserId?: string;
   serviceId: string;
   itemType: ServiceTicketItemType;
   itemCategory?: string;

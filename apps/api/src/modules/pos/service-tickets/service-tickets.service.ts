@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { customers, getDb, type Database } from "@cleanhub/db";
 
@@ -385,8 +385,6 @@ export async function createPosServiceTicket(
   const tenantId = requirePosTenantId(authContext);
 
   requirePosBranchAccess(authContext, data.branchId);
-  await requireTicketFeature(authContext, data.ticketType, db);
-  await requireCustomerActive(db, { tenantId, customerId: data.customerId });
   const branch = await findBranchById(db, {
     tenantId,
     branchId: data.branchId,
@@ -400,7 +398,39 @@ export async function createPosServiceTicket(
     );
   }
 
+  if (data.operatorUserId && data.operatorUserId !== authContext.userId) {
+    throw new ServiceTicketError(
+      "BRANCH_NOT_ALLOWED",
+      "Sign in as the original operator to synchronize this intake.",
+      403,
+    );
+  }
   return db.transaction(async (tx) => {
+    if (data.id) {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`pos-intake:ticket:${data.id}`}, 0))`,
+      );
+      const existing = await findServiceTicketDetail(tx, {
+        tenantId,
+        ticketId: data.id,
+      });
+      if (existing) {
+        requirePosBranchAccess(authContext, existing.branchId);
+        if (
+          existing.branchId !== data.branchId ||
+          existing.customerId !== data.customerId
+        ) {
+          throw new ServiceTicketError(
+            "VALIDATION_ERROR",
+            "The intake creation identifier is already in use.",
+            409,
+          );
+        }
+        return existing;
+      }
+    }
+    await requireTicketFeature(authContext, data.ticketType, tx);
+    await requireCustomerActive(tx, { tenantId, customerId: data.customerId });
     const summary = await createServiceTicketRecord(tx, {
       ...data,
       currency: branch.defaultCurrency,
@@ -741,7 +771,18 @@ export async function createPosServiceTicketItem(
   const tenantId = requirePosTenantId(authContext);
   const { ticketId, data } = input;
 
+  if (data.operatorUserId && data.operatorUserId !== authContext.userId) {
+    throw new ServiceTicketError(
+      "BRANCH_NOT_ALLOWED",
+      "Sign in as the original operator to synchronize this intake.",
+      403,
+    );
+  }
   return db.transaction(async (tx) => {
+    if (data.id)
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`pos-intake:item:${data.id}`}, 0))`,
+      );
     const before = await findServiceTicketAuditSnapshot(tx, {
       tenantId,
       ticketId,
@@ -755,6 +796,14 @@ export async function createPosServiceTicketItem(
     }
 
     requirePosBranchAccess(authContext, before.branchId);
+    if (data.id) {
+      const existing = await findTicketItemById(tx, {
+        tenantId,
+        ticketId,
+        itemId: data.id,
+      });
+      if (existing) return existing;
+    }
     await requireTicketFeature(authContext, before.ticketType, tx);
 
     if (!canEditTicket(before.ticketStatus)) {

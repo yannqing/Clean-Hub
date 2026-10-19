@@ -101,6 +101,8 @@ export const serviceTicketItemParamsSchema = z.object({
 });
 
 export const createServiceTicketBodySchema = z.object({
+  id: optionalUlid.optional(),
+  operatorUserId: optionalUlid.optional(),
   customerId: z.string().regex(ULID_PATTERN),
   branchId: z.string().regex(ULID_PATTERN),
   ticketType: serviceTicketTypeSchema,
@@ -142,6 +144,8 @@ export const changeServiceTicketStatusBodySchema = z
   });
 
 export const createServiceTicketItemBodySchema = z.object({
+  id: optionalUlid.optional(),
+  operatorUserId: optionalUlid.optional(),
   serviceId: z.string().regex(ULID_PATTERN),
   itemType: serviceTicketItemTypeSchema,
   itemCategory: z.string().trim().max(80).optional(),

@@ -21,6 +21,17 @@ import type { SupportedLocale } from "@cleanhub/i18n/locales";
 const POS_ERROR_MESSAGES: Readonly<
   Record<string, Readonly<Record<SupportedLocale, string>>>
 > = {
+  "The intake creation identifier is already in use.": {
+    en: "The intake creation identifier is already in use.",
+    fr: "Cet identifiant de création du bon de service est déjà utilisé.",
+    "zh-CN":
+      "此工单或项目的创建标识已被使用，请同步并检查现有记录，勿重复创建。",
+  },
+  "Sign in as the original operator to synchronize this intake.": {
+    en: "Sign in as the original operator to synchronize this intake.",
+    fr: "Connectez-vous avec le compte de l’opérateur initial pour synchroniser ce bon.",
+    "zh-CN": "请由原创建员工登录后同步此工单，避免记录到其他员工名下。",
+  },
   "Platform maintenance is in progress. Please retry later.": {
     en: "Platform maintenance is in progress. Please retry later.",
     fr: "Une maintenance de la plateforme est en cours. Veuillez réessayer plus tard.",

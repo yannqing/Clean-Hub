@@ -113,42 +113,52 @@ export async function createServiceTicketItemRecord(
   }
 
   const lineAmount = computeLineAmount(input);
-  const itemId = createId();
+  const itemId = input.id ?? createId();
   const labelCode = await generateLabelCode(db, {
     tenantId: input.tenantId,
     ticketId: input.ticketId,
     ticketNo: ticket.ticketNo,
   });
 
-  await db.insert(ticketItems).values({
-    id: itemId,
-    ticketId: input.ticketId,
-    tenantId: input.tenantId,
-    branchId: ticket.branchId,
-    serviceId: input.serviceId,
-    itemType: input.itemType ?? null,
-    itemName: input.itemName.trim(),
-    itemCategory: normalizeNullable(input.itemCategory ?? null),
-    itemStatus: "pending_wash",
-    itemColor: normalizeNullable(input.itemColor ?? null),
-    itemBrand: normalizeNullable(input.itemBrand ?? null),
-    itemMaterial: normalizeNullable(input.itemMaterial ?? null),
-    quantity: input.quantity,
-    pricingUnit: input.pricingUnit,
-    standardUnitAmount: input.standardUnitAmount,
-    chargedUnitAmount: input.chargedUnitAmount,
-    weight: input.weight,
-    bagCount: input.bagCount,
-    unitAmount: input.chargedUnitAmount,
-    lineAmount,
-    defectNotes: normalizeNullable(input.defectNotes ?? null),
-    specialRequest: normalizeNullable(input.specialRequest ?? null),
-    remark: normalizeNullable(input.remark ?? null),
-    labelCode,
-    sortOrder: input.sortOrder ?? 0,
-    createdBy: input.actorUserId,
-    updatedBy: input.actorUserId,
-  });
+  const inserted = await db
+    .insert(ticketItems)
+    .values({
+      id: itemId,
+      ticketId: input.ticketId,
+      tenantId: input.tenantId,
+      branchId: ticket.branchId,
+      serviceId: input.serviceId,
+      itemType: input.itemType ?? null,
+      itemName: input.itemName.trim(),
+      itemCategory: normalizeNullable(input.itemCategory ?? null),
+      itemStatus: "pending_wash",
+      itemColor: normalizeNullable(input.itemColor ?? null),
+      itemBrand: normalizeNullable(input.itemBrand ?? null),
+      itemMaterial: normalizeNullable(input.itemMaterial ?? null),
+      quantity: input.quantity,
+      pricingUnit: input.pricingUnit,
+      standardUnitAmount: input.standardUnitAmount,
+      chargedUnitAmount: input.chargedUnitAmount,
+      weight: input.weight,
+      bagCount: input.bagCount,
+      unitAmount: input.chargedUnitAmount,
+      lineAmount,
+      defectNotes: normalizeNullable(input.defectNotes ?? null),
+      specialRequest: normalizeNullable(input.specialRequest ?? null),
+      remark: normalizeNullable(input.remark ?? null),
+      labelCode,
+      sortOrder: input.sortOrder ?? 0,
+      createdBy: input.actorUserId,
+      updatedBy: input.actorUserId,
+    })
+    .onConflictDoNothing()
+    .returning({ id: ticketItems.id });
+  if (!inserted.length)
+    throw new ServiceTicketError(
+      "VALIDATION_ERROR",
+      "The intake creation identifier is already in use.",
+      409,
+    );
 
   const item = await findTicketItemById(db, {
     tenantId: input.tenantId,

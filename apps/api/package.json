@@ -67,6 +67,7 @@
     "typecheck": "pnpm audit:tenant-scopes && tsc --noEmit",
     "test:integration:product-sku-import": "tsx src/modules/tenant/products/products.sku-import.integration.ts",
     "test:integration:optional-checkout": "tsx src/modules/pos/staff/staff.optional-checkout.integration.ts",
+    "test:integration:pos-intake": "tsx src/modules/pos/service-tickets/service-tickets.intake.integration.ts",
     "test:integration:tenant-branding": "tsx src/modules/tenant/settings/settings.branding.integration.ts"
   },
   "dependencies": {

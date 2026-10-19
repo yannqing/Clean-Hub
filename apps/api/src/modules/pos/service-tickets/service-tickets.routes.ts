@@ -38,6 +38,8 @@ export function createPosServiceTicketsRoutes({
   routes.get("/", listServiceTicketsController);
   routes.post("/", createServiceTicketController);
   routes.get("/overview", getServiceTicketOverviewController);
+  // Native outboxes must not send stable IDs to an older API that silently strips them.
+  routes.get("/intake-capabilities", (c) => c.json({ stableClientIds: true }));
 
   routes.get("/:ticketId", getServiceTicketController);
   routes.patch("/:ticketId", updateServiceTicketController);

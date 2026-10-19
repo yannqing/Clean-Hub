@@ -28,6 +28,7 @@ import {
 } from "@cleanhub/db";
 import { getDateOnlyInTimeZone } from "@cleanhub/domain/timezone";
 import { createId } from "@cleanhub/id";
+import { ServiceTicketError } from "./service-tickets.errors.js";
 
 import type {
   CreateServiceTicketRequest,
@@ -512,7 +513,7 @@ export async function createServiceTicketRecord(
     timeZone: string;
   },
 ): Promise<ServiceTicketSummary> {
-  const ticketId = createId();
+  const ticketId = input.id ?? createId();
   const now = new Date();
   const ticketNo = await generateTicketNo(db, {
     tenantId: input.tenantId,
@@ -521,25 +522,35 @@ export async function createServiceTicketRecord(
     timeZone: input.timeZone,
   });
 
-  await db.insert(serviceTickets).values({
-    id: ticketId,
-    tenantId: input.tenantId,
-    branchId: input.branchId,
-    currency: input.currency,
-    customerId: input.customerId,
-    assistantId: normalizeNullable(input.assistantId),
-    ticketNo,
-    ticketType: input.ticketType,
-    ticketStatus: "draft",
-    priority: input.priority ?? "normal",
-    sourceChannel: input.sourceChannel ?? "pos",
-    expectedPickupAt: input.expectedPickupAt
-      ? new Date(input.expectedPickupAt)
-      : null,
-    remark: input.remark ?? null,
-    createdBy: input.actorUserId,
-    updatedBy: input.actorUserId,
-  });
+  const inserted = await db
+    .insert(serviceTickets)
+    .values({
+      id: ticketId,
+      tenantId: input.tenantId,
+      branchId: input.branchId,
+      currency: input.currency,
+      customerId: input.customerId,
+      assistantId: normalizeNullable(input.assistantId),
+      ticketNo,
+      ticketType: input.ticketType,
+      ticketStatus: "draft",
+      priority: input.priority ?? "normal",
+      sourceChannel: input.sourceChannel ?? "pos",
+      expectedPickupAt: input.expectedPickupAt
+        ? new Date(input.expectedPickupAt)
+        : null,
+      remark: input.remark ?? null,
+      createdBy: input.actorUserId,
+      updatedBy: input.actorUserId,
+    })
+    .onConflictDoNothing()
+    .returning({ id: serviceTickets.id });
+  if (!inserted.length)
+    throw new ServiceTicketError(
+      "VALIDATION_ERROR",
+      "The intake creation identifier is already in use.",
+      409,
+    );
 
   const ticket = await findServiceTicketById(db, {
     tenantId: input.tenantId,
