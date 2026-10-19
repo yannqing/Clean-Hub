@@ -129,44 +129,6 @@ private data class NativeMoreOrder(
     val itemCount: Int,
     val createdAt: String,
 )
-private data class NativeMoreOrderItem(
-    val id: String,
-    val name: String,
-    val quantity: String,
-    val lineAmount: String,
-)
-private data class NativeMorePayment(
-    val id: String,
-    val method: String,
-    val amount: String,
-    val tenderedAmount: String?,
-    val changeAmount: String?,
-    val status: String,
-    val provider: String?,
-    val externalReference: String?,
-    val createdAt: String,
-)
-private data class NativeMorePaymentAdjustment(
-    val id: String,
-    val originalPaymentId: String?,
-    val type: String,
-    val status: String,
-    val amount: String,
-    val reason: String,
-)
-private data class NativeMoreOrderDetail(
-    val id: String,
-    val customerName: String?,
-    val totalAmount: String,
-    val paidAmount: String,
-    val currency: String,
-    val status: String,
-    val paymentStatus: String,
-    val version: Int,
-    val items: List<NativeMoreOrderItem>,
-    val payments: List<NativeMorePayment>,
-    val adjustments: List<NativeMorePaymentAdjustment> = emptyList(),
-)
 private data class NativeMoreSearchResult(
     val id: String,
     val type: String,
@@ -370,6 +332,7 @@ fun NativePosApp(applicationContext: Context) {
     var cart by remember { mutableStateOf(NativePosCart.empty("XOF")) }
     var message by remember { mutableStateOf<String?>(null) }
     var checkoutFailure by remember { mutableStateOf<String?>(null) }
+    var checkoutResult by remember { mutableStateOf<NativeSaleResult?>(null) }
     var busy by remember { mutableStateOf(false) }
     var unlocked by remember { mutableStateOf(false) }
     var activeTab by remember { mutableStateOf(NativePosTab.Workspace) }
@@ -394,6 +357,7 @@ fun NativePosApp(applicationContext: Context) {
     var terminalSettingsScope by remember { mutableStateOf<String?>(null) }
     var terminalSettings by remember { mutableStateOf<NativeTerminalSettingsSummary?>(null) }
     val hardware = remember(applicationContext) { NativePosHardware(applicationContext) { session.pinLanguageCode() } }
+    val receiptPrintMutex = remember { Mutex() }
     var hardwareStatus by remember { mutableStateOf<NativeHardwareStatus?>(null) }
     var hardwareDevices by remember { mutableStateOf<List<NativeHardwareDevice>>(emptyList()) }
     var bluetoothPrinters by remember { mutableStateOf<List<NativeBluetoothPrinter>>(emptyList()) }
@@ -642,7 +606,7 @@ fun NativePosApp(applicationContext: Context) {
         val readiness = hardware.printerReadiness(printerId)
         if (!readiness.success) return@withContext readiness.message
         val printJob = database.claimReceiptPrint(jobId, includeFailed, failedOnly) ?: return@withContext null
-        val result = hardware.printReceipt(printJob.content, printJob.copies, printerId)
+        val result = receiptPrintMutex.withLock { hardware.printReceipt(printJob.content, printJob.copies, printerId) }
         if (result.success) {
             database.markReceiptPrintCompleted(printJob.jobId)
             if (internetAvailable) {
@@ -697,6 +661,7 @@ fun NativePosApp(applicationContext: Context) {
      * durable payment command, so an older write cannot restore it afterwards.
      */
     fun updateCart(next: NativePosCart) {
+        if (busy) return
         cart = next
         val terminal = snapshot?.terminal ?: return
         val generation = cartWriteGeneration.incrementAndGet()
@@ -2297,6 +2262,23 @@ fun NativePosApp(applicationContext: Context) {
                                 checkoutSettings = checkoutSettings,
                                 receiptPrinterConfigured = receiptPrinterConfigured,
                                 onOpenSettings = { activeTab = NativePosTab.More; openMoreDestination(NativeMoreDestination.Settings) },
+                                onSearchCustomers = { query ->
+                                    withContext(Dispatchers.IO) {
+                                        val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+                                        val data = api.get("/pos/customers?resultType=profile&status=active&limit=30&offset=0&q=$encoded").optJSONArray("data")
+                                        buildList {
+                                            for (index in 0 until (data?.length() ?: 0)) {
+                                                val entry = data?.optJSONObject(index) ?: continue
+                                                if (entry.optString("kind") == "profile") entry.optJSONObject("profile")?.toNativeMoreCustomer()?.let(::add)
+                                            }
+                                        }
+                                    }
+                                },
+                                onSelectCustomer = { customer ->
+                                    if (!busy && canChangeNativeCartCustomer(cart, customer)) {
+                                        updateCart(cart.copy(customer = customer?.let { NativeCartCustomer(it.id, it.fullName) }))
+                                    }
+                                },
                                 onRefreshPricing = { checkoutCart, discountCode, taxExemptionReason ->
                                     withContext(Dispatchers.IO) {
                                         if (internetAvailable) {
@@ -2355,126 +2337,113 @@ fun NativePosApp(applicationContext: Context) {
                                         message = checkoutFailure
                                         return@NativeSaleView
                                     }
+                                    // Set synchronously so a second tap cannot start another coroutine.
+                                    if (busy) return@NativeSaleView
+                                    busy = true
+                                    checkoutFailure = null
                                     val checkoutGeneration = cartWriteGeneration.incrementAndGet()
                                     scope.launch {
-                                        busy = true
+                                        var savedCheckout: NativeCheckoutResult? = null
                                         try {
-                                            val checkoutAndStatus = withContext(Dispatchers.IO) {
-                                                if (internetAvailable) {
-                                                    runCatching { NativePosSyncEngine(applicationContext).synchronize() }
-                                                        .getOrElse { error ->
-                                                            if (database.snapshot().cashState?.isOfflineCashReady() != true) throw error
-                                                        }
-                                                }
-                                                val printSettings = database.receiptPrintSettings()
-                                                val freshPricing = if (internetAvailable) {
-                                                    previewNativeCartPricing(
-                                                        api = api,
-                                                        cart = cartAtCheckout,
-                                                        branchId = terminalAtCheckout.branchId,
-                                                        discountCode = checkoutRequest.discountCode,
-                                                        taxExemptionReason = checkoutRequest.taxExemptionReason,
-                                                    )
-                                                } else {
-                                                    calculateNativeLocalPricing(
-                                                        cartAtCheckout,
-                                                        database.checkoutSettings(),
-                                                        checkoutRequest.taxExemptionReason,
-                                                    )
-                                                }
-                                                val freshExpectedTotal = if (checkoutRequest.paymentMethod == "cash") {
-                                                    applyNativeCashRounding(freshPricing.totalMinor, checkoutRequest.cashRoundingStep)
-                                                } else freshPricing.totalMinor
-                                                if (freshExpectedTotal != checkoutRequest.expectedTotalMinor) {
-                                                    throw NativePosValidationException(copy.priceChanged)
-                                                }
-                                                val checkout = cartWriteMutex.withLock {
+                                            val checkout = withContext(Dispatchers.IO) {
+                                                val pricing = checkoutRequest.pricing ?: if (internetAvailable) {
+                                                    previewNativeCartPricing(api, cartAtCheckout, terminalAtCheckout.branchId,
+                                                        checkoutRequest.discountCode, checkoutRequest.taxExemptionReason)
+                                                } else calculateNativeLocalPricing(cartAtCheckout, database.checkoutSettings(), checkoutRequest.taxExemptionReason)
+                                                val expected = if (checkoutRequest.paymentMethod == "cash") {
+                                                    applyNativeCashRounding(pricing.totalMinor, checkoutRequest.cashRoundingStep)
+                                                } else pricing.totalMinor
+                                                if (expected != checkoutRequest.expectedTotalMinor) throw NativePosValidationException(copy.priceChanged)
+                                                cartWriteMutex.withLock {
                                                     database.enqueueCheckout(
                                                         cart = cartAtCheckout,
                                                         checkoutRequest = checkoutRequest,
                                                         reserveOfflineStock = !internetAvailable,
                                                         receiptPrintDraft = if (checkoutRequest.receiptDelivery == NativeReceiptDelivery.Print) {
-                                                            buildNativeReceiptDraft(copy,
-                                                                terminal = terminalAtCheckout,
-                                                                cart = cartAtCheckout,
-                                                                pricing = freshPricing,
-                                                                amountDueMinor = checkoutRequest.expectedTotalMinor,
-                                                                tenderedMinor = checkoutRequest.tenderedMinor,
-                                                                paymentMethod = checkoutRequest.paymentMethod,
-                                                                externalReference = checkoutRequest.externalReference,
-                                                                balanceDueAt = checkoutRequest.balanceDueAt,
-                                                                taxExemptionReason = checkoutRequest.taxExemptionReason,
-                                                                printSettings = printSettings,
-                                                                receiptProfile = database.checkoutSettings().receiptProfile,
-                                                            )
+                                                            buildNativeReceiptDraft(copy, terminalAtCheckout, cartAtCheckout, pricing,
+                                                                checkoutRequest.expectedTotalMinor, checkoutRequest.tenderedMinor,
+                                                                checkoutRequest.paymentMethod, checkoutRequest.externalReference,
+                                                                checkoutRequest.balanceDueAt, checkoutRequest.taxExemptionReason,
+                                                                database.receiptPrintSettings(), database.checkoutSettings().receiptProfile)
                                                         } else null,
                                                     )
                                                 }
-                                                // A live network should not wait for WorkManager's next
-                                                // window. The persisted command still covers an abrupt
-                                                // response loss and replays with the same order id.
-                                                if (internetAvailable) {
-                                                    runCatching { NativePosSyncEngine(applicationContext).synchronize() }
-                                                }
-                                                checkout to database.checkoutStatus(checkout.operationId)
                                             }
-                                            val (checkout, checkoutStatus) = checkoutAndStatus
-                                            val checkoutHardwareStatus = withContext(Dispatchers.IO) { hardware.status() }
-                                            hardwareStatus = checkoutHardwareStatus
-                                            val drawerMessage = if (checkoutRequest.paymentMethod == "cash" && checkoutHardwareStatus.cashDrawerConnected) {
-                                                withContext(Dispatchers.IO) {
-                                                    hardware.openCashDrawer().takeUnless { it.success }?.message
-                                                }
-                                            } else null
-                                            val autoPrintMessage = if (
-                                                checkoutStatus != "failed" &&
-                                                checkoutRequest.receiptDelivery == NativeReceiptDelivery.Print &&
-                                                    checkout.printJobId != null
-                                            ) {
-                                                executeReceiptPrint(checkout.printJobId)
-                                            } else {
-                                                null
-                                            }
-                                            if (internetAvailable && checkoutStatus == null) {
-                                                runCatching {
-                                                    withContext(Dispatchers.IO) {
-                                                        api.post(
-                                                            "/pos/orders/${checkout.orderId}/receipt-deliveries",
-                                                            JSONObject().apply {
-                                                                put("channel", checkoutRequest.receiptDelivery.wireValue)
-                                                                put("idempotencyKey", "receipt:${checkout.orderId}:${checkoutRequest.receiptDelivery.wireValue}:initial")
-                                                                if (checkoutRequest.receiptDelivery == NativeReceiptDelivery.Print) {
-                                                                    val printed = checkout.printJobId?.let(database::receiptPrintStatus) == "printed"
-                                                                    put("printStatus", if (printed) "sent" else "failed")
-                                                                    if (!printed) put("failureReason", "The native receipt print job is queued or failed.")
-                                                                }
-                                                            },
-                                                        )
+                                            savedCheckout = checkout
+                                            if (cartWriteGeneration.get() == checkoutGeneration) cart = NativePosCart.empty(cartAtCheckout.currency)
+                                            val submission = if (internetAvailable) {
+                                                withContext(Dispatchers.IO) { NativePosSyncEngine(applicationContext).submitCheckout(checkout.operationId) }
+                                            } else NativeCheckoutSubmission("pending")
+                                            val result = nativeSaleResult(checkout, checkoutRequest, cartAtCheckout, submission)
+                                            // Only local reads remain on the critical path. Secondary work never holds the till button.
+                                            reload()
+                                            checkoutResult = result
+                                            message = result.description(copy)
+                                            busy = false
+                                            NativePosSyncWorker.schedule(applicationContext)
+                                            scope.launch {
+                                                try {
+                                                    if (checkout.printJobId != null && submission.order?.has("totalAmount") == true) {
+                                                        withContext(Dispatchers.IO) {
+                                                            database.updatePendingReceiptDraft(checkout.printJobId,
+                                                                buildNativeReceiptDraft(copy, terminalAtCheckout, cartAtCheckout,
+                                                                    submission.order.toNativeConfirmedPricing(),
+                                                                    checkoutRequest.expectedTotalMinor, checkoutRequest.tenderedMinor,
+                                                                    checkoutRequest.paymentMethod, checkoutRequest.externalReference,
+                                                                    checkoutRequest.balanceDueAt, checkoutRequest.taxExemptionReason,
+                                                                    database.receiptPrintSettings(), database.checkoutSettings().receiptProfile))
+                                                        }
+                                                    }
+                                                    val hardwareMessage = runCatching {
+                                                        val status = withContext(Dispatchers.IO) { hardware.status() }
+                                                        hardwareStatus = status
+                                                        if (checkoutRequest.paymentMethod == "cash" && submission.queueStatus != "failed" && status.cashDrawerConnected) {
+                                                            withContext(Dispatchers.IO) { hardware.openCashDrawer().takeUnless { it.success }?.message }
+                                                        } else null
+                                                    }.getOrNull()
+                                                    val printMessage = if (submission.queueStatus != "failed" && checkout.printJobId != null) {
+                                                        runCatching { executeReceiptPrint(checkout.printJobId) }.getOrElse { it.userMessage(copy) }
+                                                    } else null
+                                                    if (internetAvailable && submission.queueStatus == null) {
+                                                        withContext(Dispatchers.IO) {
+                                                            runCatching {
+                                                                api.post("/pos/orders/${checkout.orderId}/receipt-deliveries", JSONObject().apply {
+                                                                    put("channel", checkoutRequest.receiptDelivery.wireValue)
+                                                                    put("idempotencyKey", "receipt:${checkout.orderId}:${checkoutRequest.receiptDelivery.wireValue}:initial")
+                                                                    if (checkoutRequest.receiptDelivery == NativeReceiptDelivery.Print) {
+                                                                        val printed = checkout.printJobId?.let(database::receiptPrintStatus) == "printed"
+                                                                        put("printStatus", if (printed) "sent" else "failed")
+                                                                        if (!printed) put("failureReason", "The native receipt print job is queued or failed.")
+                                                                    }
+                                                                })
+                                                            }
+                                                        }
+                                                    }
+                                                    receiptPrintQueue = withContext(Dispatchers.IO) { database.receiptPrintQueueState() }
+                                                    // Do not reload the cart here: the cashier may already be making the next sale.
+                                                    if (checkoutResult?.orderId == checkout.orderId) {
+                                                        checkoutResult = checkoutResult?.copy(followUpMessage = listOfNotNull(checkoutResult?.followUpMessage, hardwareMessage, printMessage).joinToString(" ").takeIf { it.isNotBlank() })
+                                                    }
+                                                } catch (error: Exception) {
+                                                    if (error is kotlinx.coroutines.CancellationException) throw error
+                                                    if (checkoutResult?.orderId == checkout.orderId) {
+                                                        checkoutResult = checkoutResult?.copy(followUpMessage = error.userMessage(copy))
                                                     }
                                                 }
                                             }
-                                            NativePosSyncWorker.schedule(applicationContext)
-                                            if (cartWriteGeneration.get() == checkoutGeneration) {
-                                                cart = NativePosCart.empty(cartAtCheckout.currency)
-                                            }
-                                            reload()
-                                            val saleMessage = when {
-                                                checkoutStatus == "failed" -> copy.saleNeedsReview
-                                                checkoutStatus == "pending" -> copy.saleQueuedOffline
-                                                checkoutRequest.paymentMethod == "later" -> copy.salePayLaterRecorded
-                                                checkoutRequest.paymentMethod != "cash" -> copy.saleAwaitingConfirmation
-                                                else -> copy.saleSubmittedOnline
-                                            }
-                                            message = when {
-                                                drawerMessage != null -> "$saleMessage $drawerMessage"
-                                                autoPrintMessage != null -> "$saleMessage $autoPrintMessage"
-                                                checkout.printJobId != null && checkoutStatus != "failed" -> "$saleMessage ${copy.receiptQueued}"
-                                                else -> saleMessage
-                                            }
                                         } catch (error: Exception) {
-                                            val failure = error.userMessage(copy)
-                                            message = failure
-                                            checkoutFailure = failure
+                                            val saved = savedCheckout
+                                            if (saved != null) {
+                                                // The durable transaction already cleared this cart. Never invite a second charge.
+                                                val status = withContext(Dispatchers.IO) { database.checkoutStatus(saved.operationId) }
+                                                checkoutResult = nativeSaleResult(saved, checkoutRequest, cartAtCheckout, NativeCheckoutSubmission(status))
+                                                message = checkoutResult?.description(copy)
+                                                NativePosSyncWorker.schedule(applicationContext)
+                                            } else {
+                                                val failure = error.userMessage(copy)
+                                                message = failure
+                                                checkoutFailure = failure
+                                            }
                                         } finally {
                                             busy = false
                                         }
@@ -2568,6 +2537,16 @@ fun NativePosApp(applicationContext: Context) {
                     session = currentSession,
                     busy = busy,
                     onClose = ::closeHardwareScannerSession,
+                )
+            }
+            checkoutResult?.let { result ->
+                NativeSaleResultDialog(copy, result,
+                    onDismiss = { checkoutResult = null },
+                    onViewOrder = if (internetAvailable && result.state != NativeSaleState.Queued && result.state != NativeSaleState.NeedsReview) ({
+                        checkoutResult = null
+                        activeTab = NativePosTab.More
+                        openMoreOrder(result.orderId)
+                    }) else null,
                 )
             }
             checkoutFailure?.let { failure ->
@@ -4176,6 +4155,7 @@ private fun NativeMoreView(
         )
         NativeMoreDestination.OrderDetail -> NativeMoreOrderDetailView(copy,
             order = orderDetail,
+            timeZone = current.terminal?.timeZone ?: "UTC",
             canResolveManualPayments = current.terminal?.role in setOf("owner", "manager"),
             internetAvailable = internetAvailable,
             busy = busy,
@@ -4859,7 +4839,7 @@ private fun NativeMoreOrdersView(
             ) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(copy.orderPrefix.format(order.id.takeLast(8).uppercase()), color = POS_INK, fontWeight = FontWeight.SemiBold)
-                    Text("${order.customerName ?: copy.walkInCustomer} · ${copy.itemsCountSuffix.format(order.itemCount)} · ${order.status} · ${order.paymentStatus}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    Text("${order.customerName ?: copy.walkInCustomer} · ${copy.itemsCountSuffix.format(order.itemCount)} · ${nativeOrderStatusLabel(order.status, copy)} · ${nativePaymentStatusLabel(order.paymentStatus, copy)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     Text("${order.totalAmount} ${order.currency} · ${copy.tapToProcessOrder}", color = POS_ACCENT, style = MaterialTheme.typography.labelMedium)
                 }
             }
@@ -4872,6 +4852,7 @@ private fun NativeMoreOrdersView(
 private fun NativeMoreOrderDetailView(
     copy: NativePosCopy,
     order: NativeMoreOrderDetail?,
+    timeZone: String,
     canResolveManualPayments: Boolean,
     internetAvailable: Boolean,
     busy: Boolean,
@@ -4903,9 +4884,7 @@ private fun NativeMoreOrderDetailView(
         }
         val outstanding = outstandingAmount(order.totalAmount, order.paidAmount)
         val pendingManualPayment = order.payments.any { it.method == "app" && it.status == "pending" }
-        NativeReferenceRow(copy.customerLabel, order.customerName ?: copy.walkInCustomer, null)
-        NativeReferenceRow(copy.orderStatus, "${order.status} · ${order.paymentStatus}", null)
-        NativeReferenceRow(copy.orderAmount, copy.paidPrefix.format("${order.paidAmount} ${order.currency}"), "${order.totalAmount} ${order.currency}")
+        NativeOrderOverview(copy, order, timeZone)
         if (isPositiveDecimal(outstanding) && !pendingManualPayment && order.status != "cancelled" && order.status != "delivered") {
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -4941,11 +4920,14 @@ private fun NativeMoreOrderDetailView(
             }
         }
         Text(copy.orderItems, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-        order.items.forEach { item -> NativeReferenceRow(item.name, copy.quantityPrefix.format(item.quantity), "${item.lineAmount} ${order.currency}") }
+        order.items.forEach { item -> NativeOrderItemCard(copy, item, order.currency) }
+        NativeOrderFinancialSummary(copy, order)
+        NativeOrderTicketReferences(copy, order, timeZone)
+        Text(copy.paymentRecords, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        if (order.payments.isEmpty()) Text(copy.orderNoPayments, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         if (order.payments.isNotEmpty()) {
-            Text(copy.paymentRecords, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             order.payments.forEach { payment ->
-                NativeReferenceRow(payment.provider ?: payment.method, "${payment.status} · ${payment.createdAt}", "${payment.amount} ${order.currency}")
+                NativeOrderPaymentCard(copy, payment, order.currency, timeZone)
                 if (payment.status == "pending" && payment.method == "app" && canResolveManualPayments) {
                     Text(copy.paymentReferenceLine.format(payment.externalReference.orEmpty()), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     if (resolutionPaymentId == payment.id) {
@@ -5390,6 +5372,8 @@ private fun NativeSaleView(
     onCheckout: (NativeCheckoutRequest) -> Unit,
     onSynchronize: () -> Unit,
     onOpenSettings: () -> Unit,
+    onSearchCustomers: suspend (String) -> List<NativeCustomer>,
+    onSelectCustomer: (NativeCustomer?) -> Unit,
 ) {
     val terminal = current.terminal ?: return
     val screenClass = nativePosScreenClass()
@@ -5417,6 +5401,9 @@ private fun NativeSaleView(
             onClearProduct = onClearProduct,
             onRemoveTicketItem = onRemoveTicketItem,
             onCheckout = onCheckout,
+            customers = current.customers,
+            onSearchCustomers = onSearchCustomers,
+            onSelectCustomer = onSelectCustomer,
             modifier = modifier,
             persistent = persistent,
         )
@@ -5693,6 +5680,9 @@ internal fun CheckoutPanel(
     onCheckout: (NativeCheckoutRequest) -> Unit,
     modifier: Modifier = Modifier.fillMaxWidth(),
     persistent: Boolean = false,
+    customers: List<NativeCustomer> = emptyList(),
+    onSearchCustomers: suspend (String) -> List<NativeCustomer> = { emptyList() },
+    onSelectCustomer: (NativeCustomer?) -> Unit = {},
 ) {
     val taxReady = rememberNativeTaxCheckoutReady(checkoutSettings)
     val itemCount = cart.itemCount
@@ -5712,9 +5702,7 @@ internal fun CheckoutPanel(
                 Text(copy.cartTitle, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(if (itemCount == 0L) copy.noItemsSelected else copy.itemsCountSuffix.format(itemCount), color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
             }
-            cart.customer?.let { customer ->
-                Text(copy.customerPrefixShort.format(customer.name), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-            }
+            NativeSaleCustomerSelector(copy, cart, customers, internetAvailable, busy, onSearchCustomers, onSelectCustomer)
             OutlinedButton(
                 onClick = { cartDrawerOpen = true },
                 enabled = !busy && !cart.isEmpty,
@@ -5969,6 +5957,7 @@ internal fun NativeCheckoutDialog(
         cart.checkoutId,
         cart.products,
         cart.ticketItems,
+        cart.customer,
         internetAvailable,
         normalizedDiscountCode,
         normalizedTaxExemption,
@@ -6332,6 +6321,7 @@ internal fun NativeCheckoutDialog(
                                     taxExemptionReason = normalizedTaxExemption,
                                     cashRoundingStep = cashRoundingStep.takeIf { cashPayment && it > 1 },
                                     receiptDelivery = receiptDelivery,
+                                    pricing = pricing,
                                 ),
                             )
                         }
@@ -6437,7 +6427,7 @@ private fun JSONArray?.toNativeMoreOrders(): List<NativeMoreOrder> = buildList {
     }
 }
 
-private fun JSONObject.toNativeMoreOrderDetail(paymentsPayload: JSONArray?): NativeMoreOrderDetail {
+internal fun JSONObject.toNativeMoreOrderDetail(paymentsPayload: JSONArray?): NativeMoreOrderDetail {
     val items = optJSONArray("items").toNativeMoreOrderItems()
     return NativeMoreOrderDetail(
         id = optString("id"),
@@ -6450,6 +6440,25 @@ private fun JSONObject.toNativeMoreOrderDetail(paymentsPayload: JSONArray?): Nat
         version = optInt("version", 1),
         items = items,
         payments = paymentsPayload.toNativeMorePayments(),
+        orderType = optString("orderType", "manual"),
+        subtotalAmount = optString("subtotalAmount", "0"),
+        discountAmount = optString("discountAmount", "0"),
+        taxableAmount = optString("taxableAmount", "0"),
+        taxAmount = optString("taxAmount", "0"),
+        taxRate = optString("taxRateSnapshot", "0"),
+        taxLabel = optionalNativeString("taxLabelSnapshot"),
+        pricesIncludeTax = optBoolean("pricesIncludeTax", true),
+        taxNumber = optionalNativeString("taxRegistrationNumberSnapshot"),
+        taxExemptionReason = optionalNativeString("taxExemptionReason"),
+        roundingAmount = optString("roundingAdjustmentAmount", "0"),
+        createdAt = optionalNativeString("createdAt"),
+        updatedAt = optionalNativeString("updatedAt"),
+        dueAt = optionalNativeString("balanceDueAt"),
+        notes = optionalNativeString("notes"),
+        unpaidReason = optionalNativeString("unpaidReason"),
+        taxLines = nativeOrderTaxLines(),
+        discounts = nativeOrderDiscounts(),
+        tickets = nativeOrderTicketReferences(),
     )
 }
 
@@ -6462,6 +6471,13 @@ private fun JSONArray?.toNativeMoreOrderItems(): List<NativeMoreOrderItem> = bui
             name = value.optString("itemName").ifBlank { nativePosCopy(null).orderItemFallback },
             quantity = value.optString("quantity", "1"),
             lineAmount = value.optString("lineAmount", "0"),
+            unitAmount = value.optString("chargedUnitAmount", value.optString("unitAmount", "0")),
+            sku = value.optionalNativeString("sku"),
+            variantName = value.optionalNativeString("variantName"),
+            weight = value.optionalNativeString("weight"),
+            bagCount = if (value.isNull("bagCount") || !value.has("bagCount")) null else value.optInt("bagCount"),
+            notes = listOfNotNull(value.optionalNativeString("itemColor"), value.optionalNativeString("defectNotes"), value.optionalNativeString("specialRequest"), value.optionalNativeString("itemIdentifier")).joinToString(" · ").takeIf { it.isNotBlank() },
+            taxAmount = value.optString("taxAmount", "0"),
         ))
     }
 }
@@ -6747,6 +6763,15 @@ private fun previewNativeCartPricing(
     })
     return response.toNativeCartPricing()
 }
+
+/** Order snapshots can differ from the preview even when an inclusive total stays unchanged. */
+internal fun JSONObject.toNativeConfirmedPricing(): NativeCartPricing = JSONObject(toString()).apply {
+    put("taxRate", optString("taxRateSnapshot", "0"))
+    put("taxLabel", opt("taxLabelSnapshot"))
+    put("taxRegistrationNumber", opt("taxRegistrationNumberSnapshot"))
+    put("taxComponents", optJSONArray("taxComponentsSnapshot"))
+    put("discounts", optJSONArray("discountApplications"))
+}.toNativeCartPricing()
 
 private fun JSONObject.toNativeCartPricing(): NativeCartPricing = NativeCartPricing(
     subtotalMinor = parseMoney(optString("subtotalAmount", "0")) ?: 0,

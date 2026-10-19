@@ -132,7 +132,7 @@ class NativePosWorkspaceInstrumentedTest {
         compose.setContent {
             MaterialTheme(colorScheme=nativePosColors) {
                 Row(Modifier.fillMaxSize().background(POS_PAGE_BACKGROUND).testTag("preview")) {
-                    NativeAdaptiveNavigation(copy,nativeNavigationLayout(752f,56f,80f),NativeNavigationDestination.Tickets,true,true,56f,{})
+                    NativeAdaptiveNavigation(copy,terminal,nativeNavigationLayout(752f,56f,80f),NativeNavigationDestination.Tickets,true,true,56f,{})
                     NativeTicketList(copy,tickets,emptyList(),"Africa/Dakar","en",false,true,null,{},{},{})
                 }
             }
@@ -257,7 +257,7 @@ class NativePosWorkspaceInstrumentedTest {
             CompositionLocalProvider(LocalDensity provides Density(1f, 1.5f)) {
                 MaterialTheme(colorScheme=nativePosColors) {
                     Box(Modifier.width(900.dp).height(480.dp).testTag("preview")) {
-                        NativeAdaptiveNavigation(copy,nativeNavigationLayout(480f,66f,80f),NativeNavigationDestination.Tickets,true,true,66f,{})
+                        NativeAdaptiveNavigation(copy,terminal,nativeNavigationLayout(480f,66f,80f),NativeNavigationDestination.Tickets,true,true,66f,{})
                     }
                 }
             }

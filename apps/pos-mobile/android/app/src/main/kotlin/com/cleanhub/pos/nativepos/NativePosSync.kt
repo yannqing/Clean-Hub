@@ -16,6 +16,18 @@ import org.json.JSONObject
 
 data class NativeSyncResult(val replayedSales: Int, val failedSales: Int)
 
+internal data class NativeCheckoutSubmission(
+    val queueStatus: String?,
+    val paymentStatus: String? = null,
+    val error: NativePosApiException? = null,
+    val order: JSONObject? = null,
+)
+
+internal interface NativeCheckoutGateway {
+    fun submit(payload: JSONObject): JSONObject
+    fun reportException(payload: JSONObject)
+}
+
 /**
  * How many times one offline sale is replayed before it is parked.
  *
@@ -45,6 +57,14 @@ class NativePosSyncEngine(context: Context) {
     private val database = NativePosDatabase(context.applicationContext)
     private val session = NativePosSession(context.applicationContext)
     private val api = NativePosApiClient(session)
+    private var checkoutGateway: NativeCheckoutGateway = object : NativeCheckoutGateway {
+        override fun submit(payload: JSONObject): JSONObject = api.post("/pos/orders/checkout", payload)
+        override fun reportException(payload: JSONObject) { api.post("/pos/offline-sale-exceptions", payload) }
+    }
+
+    internal constructor(context: Context, gateway: NativeCheckoutGateway) : this(context) {
+        checkoutGateway = gateway
+    }
 
     /** Refreshes store-owned checkout and receipt rules without replaying sales. */
     fun refreshCheckoutSettings(): JSONObject = refreshTerminalConfiguration().second
@@ -67,32 +87,11 @@ class NativePosSyncEngine(context: Context) {
             // command would fail the same way. Stop asking, but keep whatever
             // already replayed rather than discarding the run.
             if (deferred != null) break
-            val attempt = database.recordCheckoutAttempt(command.operationId)
-            try {
-                api.post("/pos/orders/checkout", JSONObject(command.payloadJson))
-                database.markCheckoutSynced(command.operationId)
-                markReplayedTicketItemsBilled(command.payloadJson)
-                replayed += 1
-            } catch (error: NativePosApiException) {
-                if (isTransientReplayFailure(error) && attempt < NATIVE_REPLAY_MAX_ATTEMPTS) {
-                    // Transient: the command stays pending and is retried on the
-                    // next run. Recorded rather than thrown immediately so the
-                    // sales replayed before it are still committed locally.
-                    deferred = error
-                } else {
-                    // Permanent for this command only -- a price change, a
-                    // deleted product. Park it and carry on: one bad sale must
-                    // not hold up every other sale in the queue, which is what
-                    // aborting the loop used to do.
-                    val reason = if (attempt >= NATIVE_REPLAY_MAX_ATTEMPTS) {
-                        "Offline cash replay gave up after $attempt attempts: ${error.message.orEmpty()}".trim()
-                    } else {
-                        error.message ?: "Offline cash replay failed."
-                    }
-                    reportCashException(command, error)
-                    database.markCheckoutFailed(command.operationId, reason)
-                    failed += 1
-                }
+            val result = submitCheckout(command.operationId)
+            when (result.queueStatus) {
+                null -> replayed += 1
+                "failed" -> failed += 1
+                else -> deferred = result.error
             }
         }
         // A successful replay updates stock on the server. A second refresh
@@ -102,6 +101,41 @@ class NativePosSyncEngine(context: Context) {
         // sees the connection problem and WorkManager still retries.
         deferred?.let { throw it }
         return NativeSyncResult(replayed, failed)
+    }
+
+    /** Interactive checkout submits only this durable command, never the catalogue or older sales. */
+    internal fun submitCheckout(operationId: String): NativeCheckoutSubmission = synchronized(checkoutReplayLock) {
+        val command = database.listPendingCheckouts().firstOrNull { it.operationId == operationId }
+            ?: return@synchronized NativeCheckoutSubmission(database.checkoutStatus(operationId))
+        val attempt = database.recordCheckoutAttempt(operationId)
+        try {
+            val response = checkoutGateway.submit(JSONObject(command.payloadJson))
+            val order = response.optJSONObject("order")
+            if (order == null || order.optString("id") != command.orderId || order.optString("paymentStatus") !in setOf("paid", "unpaid", "partial", "refunded")) {
+                throw NativePosApiException(0, "INVALID_CHECKOUT_RESPONSE", nativePosCopy(session.pinLanguageCode()).checkoutConfirmationMissing)
+            }
+            database.markCheckoutSynced(operationId)
+            markReplayedTicketItemsBilled(command.payloadJson)
+            NativeCheckoutSubmission(null, order.optString("paymentStatus"), order = order)
+        } catch (error: NativePosApiException) {
+            if (isTransientReplayFailure(error) && attempt < NATIVE_REPLAY_MAX_ATTEMPTS) {
+                NativeCheckoutSubmission("pending", error = error)
+            } else {
+                val reason = if (attempt >= NATIVE_REPLAY_MAX_ATTEMPTS) {
+                    "Offline cash replay gave up after $attempt attempts: ${error.message.orEmpty()}".trim()
+                } else error.message ?: "Offline cash replay failed."
+                database.markCheckoutFailed(operationId, reason)
+                // Losing the exception-report response must not make a rejected sale printable.
+                runCatching { reportCashException(command, error) }
+                NativeCheckoutSubmission("failed", error = error)
+            }
+        }
+    }
+
+    companion object {
+        // WorkManager and the foreground can meet on the same command. Claim it once per process;
+        // the stable server idempotency key also covers process death and response loss.
+        private val checkoutReplayLock = Any()
     }
 
 
@@ -119,6 +153,7 @@ class NativePosSyncEngine(context: Context) {
     }
 
     private fun refreshSnapshot() {
+        val stockRevision = database.stockRevision()
         val auth = api.get("/auth/me")
         val tenantId = auth.requiredString("tenantId")
         val terminalId = auth.requiredString("terminalId")
@@ -183,6 +218,7 @@ class NativePosSyncEngine(context: Context) {
             services = catalog.optJSONArray("data").toNativeServices(terminal.currency),
             customers = customers?.optJSONArray("data")?.toNativeCustomers(),
             tickets = tickets?.optJSONArray("data")?.toNativeTickets(terminal.currency),
+            expectedStockRevision = stockRevision,
         )
         cacheCheckoutSettings(branch, printSettings)
         hardwareDevices?.let { devices ->
@@ -239,7 +275,7 @@ class NativePosSyncEngine(context: Context) {
     }
 
     private fun reportCashException(command: NativePendingCheckout, error: NativePosApiException) {
-        api.post("/pos/offline-sale-exceptions", JSONObject().apply {
+        checkoutGateway.reportException(JSONObject().apply {
             put("commandId", command.idempotencyKey)
             put("orderId", command.orderId)
             put("command", JSONObject().put("type", "checkout").put("input", JSONObject(command.payloadJson)))

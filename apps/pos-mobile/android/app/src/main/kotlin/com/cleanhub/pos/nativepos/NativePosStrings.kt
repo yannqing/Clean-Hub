@@ -32,9 +32,62 @@ internal class NativePosCopy(
     private fun get(key: String): String =
         values[key] ?: COPY_ZH_VALUES[key] ?: error("Missing copy key: $key ($languageCode)")
 
+    fun localeCode(): String = languageCode
+
     /** Keys every language must define; the test reads this. */
     internal fun keys(): Set<String> = values.keys
 
+    val checkoutConfirmationMissing: String get() = get("checkoutConfirmationMissing")
+    val checkoutPaidTitle: String get() = get("checkoutPaidTitle")
+    val checkoutSavedTitle: String get() = get("checkoutSavedTitle")
+    val checkoutQueuedTitle: String get() = get("checkoutQueuedTitle")
+    val checkoutPendingTitle: String get() = get("checkoutPendingTitle")
+    val checkoutReviewTitle: String get() = get("checkoutReviewTitle")
+    val checkoutContinue: String get() = get("checkoutContinue")
+    val checkoutViewOrder: String get() = get("checkoutViewOrder")
+    val checkoutBackgroundHint: String get() = get("checkoutBackgroundHint")
+    val checkoutSavedPendingHint: String get() = get("checkoutSavedPendingHint")
+    val checkoutConfirmedHint: String get() = get("checkoutConfirmedHint")
+    val customerSelect: String get() = get("customerSelect")
+    val customerSearchHint: String get() = get("customerSearchHint")
+    val customerLockedHint: String get() = get("customerLockedHint")
+    val customerOfflineHint: String get() = get("customerOfflineHint")
+    val customerSearchFailed: String get() = get("customerSearchFailed")
+    val customerNoResults: String get() = get("customerNoResults")
+    val orderLineCount: String get() = get("orderLineCount")
+    val orderOverview: String get() = get("orderOverview")
+    val orderInformation: String get() = get("orderInformation")
+    val orderPaidAmount: String get() = get("orderPaidAmount")
+    val orderOutstanding: String get() = get("orderOutstanding")
+    val orderCreatedAt: String get() = get("orderCreatedAt")
+    val orderUpdatedAt: String get() = get("orderUpdatedAt")
+    val orderDueAt: String get() = get("orderDueAt")
+    val orderNotes: String get() = get("orderNotes")
+    val orderUnpaidReason: String get() = get("orderUnpaidReason")
+    val orderTypeLabel: String get() = get("orderTypeLabel")
+    val orderTypeManual: String get() = get("orderTypeManual")
+    val orderTypeTicket: String get() = get("orderTypeTicket")
+    val orderUnitPrice: String get() = get("orderUnitPrice")
+    val orderSku: String get() = get("orderSku")
+    val orderWeight: String get() = get("orderWeight")
+    val orderTaxSummary: String get() = get("orderTaxSummary")
+    val orderTicketReferences: String get() = get("orderTicketReferences")
+    val orderStatusDraft: String get() = get("orderStatusDraft")
+    val orderStatusReceived: String get() = get("orderStatusReceived")
+    val orderStatusPaid: String get() = get("orderStatusPaid")
+    val orderStatusDelivered: String get() = get("orderStatusDelivered")
+    val orderStatusCancelled: String get() = get("orderStatusCancelled")
+    val paymentStatusUnpaid: String get() = get("paymentStatusUnpaid")
+    val paymentStatusPartial: String get() = get("paymentStatusPartial")
+    val paymentStatusPending: String get() = get("paymentStatusPending")
+    val paymentStatusFailed: String get() = get("paymentStatusFailed")
+    val paymentStatusRefunded: String get() = get("paymentStatusRefunded")
+    val orderUnknownStatus: String get() = get("orderUnknownStatus")
+    val orderNoPayments: String get() = get("orderNoPayments")
+
+    val assistantLabel: String get() = get("assistantLabel")
+    val wavePayment: String get() = get("wavePayment")
+    val orangeMoneyPayment: String get() = get("orangeMoneyPayment")
     val branchName: String get() = get("branchName")
     val cardPayment: String get() = get("cardPayment")
     val cashPayment: String get() = get("cashPayment")
@@ -905,6 +958,56 @@ internal class NativePosCopy(
 }
 
 private val COPY_ZH_VALUES: Map<String, String> = mapOf(
+    "checkoutConfirmationMissing" to "未收到完整的结款确认，交易已保留并将安全重试，请勿重复收款。",
+    "orderLineCount" to "条目数量",
+    "assistantLabel" to "接待员工",
+    "wavePayment" to "Wave",
+    "orangeMoneyPayment" to "Orange Money",
+    "checkoutPaidTitle" to "收款成功",
+    "checkoutSavedTitle" to "订单已记录",
+    "checkoutQueuedTitle" to "交易已保存，待同步",
+    "checkoutPendingTitle" to "订单已创建，待确认收款",
+    "checkoutReviewTitle" to "交易需要经理处理",
+    "checkoutContinue" to "继续收银",
+    "checkoutViewOrder" to "查看订单",
+    "checkoutBackgroundHint" to "小票打印和资料同步将在后台处理，不影响继续收银。",
+    "checkoutSavedPendingHint" to "交易已安全保存在本机，服务端尚未确认。请勿重复收款；联网后将自动重试，可在同步队列查看。",
+    "checkoutConfirmedHint" to "本笔付款已由服务端确认。",
+    "customerSelect" to "选择客户",
+    "customerSearchHint" to "搜索姓名、电话或邮箱",
+    "customerLockedHint" to "客户已随工单锁定。如需更换，请先移除购物车中的工单项目。",
+    "customerOfflineHint" to "离线时仅搜索本机已同步的客户。",
+    "customerSearchFailed" to "在线搜索失败，当前显示本机匹配的客户。请重试。",
+    "customerNoResults" to "没有找到客户，可更换关键词或选择散客。",
+    "orderOverview" to "订单概览",
+    "orderInformation" to "订单信息",
+    "orderPaidAmount" to "已收金额",
+    "orderOutstanding" to "待收金额",
+    "orderCreatedAt" to "创建时间",
+    "orderUpdatedAt" to "更新时间",
+    "orderDueAt" to "付款截止",
+    "orderNotes" to "备注",
+    "orderUnpaidReason" to "挂账原因",
+    "orderTypeLabel" to "订单类型",
+    "orderTypeManual" to "门店收银",
+    "orderTypeTicket" to "工单结算",
+    "orderUnitPrice" to "单价",
+    "orderSku" to "SKU",
+    "orderWeight" to "重量（kg）",
+    "orderTaxSummary" to "金额与税务",
+    "orderTicketReferences" to "关联工单",
+    "orderStatusDraft" to "草稿",
+    "orderStatusReceived" to "已接单",
+    "orderStatusPaid" to "已付款",
+    "orderStatusDelivered" to "已交付",
+    "orderStatusCancelled" to "已取消",
+    "paymentStatusUnpaid" to "未付款",
+    "paymentStatusPartial" to "部分付款",
+    "paymentStatusPending" to "待确认",
+    "paymentStatusFailed" to "失败",
+    "paymentStatusRefunded" to "已退款",
+    "orderUnknownStatus" to "状态暂不可用",
+    "orderNoPayments" to "暂无付款记录",
     "settingsRetryPrint" to "重试失败的收据",
     "settingsRetryPrintHint" to "请先确认纸质收据未打印成功。如果之前已出纸，重试可能重复打印。",
     "settingsRetryPrintConfirm" to "确认重试",
@@ -1769,6 +1872,56 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_EN_VALUES: Map<String, String> = mapOf(
+    "checkoutConfirmationMissing" to "Checkout confirmation was incomplete. The sale is retained for a safe retry; do not charge again.",
+    "orderLineCount" to "Line items",
+    "assistantLabel" to "Assistant",
+    "wavePayment" to "Wave",
+    "orangeMoneyPayment" to "Orange Money",
+    "checkoutPaidTitle" to "Payment successful",
+    "checkoutSavedTitle" to "Order recorded",
+    "checkoutQueuedTitle" to "Sale saved · sync pending",
+    "checkoutPendingTitle" to "Order created · payment pending",
+    "checkoutReviewTitle" to "Sale needs review",
+    "checkoutContinue" to "Next sale",
+    "checkoutViewOrder" to "View order",
+    "checkoutBackgroundHint" to "Receipt printing and reference-data sync continue in the background. You can start the next sale.",
+    "checkoutSavedPendingHint" to "The sale is saved on this terminal but is not confirmed by the server. Do not charge again. It retries when connected; check the sync queue.",
+    "checkoutConfirmedHint" to "This payment has been confirmed by the server.",
+    "customerSelect" to "Select customer",
+    "customerSearchHint" to "Search name, phone or email",
+    "customerLockedHint" to "The customer is linked to the ticket. Remove ticket items before changing the customer.",
+    "customerOfflineHint" to "Offline search uses customers cached on this terminal.",
+    "customerSearchFailed" to "Online search failed. Matching cached customers are shown. Please retry.",
+    "customerNoResults" to "No customers found. Try another search or use walk-in.",
+    "orderOverview" to "Order overview",
+    "orderInformation" to "Order information",
+    "orderPaidAmount" to "Amount paid",
+    "orderOutstanding" to "Balance due",
+    "orderCreatedAt" to "Created at",
+    "orderUpdatedAt" to "Updated at",
+    "orderDueAt" to "Payment due",
+    "orderNotes" to "Notes",
+    "orderUnpaidReason" to "Reason for deferred payment",
+    "orderTypeLabel" to "Order type",
+    "orderTypeManual" to "In-store sale",
+    "orderTypeTicket" to "Ticket checkout",
+    "orderUnitPrice" to "Unit price",
+    "orderSku" to "SKU",
+    "orderWeight" to "Weight (kg)",
+    "orderTaxSummary" to "Totals and tax",
+    "orderTicketReferences" to "Related tickets",
+    "orderStatusDraft" to "Draft",
+    "orderStatusReceived" to "Received",
+    "orderStatusPaid" to "Paid",
+    "orderStatusDelivered" to "Delivered",
+    "orderStatusCancelled" to "Cancelled",
+    "paymentStatusUnpaid" to "Unpaid",
+    "paymentStatusPartial" to "Partially paid",
+    "paymentStatusPending" to "Pending confirmation",
+    "paymentStatusFailed" to "Failed",
+    "paymentStatusRefunded" to "Refunded",
+    "orderUnknownStatus" to "Status unavailable",
+    "orderNoPayments" to "No payments recorded",
     "settingsRetryPrint" to "Retry failed receipt",
     "settingsRetryPrintHint" to "Check whether the receipt already printed. Retrying a job that printed before the failure may create a duplicate.",
     "settingsRetryPrintConfirm" to "Retry printing",
@@ -2633,6 +2786,56 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_FR_VALUES: Map<String, String> = mapOf(
+    "checkoutConfirmationMissing" to "La confirmation du règlement est incomplète. La vente est conservée pour un nouvel envoi sécurisé ; ne facturez pas à nouveau.",
+    "orderLineCount" to "Lignes",
+    "assistantLabel" to "Employé",
+    "wavePayment" to "Wave",
+    "orangeMoneyPayment" to "Orange Money",
+    "checkoutPaidTitle" to "Paiement réussi",
+    "checkoutSavedTitle" to "Commande enregistrée",
+    "checkoutQueuedTitle" to "Vente enregistrée · synchronisation en attente",
+    "checkoutPendingTitle" to "Commande créée · paiement en attente",
+    "checkoutReviewTitle" to "Vente à vérifier",
+    "checkoutContinue" to "Vente suivante",
+    "checkoutViewOrder" to "Voir la commande",
+    "checkoutBackgroundHint" to "L’impression du reçu et la synchronisation continuent en arrière-plan. Vous pouvez commencer la vente suivante.",
+    "checkoutSavedPendingHint" to "La vente est enregistrée sur ce terminal, sans confirmation du serveur. Ne facturez pas à nouveau. Elle sera renvoyée à la reconnexion ; consultez la file de synchronisation.",
+    "checkoutConfirmedHint" to "Ce paiement a été confirmé par le serveur.",
+    "customerSelect" to "Choisir un client",
+    "customerSearchHint" to "Rechercher un nom, téléphone ou e-mail",
+    "customerLockedHint" to "Le client est lié au ticket. Retirez les articles du ticket avant de changer de client.",
+    "customerOfflineHint" to "Hors ligne, la recherche utilise les clients enregistrés sur ce terminal.",
+    "customerSearchFailed" to "La recherche en ligne a échoué. Les clients locaux correspondants sont affichés. Réessayez.",
+    "customerNoResults" to "Aucun client trouvé. Modifiez la recherche ou choisissez un client de passage.",
+    "orderOverview" to "Aperçu de la commande",
+    "orderInformation" to "Informations de commande",
+    "orderPaidAmount" to "Montant payé",
+    "orderOutstanding" to "Solde à payer",
+    "orderCreatedAt" to "Créée le",
+    "orderUpdatedAt" to "Mise à jour",
+    "orderDueAt" to "Échéance de paiement",
+    "orderNotes" to "Notes",
+    "orderUnpaidReason" to "Motif du paiement différé",
+    "orderTypeLabel" to "Type de commande",
+    "orderTypeManual" to "Vente en magasin",
+    "orderTypeTicket" to "Règlement de ticket",
+    "orderUnitPrice" to "Prix unitaire",
+    "orderSku" to "SKU",
+    "orderWeight" to "Poids (kg)",
+    "orderTaxSummary" to "Totaux et taxes",
+    "orderTicketReferences" to "Tickets associés",
+    "orderStatusDraft" to "Brouillon",
+    "orderStatusReceived" to "Reçue",
+    "orderStatusPaid" to "Payée",
+    "orderStatusDelivered" to "Livrée",
+    "orderStatusCancelled" to "Annulée",
+    "paymentStatusUnpaid" to "Impayée",
+    "paymentStatusPartial" to "Partiellement payée",
+    "paymentStatusPending" to "En attente de confirmation",
+    "paymentStatusFailed" to "Échoué",
+    "paymentStatusRefunded" to "Remboursé",
+    "orderUnknownStatus" to "Statut indisponible",
+    "orderNoPayments" to "Aucun paiement enregistré",
     "settingsRetryPrint" to "Réessayer un reçu en échec",
     "settingsRetryPrintHint" to "Vérifiez si le reçu a déjà été imprimé. Une nouvelle tentative peut créer un doublon.",
     "settingsRetryPrintConfirm" to "Réessayer",

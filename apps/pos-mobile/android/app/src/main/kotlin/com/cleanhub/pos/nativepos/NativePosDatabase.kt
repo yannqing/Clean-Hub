@@ -5,6 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicLong
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -13,6 +14,7 @@ private const val DATABASE_VERSION = 23
 private const val MAX_RUNTIME_AGE_MS = 8 * 60 * 60 * 1_000L
 private const val MAX_CATALOG_AGE_MS = 24 * 60 * 60 * 1_000L
 private const val MAX_CASH_STATE_AGE_MS = 2 * 60 * 60 * 1_000L
+private val NATIVE_STOCK_REVISION = AtomicLong()
 
 private data class NativePosCartState(
     val checkoutId: String,
@@ -40,6 +42,8 @@ class NativePosDatabase(
     private val languageCode: () -> String? = { null },
 ) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
     private val copy: NativePosCopy get() = nativePosCopy(languageCode())
+
+    internal fun stockRevision(): Long = NATIVE_STOCK_REVISION.get()
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -393,6 +397,14 @@ class NativePosDatabase(
         arrayOf(jobId),
     ).use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
 
+    /** A confirmed online receipt uses the order's fiscal snapshot, not an earlier preview. */
+    internal fun updatePendingReceiptDraft(jobId: String, draft: NativeReceiptPrintDraft) {
+        writableDatabase.update("pending_receipt_print", ContentValues().apply {
+            put("content", draft.content)
+            put("copies", draft.copies)
+        }, "job_id = ? AND status = 'pending'", arrayOf(jobId))
+    }
+
     /** A missing row means the server accepted the stable checkout command. */
     fun checkoutStatus(operationId: String): String? = readableDatabase.rawQuery(
         "SELECT status FROM pending_operation WHERE operation_id = ?",
@@ -541,6 +553,7 @@ class NativePosDatabase(
         services: List<NativeService>? = null,
         customers: List<NativeCustomer>? = null,
         tickets: List<NativeServiceTicket>? = null,
+        expectedStockRevision: Long? = null,
     ) {
         writableDatabase.beginTransaction()
         try {
@@ -550,6 +563,11 @@ class NativePosDatabase(
                 writableDatabase.delete("checkout_settings", null, null)
             }
             val reservedBySku = reservedQuantitiesBySku()
+            // A foreground sale may commit while this network snapshot is downloading.
+            // Never restore the older, larger stock balance in that case.
+            val localStock = if (expectedStockRevision != null && expectedStockRevision != stockRevision()) {
+                readProducts().associate { it.skuId to it.availableQuantity }
+            } else emptyMap()
             writableDatabase.insertWithOnConflict("terminal_state", null, ContentValues().apply {
                 put("singleton", 1)
                 put("tenant_id", terminal.tenantId)
@@ -570,6 +588,7 @@ class NativePosDatabase(
             products.forEach { product ->
                 insertProduct(product.copy(
                     reservedOfflineQuantity = reservedBySku[product.skuId] ?: product.reservedOfflineQuantity,
+                    availableQuantity = localStock[product.skuId]?.let { local -> product.availableQuantity?.let { minOf(local, it) } ?: local } ?: product.availableQuantity,
                 ))
             }
             services?.let { rows ->
@@ -650,9 +669,9 @@ class NativePosDatabase(
 
         writableDatabase.beginTransaction()
         try {
-            if (reserveOfflineStock) {
-                cart.products.forEach { line -> reserveOfflineStock(line) }
-            }
+            // Online sales also hold local stock until accepted; a lost response must
+            // not make it available again when the cashier switches to offline mode.
+            cart.products.forEach { line -> reserveOfflineStock(line, enforceAvailability = reserveOfflineStock) }
             val orderId = cart.checkoutId
             val operationId = NativeUlid.create(now + 1)
             val paymentIdempotencyKey = "$orderId:$paymentMethod"
@@ -1415,7 +1434,7 @@ class NativePosDatabase(
         terminal.userId,
     )
 
-    private fun reserveOfflineStock(line: NativeCartLine) {
+    private fun reserveOfflineStock(line: NativeCartLine, enforceAvailability: Boolean = true) {
         val stock = readableDatabase.rawQuery(
             "SELECT track_inventory, available_quantity, allow_negative_stock, offline_stock_buffer, reserved_offline_quantity FROM catalog_product WHERE sku_id = ?",
             arrayOf(line.skuId),
@@ -1432,7 +1451,7 @@ class NativePosDatabase(
         // Every product that has been synchronised to this terminal can be
         // sold offline. The cached stock balance, branch buffer, and local
         // queued sales still prevent an untracked over-sale.
-        if (stock.trackInventory && !stock.allowNegativeStock && (
+        if (enforceAvailability && stock.trackInventory && !stock.allowNegativeStock && (
                 stock.availableQuantity == null ||
                     stock.availableQuantity - stock.offlineStockBuffer - stock.reservedOfflineQuantity < line.quantity
             )
@@ -1447,7 +1466,7 @@ class NativePosDatabase(
 
     /**
      * A replayed checkout has reached the server, so its local stock hold must
-     * be released before the next catalog refresh. Failed commands intentionally
+     * be consumed against cached stock before the next catalog refresh. Failed commands intentionally
      * keep their hold until an administrator resolves the exception.
      */
     private fun releaseOfflineStock(payloadJson: String) {
@@ -1459,10 +1478,11 @@ class NativePosDatabase(
             val skuId = item.optString("productSkuId").takeIf { it.isNotBlank() } ?: continue
             val quantity = item.optString("quantity").toLongOrNull()?.takeIf { it > 0 } ?: continue
             writableDatabase.execSQL(
-                "UPDATE catalog_product SET reserved_offline_quantity = CASE WHEN reserved_offline_quantity > ? THEN reserved_offline_quantity - ? ELSE 0 END WHERE sku_id = ?",
-                arrayOf(quantity, quantity, skuId),
+                "UPDATE catalog_product SET available_quantity = available_quantity - ?, reserved_offline_quantity = CASE WHEN reserved_offline_quantity > ? THEN reserved_offline_quantity - ? ELSE 0 END WHERE sku_id = ?",
+                arrayOf(quantity, quantity, quantity, skuId),
             )
         }
+        NATIVE_STOCK_REVISION.incrementAndGet()
     }
 
     private fun insertProduct(product: NativeProduct) {

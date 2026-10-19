@@ -391,6 +391,8 @@ data class NativeCheckoutRequest(
     val cashRoundingStep: Int? = null,
     val receiptDelivery: NativeReceiptDelivery = NativeReceiptDelivery.None,
     val receiptDestination: String? = null,
+    /** The preview already shown to the cashier. The checkout endpoint verifies the total atomically. */
+    val pricing: NativeCartPricing? = null,
 )
 
 data class NativePendingReceiptPrint(
