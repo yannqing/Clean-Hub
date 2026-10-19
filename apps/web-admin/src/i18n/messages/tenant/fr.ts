@@ -2733,6 +2733,24 @@ export const tenantMessagesFr: TenantMessages = {
     requestFailed: "L’aperçu des locataires n’a pas pu être chargé.",
   },
   settings: {
+    branding: {
+      save: "Enregistrer l’identité",
+      title: "Identité du commerçant sur le POS",
+      description: "Personnalisez le nom et le logo affichés dans le POS Android pour tous les terminaux liés.",
+      nameLabel: "Nom affiché du commerçant",
+      namePlaceholder: "Saisir le nom du commerçant",
+      logoLabel: "Logo du commerçant",
+      logoHint: "JPG, PNG ou WebP, 5 Mo maximum. Une image carrée est recommandée.",
+      upload: "Ajouter ou remplacer le logo",
+      remove: "Retirer le logo",
+      required: "Conservez au moins un nom affiché ou un logo.",
+      saving: "Enregistrement…",
+      saved: "Identité enregistrée. Synchronisez le POS pour la mettre à jour.",
+      uploadFailed: "Échec du téléversement du logo. Réessayez.",
+      saveFailed: "Impossible d’enregistrer l’identité. Vérifiez l’image et réessayez.",
+      preview: "Aperçu de l’en-tête du POS",
+      syncHint: "Les terminaux seront mis à jour à la prochaine synchronisation en ligne. Le logo reste disponible hors ligne. Le nom du locataire et l’en-tête du reçu restent inchangés.",
+    },
     paymentIntegrations: {
       unbind: "Déconnecter",
       savedAndVerified: "{provider} validé et enregistré.",
@@ -2804,7 +2822,7 @@ export const tenantMessagesFr: TenantMessages = {
         "Gérez l'identité commerciale et les coordonnées de ce locataire.",
       entityLabel: "Entité commerciale locataire",
       businessDetailsHint:
-        "Le nom du locataire apparaît dans l'administration et le PDV. Le code du locataire et le statut opérationnel restent gérés par un administrateur SaaS.",
+        "Le nom du locataire est utilisé dans l’administration et les informations du commerçant sur les reçus. L’en-tête du POS utilise l’identité ci-dessus. Le code et le statut restent gérés par un administrateur SaaS.",
       readOnlyTitle: "Ces paramètres sont en lecture seule",
       storeDefaultsTitle: "Paramètres par défaut du magasin",
       storeDefaultsDescription:

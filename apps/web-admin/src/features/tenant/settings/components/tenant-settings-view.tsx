@@ -40,6 +40,7 @@ import {
   tenantSettingsNavigationItems,
   useTenantSettingsWorkspace,
 } from "./tenant-settings-workspace";
+import { TenantPosBrandingSection } from "./tenant-pos-branding-section";
 import { TenantTimezoneField } from "./tenant-timezone-field";
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -304,6 +305,7 @@ export function TenantSettingsView() {
 
   return (
     <div className="grid max-w-[800px] gap-4">
+      <TenantPosBrandingSection />
       <SettingsSection
         description={m.settings.general.businessDetailsDescription}
         title={m.settings.general.businessDetailsTitle}

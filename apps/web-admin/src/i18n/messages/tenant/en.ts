@@ -2681,6 +2681,24 @@ export const tenantMessagesEn: TenantMessages = {
   },
 
   settings: {
+    branding: {
+      save: "Save merchant identity",
+      title: "POS merchant identity",
+      description: "Customize the merchant name and logo in the Android POS header for all enrolled terminals.",
+      nameLabel: "Merchant display name",
+      namePlaceholder: "Enter merchant name",
+      logoLabel: "Merchant logo",
+      logoHint: "JPG, PNG or WebP, up to 5 MB. A square image is recommended.",
+      upload: "Upload or replace logo",
+      remove: "Remove logo",
+      required: "Keep at least a display name or a logo.",
+      saving: "Saving…",
+      saved: "Merchant identity saved. Sync the POS to update it.",
+      uploadFailed: "Logo upload failed. Please try again.",
+      saveFailed: "Could not save merchant identity. Check the image and try again.",
+      preview: "POS header preview",
+      syncHint: "Terminals update on their next online sync. Synced logos remain available offline. This does not change the tenant name or receipt heading.",
+    },
     paymentIntegrations: {
       unbind: "Disconnect",
       savedAndVerified: "{provider} verified and saved.",
@@ -2752,7 +2770,7 @@ export const tenantMessagesEn: TenantMessages = {
         "Maintain this tenant's business identity and contact details.",
       entityLabel: "Tenant business entity",
       businessDetailsHint:
-        "The tenant name appears in the admin and POS apps. The tenant code and operating status remain managed by a SaaS administrator.",
+        "The tenant name is used in the admin and receipt merchant details. The POS header uses the merchant identity above. The tenant code and operating status are managed by a SaaS administrator.",
       readOnlyTitle: "These settings are read-only",
       storeDefaultsTitle: "Store defaults",
       storeDefaultsDescription:

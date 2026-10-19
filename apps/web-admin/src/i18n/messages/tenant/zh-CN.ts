@@ -2534,6 +2534,24 @@ export const tenantMessagesZhCN: TenantMessages = {
   },
 
   settings: {
+    branding: {
+      save: "保存商家标识",
+      title: "POS 商家标识",
+      description: "自定义 Android POS 左上角的商家名称与图标，所有绑定终端统一使用。",
+      nameLabel: "商家显示名称",
+      namePlaceholder: "输入商家名称",
+      logoLabel: "商家图标",
+      logoHint: "支持 JPG、PNG、WebP，最大 5 MB；建议使用方形图片。",
+      upload: "上传或更换图标",
+      remove: "移除图标",
+      required: "显示名称和图标至少保留一项。",
+      saving: "正在保存…",
+      saved: "商家标识已保存，请在 POS 上同步更新。",
+      uploadFailed: "图标上传失败，请重试。",
+      saveFailed: "商家标识保存失败，请检查图片后重试。",
+      preview: "POS 左上角预览",
+      syncHint: "保存后，终端下次联网同步时更新；已同步的图标离线仍可显示。此设置不修改租户名称或收据抬头。",
+    },
     paymentIntegrations: {
       unbind: "解除绑定",
       savedAndVerified: "{provider} 已验证并保存。",
@@ -2603,7 +2621,7 @@ export const tenantMessagesZhCN: TenantMessages = {
       businessDetailsDescription: "维护当前租户的业务主体与联系信息。",
       entityLabel: "租户业务主体",
       businessDetailsHint:
-        "租户名称会显示在管理端与 POS 中；租户编码和运行状态仍由 SaaS 管理员维护。",
+        "租户名称用于管理端和收据商家信息；POS 左上角使用上方的商家标识。租户编码和运行状态由 SaaS 管理员维护。",
       readOnlyTitle: "当前设置为只读",
       storeDefaultsTitle: "门店默认设置",
       storeDefaultsDescription: "设置租户默认语言与业务时区。",

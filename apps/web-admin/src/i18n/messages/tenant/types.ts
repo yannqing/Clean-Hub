@@ -2256,6 +2256,24 @@ export type TenantMessages = {
   };
 
   settings: {
+    branding: {
+      title: string;
+      description: string;
+      nameLabel: string;
+      namePlaceholder: string;
+      logoLabel: string;
+      logoHint: string;
+      upload: string;
+      remove: string;
+      required: string;
+      saving: string;
+      saved: string;
+      uploadFailed: string;
+      saveFailed: string;
+      preview: string;
+      syncHint: string;
+      save: string;
+    };
     paymentIntegrations: {
       unbind: string;
       savedAndVerified: string;
