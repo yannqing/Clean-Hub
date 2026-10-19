@@ -58,6 +58,7 @@ export type TicketItemFormValues = {
   priceTouched: boolean;
   itemType: import("@cleanhub/api-client").ServiceTicketItemType | "";
   itemCategory: string;
+  catalogItemId?: string;
   itemColor: string;
   itemBrand: string;
   itemMaterial: string;

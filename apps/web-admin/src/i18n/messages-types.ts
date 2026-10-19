@@ -46,6 +46,8 @@ export type AuditEventCode =
   | "auth.refresh.reuse_detected"
   | "auth.pos_pin_login.success"
   | "auth.pos_pin_login.failed"
+  | "service_item_catalog.updated"
+  | "tenant_item_catalog.updated"
   | "platform_settings.updated"
   | "security_settings.updated"
   | "security.settings.updated"

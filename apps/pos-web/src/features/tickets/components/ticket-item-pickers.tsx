@@ -217,6 +217,8 @@ export function TicketServicePicker({
 
 export function TicketAttributePicker({
   disabled,
+  displayValue,
+  allowCustom = true,
   emptyText,
   onValueChange,
   options,
@@ -225,6 +227,8 @@ export function TicketAttributePicker({
   value,
 }: {
   disabled?: boolean;
+  displayValue?: string;
+  allowCustom?: boolean;
   emptyText: string;
   onValueChange: (value: string) => void;
   options: ReadonlyArray<PickerOption>;
@@ -284,11 +288,7 @@ export function TicketAttributePicker({
     document.addEventListener("pointerdown", closeOnOutsidePointer, true);
     return () => {
       window.cancelAnimationFrame(focusFrame);
-      document.removeEventListener(
-        "pointerdown",
-        closeOnOutsidePointer,
-        true,
-      );
+      document.removeEventListener("pointerdown", closeOnOutsidePointer, true);
     };
   }, [open]);
 
@@ -330,7 +330,10 @@ export function TicketAttributePicker({
         <span className="flex min-w-0 items-center gap-2">
           {selected?.swatch ? <ColorSwatch swatch={selected.swatch} /> : null}
           <span className={cn("truncate", !value && "text-muted-foreground")}>
-            {selected?.localizedLabel || value || placeholder}
+            {selected?.localizedLabel ||
+              displayValue ||
+              (allowCustom ? value : "") ||
+              placeholder}
           </span>
         </span>
         <Icon
@@ -349,7 +352,12 @@ export function TicketAttributePicker({
                 closeAndRestoreFocus();
                 return;
               }
-              if (event.key === "Enter" && customValue && !exactMatch) {
+              if (
+                event.key === "Enter" &&
+                allowCustom &&
+                customValue &&
+                !exactMatch
+              ) {
                 event.preventDefault();
                 select(customValue);
               }
@@ -395,7 +403,7 @@ export function TicketAttributePicker({
                   ))}
                 </ComboboxGroup>
               ) : null}
-              {customValue && !exactMatch ? (
+              {allowCustom && customValue && !exactMatch ? (
                 <ComboboxItem
                   className="min-h-11 cursor-pointer"
                   onSelect={() => select(customValue)}
@@ -406,7 +414,7 @@ export function TicketAttributePicker({
                     {emptyText}「{customValue}」
                   </span>
                 </ComboboxItem>
-              ) : !customValue && filteredOptions.length === 0 ? (
+              ) : filteredOptions.length === 0 ? (
                 <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                   {emptyText}
                 </div>

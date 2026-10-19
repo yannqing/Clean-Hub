@@ -606,6 +606,7 @@ export const saasMessagesEn: SaasMessages = {
       sections: {
         defaults: { title: "Platform defaults", description: "Language, currency and timezone for new tenants." },
         taxTemplates: { title: "Tax templates", description: "Country tax defaults applied when tenants are created." },
+        itemCatalog: { title: "Service item catalog", description: "Manage item types, articles and tenant availability." },
         security: { title: "Security policy", description: "Password requirements and login lockout rules." },
         maintenance: { title: "Maintenance mode", description: "Control tenant write access during maintenance." },
       },

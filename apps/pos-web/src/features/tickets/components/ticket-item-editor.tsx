@@ -21,8 +21,11 @@ import {
   SelectValue,
   Textarea,
 } from "@cleanhub/ui";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
+import { useTranslation } from "@cleanhub/i18n/react";
+import { serviceCatalogText } from "@cleanhub/domain/service-item-catalog";
+import { getTicketItemCatalogQuery } from "../queries/get-item-catalog.query";
 import { Icon } from "@/components/app-shell";
 import { getActionErrorMessage } from "@/lib/action-error-message";
 
@@ -53,6 +56,7 @@ import type { TicketItemFormValues } from "../types";
 import { TicketItemStatusBadge } from "./ticket-badges";
 import type {
   PosCatalogService,
+  TenantItemCatalogResponse,
   ServiceTicketItem,
   ServiceTicketItemStatus,
   ServiceTicketStatus,
@@ -81,6 +85,7 @@ const EMPTY_ITEM_FORM: TicketItemFormValues = {
   priceTouched: false,
   itemType: "",
   itemCategory: "",
+  catalogItemId: "",
   itemColor: "",
   itemBrand: "",
   itemMaterial: "",
@@ -159,6 +164,7 @@ export function TicketItemEditor({
       priceTouched: false,
       itemType: item.itemType ?? "",
       itemCategory: item.itemCategory ?? "",
+      catalogItemId: item.catalogItemId ?? "",
       itemColor: item.itemColor ?? "",
       itemBrand: item.itemBrand ?? "",
       itemMaterial: item.itemMaterial ?? "",
@@ -257,6 +263,7 @@ export function TicketItemEditor({
             catalog={catalog}
             currency={currency}
             form={form}
+            originalItem={items.find((item) => item.id === editingId)}
             itemId={editingId ?? undefined}
             onCancel={cancel}
             onChange={setForm}
@@ -514,6 +521,7 @@ function ItemForm({
   onSubmit,
   ticketId,
   itemId,
+  originalItem,
 }: {
   canManage: boolean;
   catalog: PosCatalogService[];
@@ -524,8 +532,43 @@ function ItemForm({
   onSubmit: "create" | "update";
   ticketId: string;
   itemId?: string;
+  originalItem?: ServiceTicketItem;
 }) {
   const [isPending, startTransition] = useTransition();
+  const { locale } = useTranslation();
+  const [itemCatalog, setItemCatalog] =
+    useState<TenantItemCatalogResponse | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState(false);
+  const [catalogReload, setCatalogReload] = useState(0);
+  useEffect(() => {
+    let active = true;
+    getTicketItemCatalogQuery()
+      .then((data) => {
+        if (active) {
+          setItemCatalog(data);
+          setCatalogError(false);
+        }
+      })
+      .catch(() => {
+        if (active) setCatalogError(true);
+      })
+      .finally(() => {
+        if (active) setCatalogLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [catalogReload]);
+  const itemGroup = itemCatalog?.groups.find(
+    (group) => group.itemType === form.itemType,
+  );
+  const preservedArticle =
+    originalItem &&
+    form.itemType === originalItem.itemType &&
+    (form.catalogItemId || "") === (originalItem.catalogItemId || "") &&
+    form.itemCategory === (originalItem.itemCategory || "");
+
   const [cachedBrands, setCachedBrands] = useState<string[]>(() =>
     typeof window === "undefined" ? [] : loadCachedTicketBrands(),
   );
@@ -562,6 +605,8 @@ function ItemForm({
     onChange({
       ...form,
       itemType,
+      catalogItemId: "",
+      itemCategory: "",
       ...(keepService
         ? {}
         : {
@@ -606,6 +651,14 @@ function ItemForm({
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (catalogLoading || catalogError || !itemCatalog) {
+      toast.error("物品目录加载失败，请重试后继续。");
+      return;
+    }
+    if (!form.catalogItemId && !preservedArticle) {
+      toast.error("请选择具体物品");
+      return;
+    }
     const errors = validateTicketItemForm(form);
     if (errors) {
       const first = Object.values(errors)[0];
@@ -623,6 +676,7 @@ function ItemForm({
     const payload = {
       serviceId: form.serviceId,
       itemType,
+      catalogItemId: form.catalogItemId || undefined,
       itemCategory: form.itemCategory.trim() || undefined,
       itemColor: form.itemColor.trim() || undefined,
       itemBrand: form.itemBrand.trim() || undefined,
@@ -661,10 +715,33 @@ function ItemForm({
 
   return (
     <form onSubmit={submit}>
+      {catalogLoading ? (
+        <p role="status" className="mb-4 text-sm text-muted-foreground">
+          物品目录加载中…
+        </p>
+      ) : catalogError ? (
+        <div
+          role="alert"
+          className="mb-4 rounded-lg border border-destructive/30 p-3 text-sm text-destructive"
+        >
+          物品目录加载失败，请重试后继续。
+          <Button
+            type="button"
+            variant="outline"
+            className="ml-2"
+            onClick={() => {
+              setCatalogLoading(true);
+              setCatalogReload((key) => key + 1);
+            }}
+          >
+            重试
+          </Button>
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="物品类型（必填）" wide>
           <Select
-            disabled={isPending}
+            disabled={isPending || catalogLoading || catalogError}
             onValueChange={(value) =>
               changeItemType(coerceTicketItemType(value))
             }
@@ -674,11 +751,22 @@ function ItemForm({
               <SelectValue placeholder="请先选择物品类型" />
             </SelectTrigger>
             <SelectContent>
-              {getTicketItemTypeOptions().map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
+              {itemCatalog?.groups.map((group) => (
+                <SelectItem key={group.id} value={group.itemType}>
+                  {serviceCatalogText(group.names, locale)}
                 </SelectItem>
               ))}
+              {originalItem?.itemType &&
+              !itemCatalog?.groups.some(
+                (group) => group.itemType === originalItem.itemType,
+              ) ? (
+                <SelectItem value={originalItem.itemType} disabled>
+                  {originalItem.itemTypeName ||
+                    getTicketItemTypeOptions().find(
+                      (option) => option.value === originalItem.itemType,
+                    )?.label}
+                </SelectItem>
+              ) : null}
             </SelectContent>
           </Select>
         </Field>
@@ -716,10 +804,31 @@ function ItemForm({
             </span>
           ) : null}
         </Field>
-        <Field label="分类">
-          <Input
-            onChange={(event) => update("itemCategory", event.target.value)}
-            value={form.itemCategory}
+        <Field label="具体物品">
+          <TicketAttributePicker
+            allowCustom={false}
+            displayValue={form.itemCategory || undefined}
+            disabled={isPending || catalogLoading || !form.itemType}
+            options={
+              itemGroup?.items.map((item) => ({
+                value: item.id,
+                label: serviceCatalogText(item.names, locale),
+              })) ?? []
+            }
+            value={form.catalogItemId || ""}
+            onValueChange={(id) => {
+              const item = itemGroup?.items.find((entry) => entry.id === id);
+              onChange({
+                ...form,
+                catalogItemId: id,
+                itemCategory: item
+                  ? serviceCatalogText(item.names, locale)
+                  : "",
+              });
+            }}
+            placeholder={form.itemCategory || "请选择具体物品"}
+            searchPlaceholder="搜索具体物品…"
+            emptyText="没有可用物品，请联系管理员配置"
           />
         </Field>
         <Field label="颜色">
@@ -883,7 +992,15 @@ function ItemForm({
         >
           取消
         </Button>
-        <Button disabled={isPending} type="submit">
+        <Button
+          disabled={
+            isPending ||
+            catalogLoading ||
+            catalogError ||
+            (!form.catalogItemId && !preservedArticle)
+          }
+          type="submit"
+        >
           <Icon className="h-4 w-4" name="save" />
           {isPending ? "保存中…" : "保存"}
         </Button>

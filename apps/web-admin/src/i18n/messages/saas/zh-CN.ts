@@ -590,6 +590,7 @@ export const saasMessagesZhCN: SaasMessages = {
       sections: {
         defaults: { title: "平台默认值", description: "新租户继承的语言、货币和时区。" },
         taxTemplates: { title: "税务模板", description: "创建租户时按国家带入的税务默认配置。" },
+        itemCatalog: { title: "服务物品目录", description: "管理物品类型、具体物品及租户可用范围。" },
         security: { title: "安全策略", description: "密码要求与登录锁定规则。" },
         maintenance: { title: "维护模式", description: "维护期间控制租户端写入。" },
       },

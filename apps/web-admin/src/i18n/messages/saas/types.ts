@@ -567,6 +567,7 @@ export type SaasMessages = {
       sections: {
         defaults: { title: string; description: string };
         taxTemplates: { title: string; description: string };
+        itemCatalog: { title: string; description: string };
         security: { title: string; description: string };
         maintenance: { title: string; description: string };
       };

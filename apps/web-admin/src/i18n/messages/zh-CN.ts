@@ -292,6 +292,8 @@ export const zhCNMessages: WebAdminMessages = {
       "auth.pos_pin_login.success": "收银员 PIN 登录成功",
       "auth.pos_pin_login.failed": "收银员 PIN 登录失败",
       "platform_settings.updated": "平台设置已更新",
+      "service_item_catalog.updated": "服务物品目录已更新",
+      "tenant_item_catalog.updated": "租户可用物品已更新",
       "security_settings.updated": "安全设置已更新",
       "security.settings.updated": "安全设置已更新",
       "backup_job.created": "备份任务已创建",

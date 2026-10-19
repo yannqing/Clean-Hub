@@ -11,6 +11,12 @@ const POS_TEXT_TRANSLATION_OVERRIDES: Record<
   string,
   Record<PosTextLocale, string>
 > = {
+  "具体物品": { en: "Article", fr: "Article" },
+  "请选择具体物品": { en: "Choose an article", fr: "Choisir un article" },
+  "搜索具体物品…": { en: "Search articles…", fr: "Rechercher un article…" },
+  "没有可用物品，请联系管理员配置": { en: "No articles available. Ask an administrator to configure the catalog.", fr: "Aucun article disponible. Demandez à un administrateur de configurer le catalogue." },
+  "物品目录加载失败，请重试后继续。": { en: "Could not load the item catalog. Retry before continuing.", fr: "Impossible de charger le catalogue. Réessayez avant de continuer." },
+  "物品目录加载中…": { en: "Loading item catalog…", fr: "Chargement du catalogue…" },
   业务记录: { en: "Business records", fr: "Dossiers" },
   共: { en: "Total", fr: "Total" },
   条: { en: "items", fr: "éléments" },

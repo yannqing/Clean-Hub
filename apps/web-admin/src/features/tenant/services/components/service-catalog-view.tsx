@@ -1,5 +1,7 @@
 "use client";
 
+import { useItemTypeNames } from "../hooks/use-item-type-names";
+
 import {
   Badge,
   Button,
@@ -289,6 +291,7 @@ export function ServiceCatalogView({
 }) {
   const router = useRouter();
   const { formatDateTime, locale, m } = useTenantI18n();
+  const itemTypeName = useItemTypeNames(locale);
   const [serviceDataset, setServiceDataset] = useState<ServiceSummary[]>([]);
   const [serviceImageSources, setServiceImageSources] = useState<
     Record<string, ServiceImageSource>
@@ -1605,7 +1608,7 @@ export function ServiceCatalogView({
                         ]);
                       }}
                     />
-                    {m.services.itemTypeLabels[itemType]}
+                    {itemTypeName(itemType, m.services.itemTypeLabels[itemType])}
                   </label>
                 ))}
               </div>

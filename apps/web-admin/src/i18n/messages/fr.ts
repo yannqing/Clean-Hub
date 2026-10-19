@@ -223,6 +223,8 @@ export const frMessages: WebAdminMessages = {
       "auth.pos_pin_login.success": "Connexion caissier par PIN réussie",
       "auth.pos_pin_login.failed": "Échec de la connexion caissier par PIN",
       "platform_settings.updated": "Paramètres de la plateforme mis à jour",
+      "service_item_catalog.updated": "Catalogue des articles mis à jour",
+      "tenant_item_catalog.updated": "Articles disponibles du locataire mis à jour",
       "security_settings.updated": "Paramètres de sécurité mis à jour",
       "security.settings.updated": "Paramètres de sécurité mis à jour",
       "backup_job.created": "Tâche de sauvegarde créée",

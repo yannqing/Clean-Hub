@@ -3,6 +3,7 @@
 import { Input, Label, cn } from "@cleanhub/ui";
 import {
   Globe2,
+  Shirt,
   ReceiptText,
   Search,
   ShieldCheck,
@@ -17,7 +18,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { webAdminRoutes } from "@/config/routes";
 import { useSaasI18n } from "@/i18n";
 
-type SectionKey = "defaults" | "taxTemplates" | "security" | "maintenance";
+type SectionKey = "defaults" | "taxTemplates" | "itemCatalog" | "security" | "maintenance";
 
 const sections: Array<{ key: SectionKey; href: string; icon: LucideIcon }> = [
   {
@@ -30,6 +31,7 @@ const sections: Array<{ key: SectionKey; href: string; icon: LucideIcon }> = [
     href: webAdminRoutes.saas.config.platformSettingsSections.taxTemplates,
     icon: ReceiptText,
   },
+  { key: "itemCatalog", href: webAdminRoutes.saas.config.platformSettingsSections.itemCatalog, icon: Shirt },
   {
     key: "security",
     href: webAdminRoutes.saas.config.platformSettingsSections.security,

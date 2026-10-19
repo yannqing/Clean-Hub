@@ -238,6 +238,7 @@ export function validateTenantForm(
       contactEmail: basics.contactEmail,
       initialOwner: owner.initialOwner,
       featureFlags: flags.ok ? flags.data : undefined,
+      itemCatalogSelection: input.itemCatalogSelection,
     },
   };
 }

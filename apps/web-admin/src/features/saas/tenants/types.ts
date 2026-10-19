@@ -1,4 +1,4 @@
-import type { TenantLanguage } from "@cleanhub/api-client";
+import type { TenantLanguage, TenantItemCatalogSelection } from "@cleanhub/api-client";
 
 export type {
   CreateTenantResponse,
@@ -33,6 +33,7 @@ export type TenantFormValues = {
   initialOwnerEmail: string;
   initialOwnerPhone: string;
   featureFlags: TenantFeatureFlagsFormValues;
+  itemCatalogSelection?: TenantItemCatalogSelection;
 };
 
 export type TenantSettingsFormValues = {

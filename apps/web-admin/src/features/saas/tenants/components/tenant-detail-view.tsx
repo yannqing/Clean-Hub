@@ -40,11 +40,17 @@ import {
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import { tenantDefaultValues } from "../constants";
 import { getTenantDetailQuery, getTenantUsersQuery } from "../queries";
-import type { SaasTenantUserSummary, TenantDetail, TenantFormValues, TenantStatus } from "../types";
+import type {
+  SaasTenantUserSummary,
+  TenantDetail,
+  TenantFormValues,
+  TenantStatus,
+} from "../types";
 import { TenantIdentitySummary } from "./tenant-identity-summary";
 import { TenantFeatureFlagsPanel } from "./tenant-feature-flags-panel";
 import { TenantForm } from "./tenant-form";
 import { TenantTaxSettingsCard } from "./tenant-tax-settings-card";
+import { TenantItemCatalogPanel } from "@/features/saas/item-catalog/components/tenant-item-catalog-panel";
 import { TenantDefaultsPanel } from "./tenant-defaults-panel";
 
 export type TenantDetailPresentation = "page" | "dialog";
@@ -109,7 +115,9 @@ export function TenantDetailView({
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [tenant, setTenant] = useState<TenantDetail | null>(null);
-  const [tenantUsers, setTenantUsers] = useState<SaasTenantUserSummary[] | null>(null);
+  const [tenantUsers, setTenantUsers] = useState<
+    SaasTenantUserSummary[] | null
+  >(null);
   const [tenantUsersError, setTenantUsersError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -266,7 +274,11 @@ export function TenantDetailView({
   useEffect(() => {
     let isCurrent = true;
 
-    Promise.allSettled([getCurrentAuthQuery(), getTenantDetailQuery(tenantId), getTenantUsersQuery(tenantId)])
+    Promise.allSettled([
+      getCurrentAuthQuery(),
+      getTenantDetailQuery(tenantId),
+      getTenantUsersQuery(tenantId),
+    ])
       .then(([authResult, tenantResult, usersResult]) => {
         if (!isCurrent) {
           return;
@@ -335,8 +347,15 @@ export function TenantDetailView({
           <DialogTitle className="text-lg">
             {tenant?.name ?? m.tenants.detail.title}
           </DialogTitle>
-          {tenant ? <TenantIdentitySummary tenantId={tenant.id} tenantCode={tenant.pressingCode} /> : (
-            <p className="break-all text-sm text-muted-foreground">{m.tenants.identity.systemId}: {tenantId}</p>
+          {tenant ? (
+            <TenantIdentitySummary
+              tenantId={tenant.id}
+              tenantCode={tenant.pressingCode}
+            />
+          ) : (
+            <p className="break-all text-sm text-muted-foreground">
+              {m.tenants.identity.systemId}: {tenantId}
+            </p>
           )}
         </div>
       </div>
@@ -373,17 +392,29 @@ export function TenantDetailView({
             </div>
           ) : null}
 
-          <CheckoutReadinessCard readiness={tenant.readiness} locale={locale} tenantId={tenant.id} />
+          <CheckoutReadinessCard
+            readiness={tenant.readiness}
+            locale={locale}
+            tenantId={tenant.id}
+          />
 
           <TenantForm
             additionalContent={
-              <TenantTaxSettingsCard
-                canEdit={authContext?.role === "super_admin"}
-                key={`${tenant.id}-${tenant.updatedAt}`}
-                onSaved={() => { void getTenantDetailQuery(tenantId).then(setTenant); }}
-                templateApplied={tenant.readiness.taxTemplateApplied}
-                tenantId={tenantId}
-              />
+              <>
+                <TenantItemCatalogPanel
+                  tenantId={tenantId}
+                  canEdit={authContext?.role === "super_admin"}
+                />
+                <TenantTaxSettingsCard
+                  canEdit={authContext?.role === "super_admin"}
+                  key={`${tenant.id}-${tenant.updatedAt}`}
+                  onSaved={() => {
+                    void getTenantDetailQuery(tenantId).then(setTenant);
+                  }}
+                  templateApplied={tenant.readiness.taxTemplateApplied}
+                  tenantId={tenantId}
+                />
+              </>
             }
             disabled={!canManageTenant}
             featureFlagsContent={
@@ -405,11 +436,15 @@ export function TenantDetailView({
                   disabled={!canManageTenant}
                   key={`defaults-${tenant.id}-${tenant.defaultLanguage}-${tenant.defaultCurrency}`}
                   onSaved={(settings) => {
-                    setTenant((current) => current ? {
-                      ...current,
-                      defaultLanguage: settings.defaultLanguage,
-                      defaultCurrency: settings.defaultCurrency,
-                    } : current);
+                    setTenant((current) =>
+                      current
+                        ? {
+                            ...current,
+                            defaultLanguage: settings.defaultLanguage,
+                            defaultCurrency: settings.defaultCurrency,
+                          }
+                        : current,
+                    );
                     onTenantUpdated?.();
                   }}
                   tenantId={tenant.id}
@@ -421,7 +456,12 @@ export function TenantDetailView({
                         <h2 className="truncate text-sm font-semibold">
                           {tenant.name}
                         </h2>
-                        <div className="mt-2"><TenantIdentitySummary tenantId={tenant.id} tenantCode={tenant.pressingCode} /></div>
+                        <div className="mt-2">
+                          <TenantIdentitySummary
+                            tenantId={tenant.id}
+                            tenantCode={tenant.pressingCode}
+                          />
+                        </div>
                       </div>
                       <Badge
                         className="shrink-0"
@@ -485,24 +525,49 @@ export function TenantDetailView({
                 <Card className="gap-0 rounded-lg py-0 shadow-none">
                   <CardContent className="grid gap-3 py-5">
                     <div>
-                      <h2 className="text-sm font-semibold">{m.tenants.detail.tenantUsersTitle}</h2>
-                      <p className="mt-1 text-xs text-muted-foreground">{m.tenants.detail.tenantUsersHint}</p>
+                      <h2 className="text-sm font-semibold">
+                        {m.tenants.detail.tenantUsersTitle}
+                      </h2>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {m.tenants.detail.tenantUsersHint}
+                      </p>
                     </div>
                     {tenantUsersError ? (
-                      <p className="text-xs text-destructive">{m.tenants.detail.tenantUsersLoadError}</p>
+                      <p className="text-xs text-destructive">
+                        {m.tenants.detail.tenantUsersLoadError}
+                      </p>
                     ) : tenantUsers === null ? (
-                      <p className="text-xs text-muted-foreground">{m.tenants.detail.tenantUsersLoading}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {m.tenants.detail.tenantUsersLoading}
+                      </p>
                     ) : tenantUsers.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">{m.tenants.detail.tenantUsersEmpty}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {m.tenants.detail.tenantUsersEmpty}
+                      </p>
                     ) : (
                       <ul className="max-h-60 space-y-2 overflow-y-auto">
                         {tenantUsers.map((user) => (
-                          <li className="rounded-md border p-2 text-xs" key={user.id}>
+                          <li
+                            className="rounded-md border p-2 text-xs"
+                            key={user.id}
+                          >
                             <div className="flex items-center justify-between gap-2">
-                              <span className="truncate font-medium">{user.displayName}</span>
-                              {user.roleCodes.includes("owner") ? <Badge variant="secondary">{locale === "zh-CN" ? "店主" : locale === "fr" ? "Propriétaire" : "Owner"}</Badge> : null}
+                              <span className="truncate font-medium">
+                                {user.displayName}
+                              </span>
+                              {user.roleCodes.includes("owner") ? (
+                                <Badge variant="secondary">
+                                  {locale === "zh-CN"
+                                    ? "店主"
+                                    : locale === "fr"
+                                      ? "Propriétaire"
+                                      : "Owner"}
+                                </Badge>
+                              ) : null}
                             </div>
-                            <p className="mt-1 break-all text-muted-foreground">{user.email ?? user.phone ?? user.id}</p>
+                            <p className="mt-1 break-all text-muted-foreground">
+                              {user.email ?? user.phone ?? user.id}
+                            </p>
                           </li>
                         ))}
                       </ul>

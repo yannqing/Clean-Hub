@@ -19,6 +19,7 @@ export const AUDIT_EVENT_DICTIONARY = {
   ],
   saas_platform: [
     "platform_settings.updated",
+    "service_item_catalog.updated",
     "security_settings.updated",
     "security.settings.updated",
     "backup_job.created",
@@ -33,6 +34,7 @@ export const AUDIT_EVENT_DICTIONARY = {
     "tenant.updated",
     "tenant.status_updated",
     "tenant_settings.updated",
+    "tenant_item_catalog.updated",
     "tenant_feature_flags.updated",
   ],
   saas_user: [

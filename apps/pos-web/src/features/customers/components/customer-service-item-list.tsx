@@ -173,7 +173,7 @@ export function CustomerServiceItemList({
                   <div className="text-foreground">
                     {item.itemCategory ??
                       (item.itemType
-                        ? getTicketItemTypeLabel(item.itemType)
+                        ? (item.itemTypeName || getTicketItemTypeLabel(item.itemType))
                         : getTicketTypeLabel(item.ticketType))}
                   </div>
                   <div className="min-w-0">
@@ -281,7 +281,7 @@ function CustomerServiceItemCard({
   const service =
     item.itemCategory ??
     (item.itemType
-      ? getTicketItemTypeLabel(item.itemType)
+      ? (item.itemTypeName || getTicketItemTypeLabel(item.itemType))
       : getTicketTypeLabel(item.ticketType));
 
   return (

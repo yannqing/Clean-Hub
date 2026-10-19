@@ -318,6 +318,8 @@ export const enMessages: WebAdminMessages = {
       "auth.pos_pin_login.success": "Cashier signed in with PIN",
       "auth.pos_pin_login.failed": "Cashier PIN sign-in failed",
       "platform_settings.updated": "Platform settings updated",
+      "service_item_catalog.updated": "Service item catalog updated",
+      "tenant_item_catalog.updated": "Tenant item availability updated",
       "security_settings.updated": "Security settings updated",
       "security.settings.updated": "Security settings updated",
       "backup_job.created": "Backup job created",

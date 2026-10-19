@@ -1,5 +1,7 @@
 "use client";
 
+import { useItemTypeNames } from "../hooks/use-item-type-names";
+
 import { createId } from "@cleanhub/id";
 import {
   Button,
@@ -256,7 +258,8 @@ export function ServiceCreateView({
   taxRateOptions,
 }: ServiceCreateViewProps) {
   const router = useRouter();
-  const { m } = useTenantI18n();
+  const { m, locale } = useTenantI18n();
+  const itemTypeName = useItemTypeNames(locale);
   const isEditMode = initialService !== undefined;
   const effectiveCurrency = initialService?.currency ?? defaultCurrency;
   const pageTitle = isEditMode ? initialService.name : m.services.create.title;
@@ -1577,7 +1580,7 @@ export function ServiceCreateView({
                               ]);
                             }}
                           />
-                          {m.services.itemTypeLabels[itemType]}
+                          {itemTypeName(itemType, m.services.itemTypeLabels[itemType])}
                         </label>
                       ))}
                     </div>

@@ -32,6 +32,7 @@ export const webAdminRoutes = {
       platformSettingsSections: {
         defaults: "/saas/config/platform-settings",
         taxTemplates: "/saas/config/platform-settings/tax-templates",
+        itemCatalog: "/saas/config/platform-settings/item-catalog",
         security: "/saas/config/platform-settings/security",
         maintenance: "/saas/config/platform-settings/maintenance",
       },
