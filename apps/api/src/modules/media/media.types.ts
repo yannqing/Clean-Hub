@@ -4,6 +4,7 @@ export type MediaObjectPurpose =
   | "product_image"
   | "service_image"
   | "branch_logo"
+  | "tenant_pos_logo"
   | "order_comment_attachment"
   | "customer_comment_attachment";
 

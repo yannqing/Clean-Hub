@@ -4,8 +4,7 @@ import { isSupportedTimeZone } from "@cleanhub/domain/timezone";
 export const tenantSettingsLanguageSchema = z.enum(["en", "fr", "zh-CN"]);
 
 const currencyCodeSchema = z.preprocess(
-  (value) =>
-    typeof value === "string" ? value.trim().toUpperCase() : value,
+  (value) => (typeof value === "string" ? value.trim().toUpperCase() : value),
   z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code."),
 );
 
@@ -39,9 +38,33 @@ export const updateTenantSettingsBodySchema = z
     defaultLanguage: tenantSettingsLanguageSchema.optional(),
     defaultCurrency: currencyCodeSchema.optional(),
     timezone: timezoneSchema.optional(),
+    posDisplayName: z.string().trim().max(160).optional(),
+    posLogoObjectKey: z.string().trim().min(1).max(1024).nullable().optional(),
   })
   .strict()
   .superRefine((data, context) => {
+    if (
+      data.posDisplayName !== undefined ||
+      data.posLogoObjectKey !== undefined
+    ) {
+      if (
+        data.posDisplayName === undefined ||
+        data.posLogoObjectKey === undefined
+      ) {
+        context.addIssue({
+          code: "custom",
+          message:
+            "Provide both POS branding fields when updating the merchant identity.",
+          path: ["posDisplayName"],
+        });
+      } else if (!data.posDisplayName && !data.posLogoObjectKey) {
+        context.addIssue({
+          code: "custom",
+          message: "Provide a merchant name or logo for the POS.",
+          path: ["posDisplayName"],
+        });
+      }
+    }
     const hasProfileField = [
       data.tenantName,
       data.country,
@@ -73,3 +96,14 @@ export const updateTenantSettingsBodySchema = z
       ),
     "At least one tenant setting must be provided.",
   );
+
+export const tenantPosLogoUploadBodySchema = z
+  .object({
+    contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+    sizeBytes: z
+      .number()
+      .int()
+      .positive()
+      .max(5 * 1024 * 1024),
+  })
+  .strict();

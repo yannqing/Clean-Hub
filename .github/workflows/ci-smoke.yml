@@ -87,6 +87,14 @@ jobs:
           pnpm --filter @cleanhub/api exec tsx src/modules/tenant/products/products.validation.smoke.ts
           pnpm --filter @cleanhub/web-admin smoke:product-import
 
+      - name: Verify tenant POS branding and logo upload
+        run: |
+          trap 'docker compose rm -sf minio >/dev/null 2>&1 || true' EXIT
+          docker compose up -d --wait minio
+          docker compose run --rm minio-init
+          pnpm --filter @cleanhub/api test:integration:tenant-branding
+          pnpm --filter @cleanhub/storage smoke
+
       - name: Verify checkout without manual shift or drawer
         run: pnpm --filter @cleanhub/api test:integration:optional-checkout
 

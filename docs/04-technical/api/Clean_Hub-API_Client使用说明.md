@@ -302,3 +302,10 @@ tenants.types.ts    放请求/响应类型
 如果只记一句话：
 
 > **业务代码不要到处写 fetch。先看 `packages/api-client` 有没有方法；没有就补一个方法，再在 app 的 feature 里调用。**
+
+## POS 商家标识设置
+
+`tenant.settings.get()` 返回 `posDisplayName`、`posLogoObjectKey` 与短时签名的 `posLogoUrl`。
+`tenant.settings.requestPosLogoUpload({ contentType, sizeBytes })` 向 `/tenant/settings/pos-logo/upload-ticket` 申请上传凭证；浏览器使用凭证 PUT 图片后调用 `tenant.settings.update({ posDisplayName, posLogoObjectKey })` 保存。两个字段需要一起提交，名称和图标至少一项非空；仅 Owner 可以保存。
+
+`pos.branches.getMine()` 的分店信息同样包含这三个字段，`merchantName` 保持原租户名称语义。终端应下载并缓存图标本身，不将签名链接作为长期离线资源。

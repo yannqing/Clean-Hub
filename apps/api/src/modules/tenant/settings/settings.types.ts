@@ -20,6 +20,9 @@ export type TenantSettings = {
   id: string | null;
   tenantId: string;
   tenantName: string;
+  posDisplayName: string;
+  posLogoObjectKey: string | null;
+  posLogoUrl: string | null;
   pressingCode: string;
   country: string | null;
   city: string | null;
@@ -40,6 +43,8 @@ export type TenantSettings = {
 
 export type UpdateTenantSettingsRequest = {
   tenantName?: string;
+  posDisplayName?: string;
+  posLogoObjectKey?: string | null;
   country?: string | null;
   city?: string | null;
   contactName?: string | null;

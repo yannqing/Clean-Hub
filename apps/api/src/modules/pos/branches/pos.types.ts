@@ -7,6 +7,9 @@ import type { BranchSummary } from "../../tenant/branches/branches.types.js";
  */
 export type PosBranchSummary = BranchSummary & {
   merchantName: string;
+  posDisplayName: string;
+  posLogoObjectKey: string | null;
+  posLogoUrl: string | null;
 };
 
 export type PosRequestInput<TData> = {

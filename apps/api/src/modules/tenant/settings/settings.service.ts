@@ -1,3 +1,6 @@
+import { MediaService } from "../../media/media.service.js";
+import { MediaRepository } from "../../media/media.repository.js";
+import { MediaError } from "../../media/media.types.js";
 import { getDb, type Database } from "@cleanhub/db";
 
 import {
@@ -21,7 +24,9 @@ function hasUpdateField(data: object): boolean {
   return Object.values(data).some((value) => value !== undefined);
 }
 
-function hasTenantProfileUpdate(data: UpdateTenantSettingsInput["data"]): boolean {
+function hasTenantProfileUpdate(
+  data: UpdateTenantSettingsInput["data"],
+): boolean {
   return [
     data.tenantName,
     data.country,
@@ -52,7 +57,7 @@ export async function getTenantSettings(
     );
   }
 
-  return settings;
+  return withTenantPosLogo(settings);
 }
 
 export async function updateTenantSettings(
@@ -82,20 +87,65 @@ export async function updateTenantSettings(
       );
     }
 
-    if (input.data.country !== undefined && input.data.country !== before.country) {
+    if (
+      input.data.country !== undefined &&
+      input.data.country !== before.country
+    ) {
       throw new TenantSettingsError(
         "TENANT_COUNTRY_SAAS_MANAGED",
         "Country changes must be made by a SaaS administrator so the tax template and currency stay in sync.",
         422,
       );
     }
-    if (input.data.defaultCurrency !== undefined &&
-        input.data.defaultCurrency !== before.defaultCurrency) {
+    if (
+      input.data.defaultCurrency !== undefined &&
+      input.data.defaultCurrency !== before.defaultCurrency
+    ) {
       throw new TenantSettingsError(
         "TENANT_CURRENCY_SAAS_MANAGED",
         "Currency changes must be made by a SaaS administrator together with the country tax template.",
         422,
       );
+    }
+
+    if (
+      input.data.posDisplayName !== undefined ||
+      input.data.posLogoObjectKey !== undefined
+    ) {
+      if (
+        input.data.posDisplayName === undefined ||
+        input.data.posLogoObjectKey === undefined ||
+        (!input.data.posDisplayName.trim() && !input.data.posLogoObjectKey)
+      ) {
+        throw new TenantSettingsError(
+          "TENANT_POS_BRANDING_REQUIRED",
+          "Provide a merchant name or logo for the POS.",
+          422,
+        );
+      }
+      if (
+        input.data.posLogoObjectKey &&
+        input.data.posLogoObjectKey !== before.posLogoObjectKey
+      ) {
+        try {
+          await new MediaService({
+            repository: new MediaRepository(tx),
+          }).assertOwnedAndCommit({
+            tenantId,
+            objectKey: input.data.posLogoObjectKey,
+            expectedPurpose: "tenant_pos_logo",
+            expectedCreatedBy: input.authContext.userId,
+          });
+        } catch (error) {
+          if (error instanceof MediaError)
+            throw new TenantSettingsError(
+              "TENANT_POS_LOGO_INVALID",
+              error.message,
+              422,
+            );
+          throw error;
+        }
+      }
     }
 
     if (hasTenantProfileUpdate(input.data)) {
@@ -136,6 +186,54 @@ export async function updateTenantSettings(
       userAgent: input.requestMeta?.userAgent,
     });
 
-    return settings;
+    return withTenantPosLogo(settings);
   });
+}
+
+export async function withTenantPosLogo(
+  settings: TenantSettings,
+): Promise<TenantSettings> {
+  if (!settings.posLogoObjectKey) return settings;
+  try {
+    const ticket =
+      await new MediaService().createDownloadLinkForKnownCommittedObject({
+        tenantId: settings.tenantId,
+        objectKey: settings.posLogoObjectKey,
+      });
+    return { ...settings, posLogoUrl: ticket.downloadUrl };
+  } catch {
+    return { ...settings, posLogoUrl: null };
+  }
+}
+
+export async function requestTenantPosLogoUpload(
+  input: {
+    authContext: GetTenantSettingsInput["authContext"];
+    data: {
+      contentType: "image/jpeg" | "image/png" | "image/webp";
+      sizeBytes: number;
+    };
+  },
+  db: Database = getDb(),
+) {
+  requireTenantRole(input.authContext, ["owner"]);
+  await assertActiveTenant(input.authContext, db);
+  try {
+    return await new MediaService({
+      repository: new MediaRepository(db),
+    }).requestUpload({
+      tenantId: input.authContext.tenantId!,
+      actorUserId: input.authContext.userId,
+      purpose: "tenant_pos_logo",
+      ...input.data,
+    });
+  } catch (error) {
+    if (error instanceof MediaError)
+      throw new TenantSettingsError(
+        "TENANT_POS_LOGO_UPLOAD_FAILED",
+        error.message,
+        error.status,
+      );
+    throw error;
+  }
 }

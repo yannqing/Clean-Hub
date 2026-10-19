@@ -3,10 +3,14 @@ import type { Context } from "hono";
 import type { AppBindings } from "../../../http/types.js";
 import { TenantSettingsError } from "./settings.errors.js";
 import {
+  requestTenantPosLogoUpload,
   getTenantSettings,
   updateTenantSettings,
 } from "./settings.service.js";
-import { updateTenantSettingsBodySchema } from "./settings.validation.js";
+import {
+  tenantPosLogoUploadBodySchema,
+  updateTenantSettingsBodySchema,
+} from "./settings.validation.js";
 
 function getClientIp(c: Context<AppBindings>): string | undefined {
   return (
@@ -67,4 +71,19 @@ export async function updateTenantSettingsController(c: Context<AppBindings>) {
 
     throw error;
   }
+}
+
+export async function requestTenantPosLogoUploadController(
+  c: Context<AppBindings>,
+) {
+  const data = tenantPosLogoUploadBodySchema.parse(
+    await c.req.json().catch(() => ({})),
+  );
+  return c.json(
+    await requestTenantPosLogoUpload({
+      authContext: c.get("authContext"),
+      data,
+    }),
+    201,
+  );
 }

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+  ObjectStorage,
   StorageValidationError,
   assertTenantObjectKey,
   buildTenantObjectKey,
@@ -103,4 +104,19 @@ assert.doesNotThrow(() =>
   assertTenantObjectKey("tenant/TENANT_01/media/....jpg", "TENANT_01"),
 );
 
-console.log("storage smoke ok");
+const publicConfig = { ...config, endpoint: "http://minio:9000", publicEndpoint: "https://media.example.com" };
+const publicStorage = new ObjectStorage(publicConfig);
+for (const link of [
+  (await publicStorage.presignUpload({ objectKey, contentType: "image/png", contentLength: 12 })).uploadUrl,
+  (await publicStorage.presignDownload({ objectKey })).downloadUrl,
+]) {
+  const url = new URL(link);
+  assert.equal(url.origin, publicConfig.publicEndpoint);
+  assert.equal(url.pathname, `/cleanhub-media/${objectKey}`);
+  assert.ok(url.searchParams.has("X-Amz-Signature"));
+}
+assert.equal(loadStorageConfig({
+  OBJECT_STORAGE_ENDPOINT: "http://minio:9000", OBJECT_STORAGE_PUBLIC_ENDPOINT: "https://media.example.com",
+  OBJECT_STORAGE_BUCKET: "cleanhub-media", OBJECT_STORAGE_ACCESS_KEY: "test", OBJECT_STORAGE_SECRET_KEY: "test-secret",
+}).publicEndpoint, "https://media.example.com");
+console.log("storage smoke ok (including separate public signing origin)");

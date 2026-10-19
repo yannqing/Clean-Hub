@@ -37,6 +37,19 @@
 
 	encode zstd gzip
 
+	# Private objects stay signed. Preserve the public Host and full bucket path
+	# because both participate in S3 Signature V4 verification.
+	@media {
+		path /{$OBJECT_STORAGE_BUCKET:cleanhub-media}/tenant/*
+		method GET HEAD PUT OPTIONS
+	}
+	handle @media {
+		header >Cache-Control "private, no-store"
+		reverse_proxy minio:9000 {
+			header_up Host {http.request.host}
+		}
+	}
+
 	# Signed Android release packages are published here from the server's
 	# persistent downloads directory. Keep this handler before the API proxy.
 	handle_path /downloads/* {

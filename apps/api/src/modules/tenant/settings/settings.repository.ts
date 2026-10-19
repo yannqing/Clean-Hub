@@ -87,6 +87,8 @@ export async function findTenantSettingsByTenantId(
     .select({
       tenantId: tenants.id,
       tenantName: tenants.name,
+      posDisplayName: tenantSettings.posDisplayName,
+      posLogoObjectKey: tenantSettings.posLogoObjectKey,
       pressingCode: tenants.pressingCode,
       country: tenants.country,
       city: tenants.city,
@@ -129,6 +131,9 @@ export async function findTenantSettingsByTenantId(
     id: row.settingsId,
     tenantId: row.tenantId,
     tenantName: row.tenantName,
+    posDisplayName: row.posDisplayName ?? row.tenantName,
+    posLogoObjectKey: row.posLogoObjectKey,
+    posLogoUrl: null,
     pressingCode: row.pressingCode,
     country: row.country,
     city: row.city,
@@ -206,7 +211,9 @@ export async function updateTenantSettingsRecord(
   const hasSettingsUpdate =
     input.data.defaultLanguage !== undefined ||
     input.data.defaultCurrency !== undefined ||
-    input.data.timezone !== undefined;
+    input.data.timezone !== undefined ||
+    input.data.posDisplayName !== undefined ||
+    input.data.posLogoObjectKey !== undefined;
 
   if (!hasSettingsUpdate) {
     return findTenantSettingsByTenantId(db, input.tenantId);
@@ -221,6 +228,12 @@ export async function updateTenantSettingsRecord(
   await db
     .update(tenantSettings)
     .set({
+      ...(input.data.posDisplayName !== undefined
+        ? { posDisplayName: input.data.posDisplayName }
+        : {}),
+      ...(input.data.posLogoObjectKey !== undefined
+        ? { posLogoObjectKey: input.data.posLogoObjectKey }
+        : {}),
       defaultLanguage,
       defaultCurrency,
       timezone,
@@ -269,6 +282,8 @@ export async function writeTenantSettingsUpdatedAuditLog(
     userAgent: input.userAgent,
     before: {
       tenantName: input.before.tenantName,
+      posDisplayName: input.before.posDisplayName,
+      posLogoObjectKey: input.before.posLogoObjectKey,
       country: input.before.country,
       city: input.before.city,
       contactName: input.before.contactName,
@@ -281,6 +296,8 @@ export async function writeTenantSettingsUpdatedAuditLog(
     },
     after: {
       tenantName: input.after.tenantName,
+      posDisplayName: input.after.posDisplayName,
+      posLogoObjectKey: input.after.posLogoObjectKey,
       country: input.after.country,
       city: input.after.city,
       contactName: input.after.contactName,

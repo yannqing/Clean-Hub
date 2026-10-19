@@ -6,4 +6,7 @@ import type { BranchSummary } from "../tenant/branches/branches.types";
  */
 export type PosBranchSummary = BranchSummary & {
   merchantName: string;
+  posDisplayName: string;
+  posLogoObjectKey: string | null;
+  posLogoUrl: string | null;
 };

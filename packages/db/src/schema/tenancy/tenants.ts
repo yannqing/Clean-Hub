@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
   boolean,
   index,
   integer,
@@ -89,6 +91,9 @@ export const tenantSettings = pgTable(
       .notNull()
       .default("XOF"),
     timezone: varchar("timezone", { length: 64 }).notNull().default("UTC"),
+    // Null inherits the tenant name; an empty name intentionally shows only the logo.
+    posDisplayName: varchar("pos_display_name", { length: 160 }),
+    posLogoObjectKey: text("pos_logo_object_key"),
     pilotStatus: tenantPilotStatusEnum("pilot_status")
       .notNull()
       .default("pilot"),
@@ -102,6 +107,10 @@ export const tenantSettings = pgTable(
     version: integer("version").notNull().default(1),
   },
   (table) => [
+    check(
+      "tenant_settings_pos_branding_required",
+      sql`${table.posDisplayName} IS NULL OR length(trim(${table.posDisplayName})) > 0 OR (${table.posLogoObjectKey} IS NOT NULL AND length(trim(${table.posLogoObjectKey})) > 0)`,
+    ),
     uniqueIndex("tenant_settings_tenant_id_unique").on(table.tenantId),
     index("tenant_settings_updated_by_idx").on(table.updatedBy),
   ],
@@ -139,7 +148,9 @@ export const tenantFeatureFlags = pgTable(
      * Disabled by default until the platform has an actual SMS or email
      * delivery provider. The mobile API enforces this flag as well as the UI.
      */
-    customerOtpEnabled: boolean("customer_otp_enabled").notNull().default(false),
+    customerOtpEnabled: boolean("customer_otp_enabled")
+      .notNull()
+      .default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

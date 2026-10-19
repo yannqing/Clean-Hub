@@ -22,6 +22,8 @@ export type MediaPurpose = "delivery_proof" | "delivery_signature" | string;
 
 export type StorageConfig = {
   endpoint: string;
+  /** Browser/device signing origin; internal operations keep using endpoint. */
+  publicEndpoint?: string;
   region: string;
   bucket: string;
   accessKeyId: string;
@@ -37,6 +39,7 @@ export type StorageConfig = {
 export type StorageEnv = Partial<
   Record<
     | "OBJECT_STORAGE_ENDPOINT"
+    | "OBJECT_STORAGE_PUBLIC_ENDPOINT"
     | "OBJECT_STORAGE_REGION"
     | "OBJECT_STORAGE_BUCKET"
     | "OBJECT_STORAGE_ACCESS_KEY"
@@ -120,6 +123,7 @@ export function loadStorageConfig(
 
   return {
     endpoint,
+    publicEndpoint: env.OBJECT_STORAGE_PUBLIC_ENDPOINT?.trim() || undefined,
     bucket,
     accessKeyId,
     secretAccessKey,
@@ -257,11 +261,15 @@ export function getExtensionForContentType(contentType: string): string {
 
 export class ObjectStorage {
   private readonly client: S3Client;
+  private readonly signingClient: S3Client;
   private readonly config: StorageConfig;
 
   constructor(config: StorageConfig, client = createS3Client(config)) {
     this.config = config;
     this.client = client;
+    this.signingClient = config.publicEndpoint
+      ? createS3Client({ ...config, endpoint: config.publicEndpoint })
+      : client;
   }
 
   async presignUpload(input: PresignUploadInput): Promise<PresignedUpload> {
@@ -281,7 +289,7 @@ export class ObjectStorage {
 
     return {
       objectKey: input.objectKey,
-      uploadUrl: await getSignedUrl(this.client, command, { expiresIn }),
+      uploadUrl: await getSignedUrl(this.signingClient, command, { expiresIn }),
       headers: {
         "content-type": input.contentType,
         ...(input.contentLength !== undefined
@@ -301,7 +309,7 @@ export class ObjectStorage {
 
     return {
       objectKey: input.objectKey,
-      downloadUrl: await getSignedUrl(this.client, command, { expiresIn }),
+      downloadUrl: await getSignedUrl(this.signingClient, command, { expiresIn }),
       expiresAt: addSeconds(new Date(), expiresIn),
     };
   }
