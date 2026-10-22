@@ -574,6 +574,13 @@ internal class NativePosCopy(
     val loading: String get() = get("loading")
     val refreshOrders: String get() = get("refreshOrders")
     val noOrdersToShow: String get() = get("noOrdersToShow")
+    val orderSearchHint: String get() = get("orderSearchHint")
+    val orderNoMatches: String get() = get("orderNoMatches")
+    val orderListSyncedAt: String get() = get("orderListSyncedAt")
+    val orderOfflineNotice: String get() = get("orderOfflineNotice")
+    val orderCacheMissing: String get() = get("orderCacheMissing")
+    val orderDetailNotCached: String get() = get("orderDetailNotCached")
+    val offlineReadOnlyNotice: String get() = get("offlineReadOnlyNotice")
     val orderPrefix: String get() = get("orderPrefix")
     val walkInCustomer: String get() = get("walkInCustomer")
     val tapToProcessOrder: String get() = get("tapToProcessOrder")
@@ -1560,8 +1567,8 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
     "drawerNeedsNetworkAuth" to "手动开钱箱需要联网授权。",
     "branchNotFound" to "未找到当前门店，请先同步。",
     "localBranchNotFound" to "未找到本机门店信息，请先同步。",
-    "orderDetailNeedsNetwork" to "订单详情和订单收款需要联网。",
-    "offlineSearchLimited" to "设备离线时只能检索本机已缓存的客户、商品和工单。",
+    "orderDetailNeedsNetwork" to "已有订单的收款需要联网。",
+    "offlineSearchLimited" to "设备离线时只能检索本机已缓存的订单、客户、商品和工单。",
     "ticketNotCached" to "该工单尚未缓存，请恢复网络后打开。",
     "customerNotCached" to "该客户尚未缓存，请恢复网络后打开。",
     "settingsNeedNetwork" to "设备离线时不能修改终端设置。",
@@ -1929,7 +1936,14 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
     "archiveNotification" to "归档通知",
     "loading" to "正在加载…",
     "refreshOrders" to "刷新订单",
-    "noOrdersToShow" to "当前没有可显示订单，联网后点击刷新。",
+    "noOrdersToShow" to "暂无订单。",
+    "orderSearchHint" to "搜索订单号或客户",
+    "orderNoMatches" to "没有匹配的订单，请调整搜索词。",
+    "orderListSyncedAt" to "最近 100 条订单 · 上次同步：%s",
+    "orderOfflineNotice" to "正在查看本机缓存的订单；状态可能已变化。联网后会自动同步。",
+    "orderCacheMissing" to "本机尚无订单缓存，请先联网同步一次。",
+    "orderDetailNotCached" to "这笔订单的详情尚未保存到本机，请联网等待同步完成后重试。",
+    "offlineReadOnlyNotice" to "正在查看本机上次同步的数据；离线时不能修改。",
     "orderPrefix" to "订单 %s",
     "walkInCustomer" to "散客",
     "tapToProcessOrder" to "点击处理订单",
@@ -2552,8 +2566,8 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
     "drawerNeedsNetworkAuth" to "Opening the drawer by hand needs an online authorisation.",
     "branchNotFound" to "This store was not found. Sync first.",
     "localBranchNotFound" to "No local store information found. Sync first.",
-    "orderDetailNeedsNetwork" to "Order detail and taking payment on an order need a connection.",
-    "offlineSearchLimited" to "Offline, only cached customers, products and tickets can be searched.",
+    "orderDetailNeedsNetwork" to "Taking payment on an existing order needs a connection.",
+    "offlineSearchLimited" to "Offline, only orders, customers, products and tickets cached on this terminal can be searched.",
     "ticketNotCached" to "This ticket is not cached. Open it once the network is back.",
     "customerNotCached" to "This customer is not cached. Open them once the network is back.",
     "settingsNeedNetwork" to "Terminal settings cannot be changed while offline.",
@@ -2921,7 +2935,14 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
     "archiveNotification" to "Archive",
     "loading" to "Loading…",
     "refreshOrders" to "Refresh orders",
-    "noOrdersToShow" to "No orders to show. Connect and refresh.",
+    "noOrdersToShow" to "No orders to show.",
+    "orderSearchHint" to "Search order number or customer",
+    "orderNoMatches" to "No matching orders. Try another search.",
+    "orderListSyncedAt" to "Latest 100 orders · Last synced: %s",
+    "orderOfflineNotice" to "Showing orders saved on this terminal. Status may have changed; they sync automatically when online.",
+    "orderCacheMissing" to "No orders have been saved on this terminal yet. Connect and sync once.",
+    "orderDetailNotCached" to "This order's detail is not saved on this terminal yet. Connect and wait for sync to finish, then retry.",
+    "offlineReadOnlyNotice" to "Showing the last data synced to this terminal. Changes require a connection.",
     "orderPrefix" to "Order %s",
     "walkInCustomer" to "Walk-in",
     "tapToProcessOrder" to "Tap to process",
@@ -3544,8 +3565,8 @@ private val COPY_FR_VALUES: Map<String, String> = mapOf(
     "drawerNeedsNetworkAuth" to "Ouvrir le tiroir manuellement demande une autorisation en ligne.",
     "branchNotFound" to "Magasin introuvable. Synchronisez d'abord.",
     "localBranchNotFound" to "Aucune information de magasin locale. Synchronisez d'abord.",
-    "orderDetailNeedsNetwork" to "Le détail d'une commande et son encaissement demandent une connexion.",
-    "offlineSearchLimited" to "Hors ligne, seuls les clients, produits et bons en cache sont consultables.",
+    "orderDetailNeedsNetwork" to "Encaisser une commande existante demande une connexion.",
+    "offlineSearchLimited" to "Hors ligne, seules les commandes, les clients, les produits et les bons en cache sont consultables.",
     "ticketNotCached" to "Ce bon n'est pas en cache. Ouvrez-le au retour du réseau.",
     "customerNotCached" to "Ce client n'est pas en cache. Ouvrez sa fiche au retour du réseau.",
     "settingsNeedNetwork" to "Les réglages de la caisse ne peuvent pas être modifiés hors ligne.",
@@ -3913,7 +3934,14 @@ private val COPY_FR_VALUES: Map<String, String> = mapOf(
     "archiveNotification" to "Archiver",
     "loading" to "Chargement…",
     "refreshOrders" to "Actualiser les commandes",
-    "noOrdersToShow" to "Aucune commande à afficher. Connectez-vous et actualisez.",
+    "noOrdersToShow" to "Aucune commande à afficher.",
+    "orderSearchHint" to "Rechercher un numéro de commande ou un client",
+    "orderNoMatches" to "Aucune commande correspondante. Modifiez la recherche.",
+    "orderListSyncedAt" to "100 dernières commandes · Dernière synchro : %s",
+    "orderOfflineNotice" to "Commandes enregistrées sur ce terminal. Leur état peut avoir changé ; elles se synchronisent en ligne.",
+    "orderCacheMissing" to "Aucune commande n'est encore enregistrée ici. Connectez-vous et synchronisez une fois.",
+    "orderDetailNotCached" to "Le détail de cette commande n'est pas encore enregistré ici. Connectez-vous, attendez la synchronisation, puis réessayez.",
+    "offlineReadOnlyNotice" to "Dernières données synchronisées sur ce terminal. Les modifications demandent une connexion.",
     "orderPrefix" to "Commande %s",
     "walkInCustomer" to "Client de passage",
     "tapToProcessOrder" to "Touchez pour traiter",

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -119,11 +120,13 @@ internal enum class NativeMoreDestination {
         Hardware -> copy.menuHardware
     }
 }
-private data class NativeMoreOrder(
+internal data class NativeMoreOrder(
     val id: String,
     val customerName: String?,
     val totalAmount: String,
+    val paidAmount: String,
     val currency: String,
+    val orderType: String,
     val status: String,
     val paymentStatus: String,
     val itemCount: Int,
@@ -334,7 +337,9 @@ fun NativePosApp(applicationContext: Context) {
     var setupAdministrator by remember { mutableStateOf<NativeAdministrator?>(null) }
     var moreDestination by remember { mutableStateOf(NativeMoreDestination.Menu) }
     var moreOrders by remember { mutableStateOf<List<NativeMoreOrder>>(emptyList()) }
+    var moreOrdersSyncedAt by remember { mutableStateOf<Long?>(null) }
     var moreOrderDetail by remember { mutableStateOf<NativeMoreOrderDetail?>(null) }
+    var moreOrderScope by remember { mutableStateOf<String?>(null) }
     // Ids for a customer creation that may need retrying; see createCustomer.
     var pendingCustomerDraft by remember { mutableStateOf<NativeCustomerDraft?>(null) }
     val moreOrderCashKeys = remember { NativePaymentIdempotency() }
@@ -547,6 +552,17 @@ fun NativePosApp(applicationContext: Context) {
             }
         val previousTerminal = snapshot?.terminal
         val nextTerminal = refreshed.first.terminal
+        if (previousTerminal?.userId != nextTerminal?.userId || previousTerminal?.tenantId != nextTerminal?.tenantId || previousTerminal?.branchId != nextTerminal?.branchId) {
+            moreNotifications = emptyList()
+            moreStatistics = null
+            moreSearchResults = emptyList()
+        }
+        val nextOrderScope = nextTerminal?.let { "${it.tenantId}:${it.branchId}:${it.terminalId}" }
+        if (nextOrderScope != moreOrderScope) {
+            moreOrderDetail = null
+            if (moreDestination == NativeMoreDestination.OrderDetail) moreDestination = NativeMoreDestination.Orders
+            moreOrderScope = nextOrderScope
+        }
         if (
             previousTerminal != null &&
                 (nextTerminal == null ||
@@ -558,6 +574,13 @@ fun NativePosApp(applicationContext: Context) {
             intakeCustomer = null
         }
         snapshot = refreshed.first
+        val cachedOrders = withContext(Dispatchers.IO) {
+            nextTerminal?.let { terminal ->
+                database.cachedOrderSummaries(terminal).toNativeMoreOrders() to database.orderCacheSyncedAt(terminal)
+            }
+        }
+        moreOrders = cachedOrders?.first ?: emptyList()
+        moreOrdersSyncedAt = cachedOrders?.second
         if (refreshCart && cartWriteGeneration.get() == cartGenerationBefore)
             cart = refreshed.second
         receiptPrintQueue = refreshed.third
@@ -592,15 +615,22 @@ fun NativePosApp(applicationContext: Context) {
     }
 
     DisposableEffect(applicationContext) {
-        val work =
-            androidx.work.WorkManager.getInstance(applicationContext)
-                .getWorkInfosForUniqueWorkLiveData(NativePosSyncWorker.UNIQUE_WORK)
+        val manager = androidx.work.WorkManager.getInstance(applicationContext)
+        val work = manager.getWorkInfosForUniqueWorkLiveData(NativePosSyncWorker.UNIQUE_WORK)
+        val periodic = manager.getWorkInfosForUniqueWorkLiveData(NativePosSyncWorker.PERIODIC_WORK)
         val observer =
             androidx.lifecycle.Observer<List<androidx.work.WorkInfo>> { infos ->
-                if (infos.any { it.state.isFinished }) scope.launch { reload(refreshCart = false) }
+                if (infos.any { it.state.isFinished || it.state == androidx.work.WorkInfo.State.ENQUEUED && it.runAttemptCount == 0 }) {
+                    scope.launch { reload(refreshCart = false) }
+                }
             }
         work.observeForever(observer)
-        onDispose { work.removeObserver(observer) }
+        val periodicObserver = androidx.lifecycle.Observer<List<androidx.work.WorkInfo>> { infos ->
+            if (infos.any { it.state == androidx.work.WorkInfo.State.ENQUEUED && it.runAttemptCount == 0 })
+                scope.launch { reload(refreshCart = false) }
+        }
+        periodic.observeForever(periodicObserver)
+        onDispose { work.removeObserver(observer); periodic.removeObserver(periodicObserver) }
     }
 
     /**
@@ -1037,6 +1067,33 @@ fun NativePosApp(applicationContext: Context) {
             destination == NativeMoreDestination.Catalog ||
             destination == NativeMoreDestination.Scan
         ) return
+        if (!internetAvailable && destination in setOf(NativeMoreDestination.Orders, NativeMoreDestination.Settings)) {
+            if (destination == NativeMoreDestination.Settings) {
+                scope.launch {
+                    val cached = withContext(Dispatchers.IO) {
+                        snapshot?.terminal?.let { database.intakeStore.cached(it, "terminal-settings", "current") }
+                    }
+                    terminalSettings = cached?.optJSONObject("settings")?.toNativeTerminalSettingsSummary(cached.optJSONObject("branch"))
+                    message = if (cached == null) copy.moreNeedsNetwork.format(destination.title(copy)) else copy.offlineReadOnlyNotice
+                }
+            } else message = if (moreOrdersSyncedAt == null) copy.orderCacheMissing else null
+            return
+        }
+        if (!internetAvailable && destination in setOf(NativeMoreDestination.Statistics, NativeMoreDestination.Notifications)) {
+            val terminal = snapshot?.terminal ?: return
+            if (destination == NativeMoreDestination.Statistics) moreStatistics = null
+            scope.launch {
+                val cached = withContext(Dispatchers.IO) {
+                    if (destination == NativeMoreDestination.Statistics)
+                        database.intakeStore.cached(terminal, "statistics", moreStatisticsPeriod)
+                    else database.intakeStore.cached(terminal, "notifications", terminal.userId)
+                }
+                if (destination == NativeMoreDestination.Statistics) moreStatistics = cached?.toNativeMoreStatistics()
+                else moreNotifications = cached?.optJSONArray("data").toNativeMoreNotifications()
+                message = if (cached == null) copy.moreNeedsNetwork.format(destination.title(copy)) else copy.offlineReadOnlyNotice
+            }
+            return
+        }
         if (!internetAvailable) {
             message = copy.moreNeedsNetwork.format(destination.title(copy))
             return
@@ -1046,25 +1103,32 @@ fun NativePosApp(applicationContext: Context) {
             try {
                 when (destination) {
                     NativeMoreDestination.Orders -> {
-                        val branchId = snapshot?.terminal?.branchId
+                        val terminal = snapshot?.terminal
                             ?: throw NativePosValidationException(copy.branchNotFound)
-                        moreOrders = withContext(Dispatchers.IO) {
-                            api.get("/pos/orders?branchId=$branchId&limit=50&offset=0")
-                                .optJSONArray("data")
-                                .toNativeMoreOrders()
+                        val syncedAt = withContext(Dispatchers.IO) {
+                            val rows = api.get("/pos/orders?branchId=${terminal.branchId}&limit=100&offset=0")
+                                .optJSONArray("data") ?: error("Missing order list")
+                            database.replaceOrderSummaries(terminal, rows)
+                            database.orderCacheSyncedAt(terminal)
                         }
+                        moreOrders = withContext(Dispatchers.IO) { database.cachedOrderSummaries(terminal).toNativeMoreOrders() }
+                        moreOrdersSyncedAt = syncedAt
+                        NativePosOrderDetailWorker.schedule(applicationContext)
                     }
                     NativeMoreDestination.Statistics -> {
-                        val branchId = snapshot?.terminal?.branchId
+                        val terminal = snapshot?.terminal
                             ?: throw NativePosValidationException(copy.branchNotFound)
                         moreStatistics = withContext(Dispatchers.IO) {
-                            api.get("/pos/statistics/overview?period=$moreStatisticsPeriod&branchId=$branchId")
+                            api.get("/pos/statistics/overview?period=$moreStatisticsPeriod&branchId=${terminal.branchId}")
+                                .also { database.intakeStore.cache(terminal, "statistics", moreStatisticsPeriod, it) }
                                 .toNativeMoreStatistics()
                         }
                     }
                     NativeMoreDestination.Notifications -> {
+                        val terminal = snapshot?.terminal ?: throw NativePosValidationException(copy.branchNotFound)
                         moreNotifications = withContext(Dispatchers.IO) {
                             api.get("/pos/notifications?limit=50&offset=0")
+                                .also { database.intakeStore.cache(terminal, "notifications", terminal.userId, it) }
                                 .optJSONArray("data")
                                 .toNativeMoreNotifications()
                         }
@@ -1084,7 +1148,10 @@ fun NativePosApp(applicationContext: Context) {
                 }
                 message = null
             } catch (error: Exception) {
-                message = error.userMessage(copy)
+                if (destination == NativeMoreDestination.Orders && moreOrdersSyncedAt != null &&
+                    error is NativePosApiException && (error.status == 0 || error.status >= 500)) {
+                    message = copy.orderOfflineNotice
+                } else message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1096,6 +1163,9 @@ fun NativePosApp(applicationContext: Context) {
             val detail = api.get("/pos/orders/$orderId")
             val payments = api.get("/pos/orders/$orderId/payments")
             val adjustments = api.get("/pos/payment-adjustments?orderId=$orderId")
+            snapshot?.terminal?.let { terminal ->
+                database.replaceOrderDetail(terminal, detail, payments.optJSONArray("data") ?: JSONArray(), adjustments.optJSONArray("data") ?: JSONArray())
+            }
             detail.toNativeMoreOrderDetail(payments.optJSONArray("data"))
                 .copy(adjustments = adjustments.optJSONArray("data").toNativeMorePaymentAdjustments())
         }
@@ -1103,16 +1173,36 @@ fun NativePosApp(applicationContext: Context) {
     }
 
     fun openMoreOrder(orderId: String) {
-        if (!internetAvailable) {
-            message = copy.orderDetailNeedsNetwork
-            return
-        }
-        moreDestination = NativeMoreDestination.OrderDetail
         scope.launch {
             busy = true
             try {
-                openMoreOrderDetailAfterMutation(orderId)
-                message = null
+                val cached = withContext(Dispatchers.IO) {
+                    snapshot?.terminal?.let { database.cachedOrderDetail(it, orderId) }
+                }
+                if (cached == null && !internetAvailable) {
+                    message = copy.orderDetailNotCached
+                    return@launch
+                }
+                moreOrderDetail = cached?.optJSONObject("order")?.toNativeMoreOrderDetail(cached.optJSONArray("payments"))
+                    ?.copy(adjustments = cached.optJSONArray("adjustments").toNativeMorePaymentAdjustments())
+                moreDestination = NativeMoreDestination.OrderDetail
+                message = if (internetAvailable) null else copy.orderOfflineNotice
+                if (internetAvailable) {
+                    try {
+                        openMoreOrderDetailAfterMutation(orderId)
+                        message = null
+                    } catch (error: NativePosApiException) {
+                        if (error.status in setOf(401, 403, 404)) {
+                            moreOrderDetail = null
+                            moreDestination = NativeMoreDestination.Orders
+                            throw error
+                        }
+                        if (moreOrderDetail == null) {
+                            moreDestination = NativeMoreDestination.Orders
+                            message = if (error.status == 0) copy.orderDetailNotCached else error.userMessage(copy)
+                        } else message = copy.orderOfflineNotice
+                    }
+                }
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1208,6 +1298,7 @@ fun NativePosApp(applicationContext: Context) {
     fun saveTerminalSettings(patch: NativeTerminalSettingsPatch) {
         if (!internetAvailable) { message = copy.settingsNeedNetwork; return }
         if (!terminalSettingsReady || terminalSettings == null || !patch.isValid()) { message = copy.settingsOutOfRange; return }
+        val terminal = snapshot?.terminal
         scope.launch {
             busy = true
             try {
@@ -1221,6 +1312,10 @@ fun NativePosApp(applicationContext: Context) {
                         patch.lockTimeoutSeconds?.let { put("lockTimeoutSeconds", it) }
                     }).also { result ->
                         requireNativeTerminalDevice(result.optString("deviceId"), session.deviceId(), copy)
+                        terminal?.let { current ->
+                            val branch = database.intakeStore.cached(current, "terminal-settings", "current")?.optJSONObject("branch") ?: JSONObject()
+                            database.intakeStore.cache(current, "terminal-settings", "current", JSONObject().put("branch", branch).put("settings", result))
+                        }
                     }.toNativeTerminalSettingsSummary().copy(
                         branchAddress = previous?.branchAddress, branchPhone = previous?.branchPhone,
                     ).also {
@@ -2603,6 +2698,7 @@ fun NativePosApp(applicationContext: Context) {
                             onSelectLanguage = ::selectLanguage,
                             onLock = { unlocked = false },
                             orders = moreOrders,
+                            ordersSyncedAt = moreOrdersSyncedAt,
                             statistics = moreStatistics,
                             notifications = moreNotifications,
                             terminalSettings = terminalSettings,
@@ -2665,6 +2761,7 @@ fun NativePosApp(applicationContext: Context) {
                             statisticsPeriod = moreStatisticsPeriod,
                             onStatisticsPeriodChange = { period ->
                                 moreStatisticsPeriod = period
+                                moreStatistics = null
                                 openMoreDestination(NativeMoreDestination.Statistics)
                             },
                         )
@@ -3652,6 +3749,7 @@ private fun NativeMoreView(
     onSelectLanguage: (NativePinLanguage) -> Unit,
     onLock: () -> Unit,
     orders: List<NativeMoreOrder>,
+    ordersSyncedAt: Long?,
     statistics: NativeMoreStatistics?,
     notifications: List<NativeMoreNotification>,
     terminalSettings: NativeTerminalSettingsSummary?,
@@ -3741,6 +3839,7 @@ private fun NativeMoreView(
         )
         NativeMoreDestination.Scan -> NativeMoreScanView(copy,
             current = current,
+            orders = orders,
             busy = busy,
             message = message,
             hardwareScan = lastHardwareScan,
@@ -3751,10 +3850,14 @@ private fun NativeMoreView(
             searchResults = searchResults,
             onSearch = onSearch,
             onOpenSearchResult = onOpenSearchResult,
+            onOpenOrder = onOpenOrder,
             onTriggerHardwareScanner = onTriggerHardwareScanner,
         )
         NativeMoreDestination.Orders -> NativeMoreOrdersView(copy,
             orders = orders,
+            syncedAt = ordersSyncedAt,
+            timeZone = current.terminal?.timeZone ?: "UTC",
+            internetAvailable = internetAvailable,
             busy = busy,
             message = message,
             onBack = ::backToMenu,
@@ -3778,6 +3881,7 @@ private fun NativeMoreView(
         )
         NativeMoreDestination.Statistics -> NativeMoreStatisticsView(copy,
             statistics = statistics,
+            internetAvailable = internetAvailable,
             busy = busy,
             message = message,
             onBack = ::backToMenu,
@@ -4366,6 +4470,7 @@ private fun NativeMoreCatalogView(
 private fun NativeMoreScanView(
     copy: NativePosCopy,
     current: NativePosSnapshot,
+    orders: List<NativeMoreOrder>,
     busy: Boolean,
     message: String?,
     hardwareScan: NativeHardwareScan?,
@@ -4376,6 +4481,7 @@ private fun NativeMoreScanView(
     searchResults: List<NativeMoreSearchResult>,
     onSearch: (String) -> Unit,
     onOpenSearchResult: (NativeMoreSearchResult) -> Unit,
+    onOpenOrder: (String) -> Unit,
     onTriggerHardwareScanner: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
@@ -4389,6 +4495,7 @@ private fun NativeMoreScanView(
     val ticketMatches = current.tickets.filter { keyword.isNotBlank() && (it.ticketNo.orEmpty().lowercase().contains(keyword) || it.customerName.lowercase().contains(keyword)) }
     val productMatches = current.products.filter { keyword.isNotBlank() && (it.sku.lowercase().contains(keyword) || it.name.lowercase().contains(keyword)) }
     val customerMatches = current.customers.filter { keyword.isNotBlank() && (it.fullName.lowercase().contains(keyword) || it.phone.orEmpty().contains(keyword)) }
+    val orderMatches = orders.filter { keyword.isNotBlank() && (it.id.lowercase().contains(keyword) || it.customerName.orEmpty().lowercase().contains(keyword)) }
     NativeMorePage(copy, copy.menuScan, onBack) {
         Text(copy.scanIntro, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         NativePosInput(value = query, onValueChange = { query = it }, label = { Text(copy.scanOrType) }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -4406,6 +4513,11 @@ private fun NativeMoreScanView(
         customerMatches.forEach { customer ->
             OutlinedButton(onClick = { onStartIntakeForCustomer(customer) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.customerIntakePrefix.format(customer.fullName)) }
         }
+        orderMatches.forEach { order ->
+            OutlinedButton(onClick = { onOpenOrder(order.id) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                Text("${copy.orderPrefix.format(order.id.takeLast(8).uppercase())} · ${order.customerName ?: copy.walkInCustomer}")
+            }
+        }
         if (searchResults.isNotEmpty()) {
             Text(copy.onlineSearchResults, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             searchResults.forEach { result ->
@@ -4421,39 +4533,118 @@ private fun NativeMoreScanView(
                 }
             }
         }
-        if (keyword.isNotBlank() && ticketMatches.isEmpty() && productMatches.isEmpty() && customerMatches.isEmpty() && searchResults.isEmpty()) Text(copy.noMatchFound, color = POS_MUTED)
+        if (keyword.isNotBlank() && ticketMatches.isEmpty() && productMatches.isEmpty() && customerMatches.isEmpty() && orderMatches.isEmpty() && searchResults.isEmpty()) Text(copy.noMatchFound, color = POS_MUTED)
         message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
 @Composable
-private fun NativeMoreOrdersView(
+internal fun NativeMoreOrdersView(
     copy: NativePosCopy,
     orders: List<NativeMoreOrder>,
+    syncedAt: Long?,
+    timeZone: String,
+    internetAvailable: Boolean,
     busy: Boolean,
     message: String?,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onOpenOrder: (String) -> Unit,
 ) {
+    var query by remember { mutableStateOf("") }
+    var page by remember { mutableStateOf(0) }
+    val filtered = remember(orders, query) {
+        val needle = query.trim()
+        if (needle.isEmpty()) orders else orders.filter {
+            it.id.contains(needle, ignoreCase = true) ||
+                it.customerName.orEmpty().contains(needle, ignoreCase = true)
+        }
+    }
+    LaunchedEffect(query) { page = 0 }
+    val pageCount = ((filtered.size + 19) / 20).coerceAtLeast(1)
+    val currentPage = page.coerceAtMost(pageCount - 1)
+    val visible = filtered.drop(currentPage * 20).take(20)
     NativeMorePage(copy, copy.menuOrders, onBack) {
-        OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) copy.loading else copy.refreshOrders) }
-        if (!busy && orders.isEmpty()) Text(copy.noOrdersToShow, color = POS_MUTED)
-        orders.forEach { order ->
-            Card(
-                modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { onOpenOrder(order.id) },
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
-            ) {
-                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(copy.orderPrefix.format(order.id.takeLast(8).uppercase()), color = POS_INK, fontWeight = FontWeight.SemiBold)
-                    Text("${order.customerName ?: copy.walkInCustomer} · ${copy.itemsCountSuffix.format(order.itemCount)} · ${nativeOrderStatusLabel(order.status, copy)} · ${nativePaymentStatusLabel(order.paymentStatus, copy)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                    Text("${order.totalAmount} ${order.currency} · ${copy.tapToProcessOrder}", color = POS_ACCENT, style = MaterialTheme.typography.labelMedium)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            NativePosInput(value = query, onValueChange = { query = it }, label = { Text(copy.orderSearchHint) }, singleLine = true, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = onRefresh, enabled = internetAvailable && !busy) { Text(if (busy) copy.loading else copy.refreshOrders) }
+        }
+        if (syncedAt != null) Text(
+            copy.orderListSyncedAt.format(nativeOrderTime(java.time.Instant.ofEpochMilli(syncedAt).toString(), timeZone, copy.localeCode())),
+            color = POS_MUTED, style = MaterialTheme.typography.bodySmall,
+        )
+        if (!internetAvailable) Text(if (syncedAt == null) copy.orderCacheMissing else copy.orderOfflineNotice,
+            color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+        if (!busy && filtered.isEmpty()) Text(if (query.isBlank()) copy.noOrdersToShow else copy.orderNoMatches, color = POS_MUTED)
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            if (maxWidth >= 700.dp && visible.isNotEmpty()) {
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, POS_BORDER, RoundedCornerShape(14.dp)).background(POS_PANEL_BACKGROUND)) {
+                    Row(Modifier.fillMaxWidth().background(POS_PAGE_BACKGROUND).padding(horizontal = 12.dp, vertical = 10.dp)) {
+                        NativeOrderTableCell(copy.menuOrders, 1.3f, true)
+                        NativeOrderTableCell(copy.customerLabel, 1.5f, true)
+                        NativeOrderTableCell(copy.orderAmount, 1.4f, true)
+                        NativeOrderTableCell(copy.orderStatus, 1f, true)
+                        NativeOrderTableCell(copy.paymentRecords, 1f, true)
+                        NativeOrderTableCell(copy.orderCreatedAt, 1.2f, true)
+                    }
+                    visible.forEach { order ->
+                        HorizontalDivider(color = POS_BORDER)
+                        Row(Modifier.fillMaxWidth().clickable(enabled = !busy) { onOpenOrder(order.id) }
+                            .padding(horizontal = 12.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1.3f)) {
+                                Text(order.id.takeLast(8).uppercase(), color = POS_INK, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
+                                Text(if (order.orderType == "ticket") copy.orderTypeTicket else copy.orderTypeManual, color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
+                            }
+                            Column(Modifier.weight(1.5f)) {
+                                Text(order.customerName ?: copy.walkInCustomer, maxLines = 1, overflow = TextOverflow.Ellipsis, color = POS_INK, style = MaterialTheme.typography.bodySmall)
+                                Text(copy.itemsCountSuffix.format(order.itemCount), color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
+                            }
+                            Column(Modifier.weight(1.4f)) {
+                                Text(nativeOrderMoney(order.totalAmount, order.currency), color = POS_INK, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodySmall)
+                                Text("${copy.orderPaidAmount} ${nativeOrderMoney(order.paidAmount, order.currency)}", color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
+                            }
+                            NativeOrderTableCell(nativeOrderStatusLabel(order.status, copy), 1f)
+                            NativeOrderTableCell(nativePaymentStatusLabel(order.paymentStatus, copy), 1f)
+                            NativeOrderTableCell(nativeOrderTime(order.createdAt, timeZone, copy.localeCode()), 1.2f)
+                        }
+                    }
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    visible.forEach { order ->
+                        Card(modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { onOpenOrder(order.id) },
+                            shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
+                            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(order.id.takeLast(8).uppercase(), color = POS_INK, fontWeight = FontWeight.SemiBold)
+                                    Text(nativeOrderStatusLabel(order.status, copy), color = POS_ACCENT, style = MaterialTheme.typography.labelMedium)
+                                }
+                                Text("${order.customerName ?: copy.walkInCustomer} · ${copy.itemsCountSuffix.format(order.itemCount)} · ${if (order.orderType == "ticket") copy.orderTypeTicket else copy.orderTypeManual}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(nativeOrderMoney(order.totalAmount, order.currency), color = POS_INK, fontWeight = FontWeight.Bold)
+                                    Text(nativePaymentStatusLabel(order.paymentStatus, copy), color = POS_MUTED)
+                                }
+                                Text("${copy.orderPaidAmount} ${nativeOrderMoney(order.paidAmount, order.currency)} · ${nativeOrderTime(order.createdAt, timeZone, copy.localeCode())}", color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
                 }
             }
         }
+        if (pageCount > 1) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { page = currentPage - 1 }, enabled = currentPage > 0 && !busy) { Text(copy.detailPrevious) }
+            Text(copy.detailPage.format(currentPage + 1, filtered.size), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(onClick = { page = currentPage + 1 }, enabled = currentPage < pageCount - 1 && !busy) { Text(copy.detailNext) }
+        }
         message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
+}
+
+@Composable
+private fun RowScope.NativeOrderTableCell(value: String, weight: Float, heading: Boolean = false) {
+    Text(value, Modifier.weight(weight).padding(end = 8.dp), color = if (heading) POS_MUTED else POS_INK,
+        style = if (heading) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodySmall,
+        maxLines = 2, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable
@@ -4601,6 +4792,7 @@ private fun NativeMoreOrderDetailView(
 private fun NativeMoreStatisticsView(
     copy: NativePosCopy,
     statistics: NativeMoreStatistics?,
+    internetAvailable: Boolean,
     busy: Boolean,
     message: String?,
     onBack: () -> Unit,
@@ -4614,7 +4806,7 @@ private fun NativeMoreStatisticsView(
                 OutlinedButton(onClick = { onPeriodChange(value) }, enabled = !busy) { Text(if (period == value) "✓ $label" else label) }
             }
         }
-        OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) copy.loading else copy.refreshData) }
+        OutlinedButton(onClick = onRefresh, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) copy.loading else copy.refreshData) }
         if (statistics != null) {
             val data = statistics
             NativeReferenceRow(copy.ordersLabel, copy.ordersSummary.format(data.orderCount, data.unpaidCount), data.paidAmount)
@@ -4643,7 +4835,7 @@ private fun NativeMoreNotificationsView(
 ) {
     NativeMorePage(copy, copy.menuNotifications, onBack) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.weight(1f)) { Text(if (busy) copy.loading else copy.refreshNotifications) }
+            OutlinedButton(onClick = onRefresh, enabled = internetAvailable && !busy, modifier = Modifier.weight(1f)) { Text(if (busy) copy.loading else copy.refreshNotifications) }
             OutlinedButton(onClick = onMarkAllRead, enabled = internetAvailable && !busy && notifications.any { it.readStatus == "unread" }, modifier = Modifier.weight(1f)) { Text(copy.markAllRead) }
         }
         if (!busy && notifications.isEmpty()) Text(copy.noNotifications, color = POS_MUTED)
@@ -6026,7 +6218,9 @@ private fun JSONArray?.toNativeMoreOrders(): List<NativeMoreOrder> = buildList {
             id = id,
             customerName = value.optString("customerName").takeIf { it.isNotBlank() && it != "null" },
             totalAmount = value.optString("totalAmount", "0"),
+            paidAmount = value.optString("paidAmount", "0"),
             currency = value.optString("currency", ""),
+            orderType = value.optString("orderType", "manual"),
             status = value.optString("status", "unknown"),
             paymentStatus = value.optString("paymentStatus", "unknown"),
             itemCount = value.optInt("itemCount", 0),

@@ -4,8 +4,10 @@ import android.content.Context
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.math.BigDecimal
@@ -58,6 +60,7 @@ internal fun isTransientReplayFailure(error: NativePosApiException): Boolean =
 
 /** Synchronizes immutable local cash commands before refreshing POS reference data. */
 class NativePosSyncEngine(context: Context) {
+    private val appContext = context.applicationContext
     private val brandingCache = NativeBrandLogoCache(context.applicationContext)
     private val database = NativePosDatabase(context.applicationContext)
     private val intakeStore = database.intakeStore
@@ -117,6 +120,9 @@ class NativePosSyncEngine(context: Context) {
         val settings = api.get("/pos/terminal-settings")
         requireNativeTerminalDevice(settings.optString("deviceId"), session.deviceId(), nativePosCopy(session.pinLanguageCode()))
         cacheCheckoutSettings(branch, settings)
+        database.intakeTerminal()?.let { terminal ->
+            intakeStore.cache(terminal, "terminal-settings", "current", JSONObject().put("branch", branch).put("settings", settings))
+        }
         return branch to settings
     }
 
@@ -152,6 +158,7 @@ class NativePosSyncEngine(context: Context) {
         // Surfaced after the successful work is recorded, so the caller still
         // sees the connection problem and WorkManager still retries.
         deferred?.let { throw it }
+        NativePosOrderDetailWorker.schedule(appContext)
         return NativeSyncResult(replayed, failed, intakeFailure)
     }
 
@@ -333,6 +340,22 @@ class NativePosSyncEngine(context: Context) {
             expectedStockRevision = stockRevision,
             itemCatalogJson = catalog.optJSONObject("itemCatalog"),
         )
+        intakeStore.cache(terminal, "terminal-settings", "current", JSONObject().put("branch", branch).put("settings", printSettings))
+        // Orders are reference data. A failed order fetch must not prevent a
+        // successful catalogue/checkout sync from making the till usable.
+        runCatching {
+            val orderPage = api.get("/pos/orders?branchId=$branchId&limit=100&offset=0")
+            val rows = orderPage.optJSONArray("data") ?: error("Missing order list")
+            database.replaceOrderSummaries(terminal, rows)
+        }
+        runCatching {
+            intakeStore.cache(terminal, "statistics", "today",
+                api.get("/pos/statistics/overview?period=today&branchId=$branchId"))
+        }
+        runCatching {
+            intakeStore.cache(terminal, "notifications", terminal.userId,
+                api.get("/pos/notifications?limit=50&offset=0"))
+        }
         cacheCheckoutSettings(branch, printSettings)
         hardwareDevices?.let { devices ->
             database.replaceReceiptPrinterBinding(devices.defaultReceiptPrinterId())
@@ -620,6 +643,7 @@ class NativePosSyncWorker(appContext: Context, params: WorkerParameters) : Corou
 
     companion object {
         internal const val UNIQUE_WORK = "cleanhub-native-pos-sync"
+        internal const val PERIODIC_WORK = "cleanhub-native-pos-periodic-sync"
 
         fun schedule(context: Context) {
             val request = OneTimeWorkRequestBuilder<NativePosSyncWorker>()
@@ -631,6 +655,51 @@ class NativePosSyncWorker(appContext: Context, params: WorkerParameters) : Corou
                 ExistingWorkPolicy.KEEP,
                 request,
             )
+            val periodic = PeriodicWorkRequestBuilder<NativePosSyncWorker>(15, TimeUnit.MINUTES)
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .build()
+            WorkManager.getInstance(context.applicationContext).enqueueUniquePeriodicWork(
+                PERIODIC_WORK,
+                ExistingPeriodicWorkPolicy.KEEP,
+                periodic,
+            )
+        }
+    }
+}
+
+/** Progressive prefetch keeps opening Order Management fast while making each
+ * visible order's complete detail available after the background pass. */
+class NativePosOrderDetailWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
+    override suspend fun doWork(): Result {
+        val database = NativePosDatabase(applicationContext)
+        val terminal = database.intakeTerminal() ?: return Result.success()
+        val api = NativePosApiClient(NativePosSession(applicationContext))
+        for (id in database.orderDetailsNeedingRefresh(terminal)) {
+            try {
+                val order = api.get("/pos/orders/$id")
+                val payments = api.get("/pos/orders/$id/payments").optJSONArray("data") ?: JSONArray()
+                val adjustments = api.get("/pos/payment-adjustments?orderId=$id").optJSONArray("data") ?: JSONArray()
+                if (!database.replaceOrderDetail(terminal, order, payments, adjustments)) return Result.success()
+            } catch (error: NativePosApiException) {
+                if (error.status == 401 || error.status == 403) return Result.success()
+                if (error.status == 0 || error.status >= 500) return Result.retry()
+                // A deleted or inaccessible order is removed by the next list refresh.
+            } catch (_: Exception) {
+                return Result.retry()
+            }
+        }
+        return Result.success()
+    }
+
+    companion object {
+        private const val UNIQUE_WORK = "cleanhub-native-pos-order-details"
+
+        fun schedule(context: Context) {
+            val request = OneTimeWorkRequestBuilder<NativePosOrderDetailWorker>()
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
+                .build()
+            WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(UNIQUE_WORK, ExistingWorkPolicy.KEEP, request)
         }
     }
 }

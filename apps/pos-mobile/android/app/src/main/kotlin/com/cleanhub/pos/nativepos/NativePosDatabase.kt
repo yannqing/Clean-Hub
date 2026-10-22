@@ -10,7 +10,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private const val DATABASE_NAME = "cleanhub_native_pos.db"
-private const val DATABASE_VERSION = 24
+private const val DATABASE_VERSION = 25
 private const val MAX_RUNTIME_AGE_MS = 8 * 60 * 60 * 1_000L
 private const val MAX_CATALOG_AGE_MS = 24 * 60 * 60 * 1_000L
 private const val MAX_CASH_STATE_AGE_MS = 2 * 60 * 60 * 1_000L
@@ -133,6 +133,7 @@ class NativePosDatabase(
         createReceiptPrinterBindingTable(db)
         createCheckoutSettingsTable(db)
         createItemCatalogTable(db)
+        createOrderCacheTables(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -238,6 +239,133 @@ class NativePosDatabase(
             }
             if ("catalog_item_id" !in columns) db.execSQL("ALTER TABLE service_ticket_item ADD COLUMN catalog_item_id TEXT")
             if ("item_type_name" !in columns) db.execSQL("ALTER TABLE service_ticket_item ADD COLUMN item_type_name TEXT")
+        }
+        if (oldVersion < 25) createOrderCacheTables(db)
+    }
+
+    private fun createOrderCacheTables(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS order_cache_state (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), tenant_id TEXT NOT NULL, branch_id TEXT NOT NULL, terminal_id TEXT NOT NULL, synced_at INTEGER NOT NULL)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS order_cache (order_id TEXT PRIMARY KEY NOT NULL, tenant_id TEXT NOT NULL, branch_id TEXT NOT NULL, terminal_id TEXT NOT NULL, position INTEGER NOT NULL, summary_json TEXT NOT NULL, summary_updated_at TEXT NOT NULL, detail_json TEXT, detail_synced_at INTEGER)")
+    }
+
+    private fun isCurrentOrderScope(terminal: NativeTerminal): Boolean = readTerminal()?.let {
+        it.tenantId == terminal.tenantId && it.branchId == terminal.branchId && it.terminalId == terminal.terminalId
+    } == true
+
+    /** Replace a complete recent-order page only after the API has returned successfully. */
+    fun replaceOrderSummaries(terminal: NativeTerminal, summaries: JSONArray, syncedAt: Long = System.currentTimeMillis()) {
+        require(summaries.length() <= 100)
+        val rows = (0 until summaries.length()).map { index ->
+            val row = requireNotNull(summaries.optJSONObject(index))
+            require(row.optString("id").isNotBlank())
+            require(row.optString("tenantId") == terminal.tenantId && row.optString("branchId") == terminal.branchId)
+            row
+        }
+        writableDatabase.beginTransaction()
+        try {
+            check(isCurrentOrderScope(terminal)) { "Order cache scope changed during refresh" }
+            val previous = mutableMapOf<String, Triple<String?, Long?, String>>()
+            writableDatabase.rawQuery("SELECT order_id, detail_json, detail_synced_at, summary_updated_at FROM order_cache WHERE tenant_id = ? AND branch_id = ? AND terminal_id = ?",
+                arrayOf(terminal.tenantId, terminal.branchId, terminal.terminalId)).use { cursor ->
+                while (cursor.moveToNext()) previous[cursor.getString(0)] = Triple(
+                    cursor.getStringOrNull(1), if (cursor.isNull(2)) null else cursor.getLong(2), cursor.getString(3),
+                )
+            }
+            writableDatabase.delete("order_cache", null, null)
+            rows.forEachIndexed { index, row ->
+                val old = previous[row.getString("id")]
+                val changed = old != null && old.third != row.optString("updatedAt")
+                writableDatabase.insertOrThrow("order_cache", null, ContentValues().apply {
+                    put("order_id", row.getString("id"))
+                    put("tenant_id", terminal.tenantId)
+                    put("branch_id", terminal.branchId)
+                    put("terminal_id", terminal.terminalId)
+                    put("position", index)
+                    put("summary_json", row.toString())
+                    put("summary_updated_at", row.optString("updatedAt"))
+                    put("detail_json", old?.first)
+                    if (old?.second == null) putNull("detail_synced_at")
+                    else put("detail_synced_at", if (changed) 0L else old.second)
+                })
+            }
+            writableDatabase.insertWithOnConflict("order_cache_state", null, ContentValues().apply {
+                put("singleton", 1)
+                put("tenant_id", terminal.tenantId)
+                put("branch_id", terminal.branchId)
+                put("terminal_id", terminal.terminalId)
+                put("synced_at", syncedAt)
+            }, SQLiteDatabase.CONFLICT_REPLACE)
+            writableDatabase.setTransactionSuccessful()
+        } finally {
+            writableDatabase.endTransaction()
+        }
+    }
+
+    fun cachedOrderSummaries(terminal: NativeTerminal): JSONArray {
+        if (!isCurrentOrderScope(terminal)) return JSONArray()
+        val rows = JSONArray()
+        readableDatabase.rawQuery("SELECT summary_json FROM order_cache WHERE tenant_id = ? AND branch_id = ? AND terminal_id = ? ORDER BY position",
+            arrayOf(terminal.tenantId, terminal.branchId, terminal.terminalId)).use { cursor ->
+            while (cursor.moveToNext()) rows.put(JSONObject(cursor.getString(0)))
+        }
+        return rows
+    }
+
+    fun orderCacheSyncedAt(terminal: NativeTerminal): Long? {
+        if (!isCurrentOrderScope(terminal)) return null
+        return readableDatabase.rawQuery("SELECT synced_at FROM order_cache_state WHERE singleton = 1 AND tenant_id = ? AND branch_id = ? AND terminal_id = ?",
+            arrayOf(terminal.tenantId, terminal.branchId, terminal.terminalId)).use { cursor ->
+            if (cursor.moveToFirst()) cursor.getLong(0) else null
+        }
+    }
+
+    fun orderDetailsNeedingRefresh(terminal: NativeTerminal, now: Long = System.currentTimeMillis()): List<String> {
+        if (!isCurrentOrderScope(terminal)) return emptyList()
+        return readableDatabase.rawQuery("SELECT order_id FROM order_cache WHERE tenant_id = ? AND branch_id = ? AND terminal_id = ? AND (detail_json IS NULL OR detail_synced_at < ?) ORDER BY position",
+            arrayOf(terminal.tenantId, terminal.branchId, terminal.terminalId, (now - 24 * 60 * 60 * 1_000L).toString())).use { cursor ->
+            buildList { while (cursor.moveToNext()) add(cursor.getString(0)) }
+        }
+    }
+
+    fun replaceOrderDetail(terminal: NativeTerminal, order: JSONObject, payments: JSONArray, adjustments: JSONArray, syncedAt: Long = System.currentTimeMillis()): Boolean {
+        if (!isCurrentOrderScope(terminal) || order.optString("tenantId") != terminal.tenantId || order.optString("branchId") != terminal.branchId) return false
+        val id = order.optString("id").takeIf { it.isNotBlank() } ?: return false
+        val detail = JSONObject().put("order", order).put("payments", payments).put("adjustments", adjustments).put("syncedAt", syncedAt)
+        val oldSummary = readableDatabase.rawQuery("SELECT summary_json FROM order_cache WHERE order_id = ? AND tenant_id = ? AND branch_id = ? AND terminal_id = ?",
+            arrayOf(id, terminal.tenantId, terminal.branchId, terminal.terminalId)).use { cursor ->
+            if (cursor.moveToFirst()) JSONObject(cursor.getString(0)) else null
+        }
+        val summary = oldSummary?.apply {
+            listOf("customerName", "totalAmount", "paidAmount", "currency", "orderType", "status", "paymentStatus", "createdAt", "updatedAt", "version")
+                .forEach { key -> if (order.has(key)) put(key, order.get(key)) }
+            put("itemCount", order.optJSONArray("items")?.length() ?: optInt("itemCount"))
+        }
+        val values = ContentValues().apply {
+            put("detail_json", detail.toString()); put("detail_synced_at", syncedAt)
+            if (summary != null) { put("summary_json", summary.toString()); put("summary_updated_at", order.optString("updatedAt")) }
+        }
+        if (writableDatabase.update("order_cache", values, "order_id = ? AND tenant_id = ? AND branch_id = ? AND terminal_id = ?",
+                arrayOf(id, terminal.tenantId, terminal.branchId, terminal.terminalId)) == 1) return true
+        // A just-created order or search result may not be in the last list page yet.
+        val fallbackSummary = JSONObject(order.toString()).put("itemCount", order.optJSONArray("items")?.length() ?: 0)
+        return writableDatabase.insertWithOnConflict("order_cache", null, ContentValues().apply {
+            put("order_id", id)
+            put("tenant_id", terminal.tenantId)
+            put("branch_id", terminal.branchId)
+            put("terminal_id", terminal.terminalId)
+            put("position", 100)
+            put("summary_json", fallbackSummary.toString())
+            put("summary_updated_at", order.optString("updatedAt"))
+            put("detail_json", detail.toString())
+            put("detail_synced_at", syncedAt)
+        }, SQLiteDatabase.CONFLICT_IGNORE) != -1L
+    }
+
+    fun cachedOrderDetail(terminal: NativeTerminal, orderId: String): JSONObject? {
+        if (!isCurrentOrderScope(terminal)) return null
+        return readableDatabase.rawQuery("SELECT detail_json FROM order_cache WHERE order_id = ? AND tenant_id = ? AND branch_id = ? AND terminal_id = ?",
+            arrayOf(orderId, terminal.tenantId, terminal.branchId, terminal.terminalId)).use { cursor ->
+            if (cursor.moveToFirst() && !cursor.isNull(0)) runCatching { JSONObject(cursor.getString(0)) }.getOrNull() else null
         }
     }
 
@@ -588,7 +716,7 @@ class NativePosDatabase(
             }
             if(previous!=null && (previous.tenantId!=terminal.tenantId || previous.branchId!=terminal.branchId || previous.terminalId!=terminal.terminalId)) {
                 // Reference caches have no per-row scope; never carry another store's details forward.
-                listOf("catalog_service","customer_profile","service_ticket","service_ticket_item","service_ticket_billed_item","service_item_catalog").forEach { writableDatabase.delete(it,null,null) }
+                listOf("catalog_service","customer_profile","service_ticket","service_ticket_item","service_ticket_billed_item","service_item_catalog","order_cache","order_cache_state").forEach { writableDatabase.delete(it,null,null) }
             }
             val reservedBySku = reservedQuantitiesBySku()
             // A foreground sale may commit while this network snapshot is downloading.
