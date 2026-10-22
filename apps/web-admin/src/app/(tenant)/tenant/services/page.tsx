@@ -1,11 +1,19 @@
-import { PagePlaceholder } from "@/components/app-shell";
+import { ServiceCatalogView } from "@/features/tenant/services";
 
-export default function ServicesPage() {
+type ServicesPageProps = {
+  searchParams?: Promise<{ q?: string | string[] }>;
+};
+
+export default async function ServicesPage({
+  searchParams,
+}: ServicesPageProps) {
+  const query = (await searchParams)?.q;
+
   return (
-    <PagePlaceholder
-      description="Manage service catalog used by POS and branch operations."
-      items={["Laundry services", "Dry cleaning", "Pressing", "Car wash"]}
-      title="Services"
+    <ServiceCatalogView
+      initialSearchQuery={
+        Array.isArray(query) ? (query[0] ?? "") : (query ?? "")
+      }
     />
   );
 }

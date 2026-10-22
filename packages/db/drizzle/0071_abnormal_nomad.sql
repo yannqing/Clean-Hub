@@ -1,0 +1,3 @@
+ALTER TABLE "tenant_settings" ADD COLUMN "pos_display_name" varchar(160);--> statement-breakpoint
+ALTER TABLE "tenant_settings" ADD COLUMN "pos_logo_object_key" text;--> statement-breakpoint
+ALTER TABLE "tenant_settings" ADD CONSTRAINT "tenant_settings_pos_branding_required" CHECK ("tenant_settings"."pos_display_name" IS NULL OR length(trim("tenant_settings"."pos_display_name")) > 0 OR ("tenant_settings"."pos_logo_object_key" IS NOT NULL AND length(trim("tenant_settings"."pos_logo_object_key")) > 0));

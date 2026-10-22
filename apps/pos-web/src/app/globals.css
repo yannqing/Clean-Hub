@@ -1,1 +1,40 @@
 @import "@cleanhub/ui/styles.css";
+
+/* Keep the touch-first lock screen on iPad, including 13-inch landscape sizes. */
+@custom-variant login-desktop (@media (min-width: 80rem) and (hover: hover) and (pointer: fine));
+
+html,
+body {
+  min-height: 100%;
+  overscroll-behavior: none;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* POS workspace scrollbar — mirrors the design prototype (.scrollbar). */
+.pos-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pos-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pos-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pos-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}

@@ -4,16 +4,35 @@ import { createId } from "@cleanhub/id";
 import { jwtVerify, SignJWT } from "jose";
 
 import { AuthError } from "./auth.errors.js";
-import type { AuthContext, AuthTokenPair } from "./auth.types.js";
+import type { AuthTokenPair } from "./auth.types.js";
 
 export type AccessTokenClaims = {
   sub: string;
+  subjectType: string;
   tenantId: string | null;
   role: string;
   roles: string[];
   permissions: string[];
   branchIds: string[];
+  terminalId?: string;
+  terminalBranchId?: string;
+  terminalDeviceId?: string;
+  terminalCredentialVersion?: number;
   expiresAt: Date;
+};
+
+export type TokenIssueContext = {
+  userId: string;
+  subjectType?: string;
+  tenantId: string | null;
+  role: string;
+  roles: string[];
+  permissions: string[];
+  branchIds: string[];
+  terminalId?: string;
+  terminalBranchId?: string;
+  terminalDeviceId?: string;
+  terminalCredentialVersion?: number;
 };
 
 export type TokenServiceOptions = {
@@ -67,21 +86,31 @@ export class TokenService {
     this.refreshTokenTtlSeconds = refreshTokenTtlSeconds;
   }
 
-  async issueTokenPair(context: Omit<AuthContext, "accessTokenExpiresAt">): Promise<AuthTokenPair> {
+  async issueTokenPair(
+    context: TokenIssueContext,
+    options?: { refreshTokenTtlSeconds?: number },
+  ): Promise<AuthTokenPair> {
     const now = Math.floor(Date.now() / 1000);
+    const refreshTokenTtlSeconds =
+      options?.refreshTokenTtlSeconds ?? this.refreshTokenTtlSeconds;
     const accessTokenExpiresAt = new Date(
       (now + this.accessTokenTtlSeconds) * 1000,
     );
     const refreshTokenExpiresAt = new Date(
-      (now + this.refreshTokenTtlSeconds) * 1000,
+      (now + refreshTokenTtlSeconds) * 1000,
     );
 
     const accessToken = await new SignJWT({
+      subjectType: context.subjectType ?? "user",
       tenantId: context.tenantId,
       role: context.role,
       roles: context.roles,
       permissions: context.permissions,
       branchIds: context.branchIds,
+      terminalId: context.terminalId,
+      terminalBranchId: context.terminalBranchId,
+      terminalDeviceId: context.terminalDeviceId,
+      terminalCredentialVersion: context.terminalCredentialVersion,
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
       .setSubject(context.userId)
@@ -110,6 +139,10 @@ export class TokenService {
 
       return {
         sub: result.payload.sub ?? "",
+        subjectType:
+          typeof result.payload.subjectType === "string"
+            ? result.payload.subjectType
+            : "user",
         tenantId:
           typeof result.payload.tenantId === "string"
             ? result.payload.tenantId
@@ -124,6 +157,22 @@ export class TokenService {
         branchIds: Array.isArray(result.payload.branchIds)
           ? result.payload.branchIds.map(String)
           : [],
+        terminalId:
+          typeof result.payload.terminalId === "string"
+            ? result.payload.terminalId
+            : undefined,
+        terminalBranchId:
+          typeof result.payload.terminalBranchId === "string"
+            ? result.payload.terminalBranchId
+            : undefined,
+        terminalDeviceId:
+          typeof result.payload.terminalDeviceId === "string"
+            ? result.payload.terminalDeviceId
+            : undefined,
+        terminalCredentialVersion:
+          typeof result.payload.terminalCredentialVersion === "number"
+            ? result.payload.terminalCredentialVersion
+            : undefined,
         expiresAt: new Date(Number(result.payload.exp ?? 0) * 1000),
       };
     } catch {

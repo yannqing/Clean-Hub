@@ -1,0 +1,2 @@
+ALTER TABLE "users" DROP CONSTRAINT "users_email_normalization_check";--> statement-breakpoint
+ALTER TABLE "users" ADD CONSTRAINT "users_email_normalization_check" CHECK (("users"."email" is null and "users"."normalized_email" is null) or ("users"."email" is not null and "users"."normalized_email" is not null and "users"."normalized_email" = lower(btrim("users"."email")) and "users"."normalized_email" <> ''));

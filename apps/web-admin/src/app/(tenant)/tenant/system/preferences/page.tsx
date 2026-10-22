@@ -1,11 +1,7 @@
-import { PagePlaceholder } from "@/components/app-shell";
+import { redirect } from "next/navigation";
+
+import { webAdminRoutes } from "@/config/routes";
 
 export default function TenantSystemPreferencesPage() {
-  return (
-    <PagePlaceholder
-      description="Tenant-level preferences for locale, currency, working rules, branch defaults, and operational policies."
-      items={["Locale", "Currency", "Branch defaults", "Policies"]}
-      title="Tenant Preferences"
-    />
-  );
+  redirect(webAdminRoutes.tenant.system.settings);
 }

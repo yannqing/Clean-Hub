@@ -1,0 +1,94 @@
+{
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+{$POS_PUBLIC_HOST} {
+	tls {
+		issuer acme {
+			dir https://acme-v02.api.letsencrypt.org/directory
+		}
+	}
+
+	encode zstd gzip
+
+	handle_path /api/* {
+		reverse_proxy api:4000
+	}
+
+	handle {
+		reverse_proxy pos-web:3001
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}
+
+{$API_PUBLIC_HOST} {
+	tls {
+		issuer acme {
+			dir https://acme-v02.api.letsencrypt.org/directory
+		}
+	}
+
+	encode zstd gzip
+
+	# Private objects stay signed. Preserve the public Host and full bucket path
+	# because both participate in S3 Signature V4 verification.
+	@media {
+		path /{$OBJECT_STORAGE_BUCKET:cleanhub-media}/tenant/*
+		method GET HEAD PUT OPTIONS
+	}
+	handle @media {
+		header >Cache-Control "private, no-store"
+		reverse_proxy minio:9000 {
+			header_up Host {http.request.host}
+		}
+	}
+
+	# Signed Android release packages are published here from the server's
+	# persistent downloads directory. Keep this handler before the API proxy.
+	handle_path /downloads/* {
+		root * /srv/downloads
+		header Content-Type application/vnd.android.package-archive
+		header Content-Disposition attachment
+		header Cache-Control "public, max-age=3600"
+		file_server
+	}
+
+	reverse_proxy api:4000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}
+
+{$WEB_ADMIN_PUBLIC_HOST} {
+	tls {
+		issuer acme {
+			dir https://acme-v02.api.letsencrypt.org/directory
+		}
+	}
+
+	encode zstd gzip
+
+	handle_path /api/* {
+		reverse_proxy api:4000
+	}
+
+	handle {
+		reverse_proxy web-admin:3000
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}

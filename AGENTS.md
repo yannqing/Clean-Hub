@@ -65,6 +65,21 @@ pnpm --filter @cleanhub/api dev
 pnpm --filter @cleanhub/web-admin dev
 ```
 
+Run the normal local pos-web stack (after the steps above, plus seed):
+
+```bash
+pnpm db:seed
+pnpm --filter @cleanhub/api dev
+pnpm --filter @cleanhub/pos-web dev
+```
+
+POS Web is a single-store terminal. A tenant owner or manager initializes each
+installation from the POS setup flow, selects an accessible branch, and enrolls
+the current device. The resulting HttpOnly terminal credential resolves the
+tenant dynamically, so POS login must not depend on a build-time tenant code.
+Seed cashier accounts (`pos.cashier1..4@cleanhub.local`, password `123456`,
+tenant `CLEAN-001`) are created by `pnpm db:seed`.
+
 Build:
 
 ```bash
@@ -91,6 +106,7 @@ pnpm lint
 - `apps/pos-web`: Next.js POS frontend for in-store staff workflows.
 - `apps/desktop`: Electron shell for the official Windows/macOS in-store POS runtime and local hardware integration.
 - `apps/mobile`: Capacitor shell for customer-facing and delivery-facing Android/iOS workflows. Do not treat it as the default mobile cashier POS.
+- `apps/pos-mobile`: the Android and iOS POS. Android is a **native Jetpack Compose app** under `android/app/src/main/kotlin/com/cleanhub/pos/nativepos/`, not a WebView around `pos-web`; iOS is still a Capacitor shell. Server business rules (ticket state machines, offline pricing, currency units) have a second implementation in that Kotlin — see "Native Android POS" in `CLAUDE.md` before changing them.
 - `apps/api`: standalone TypeScript API service.
 
 ### Packages

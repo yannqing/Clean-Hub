@@ -1,54 +1,49 @@
 "use client";
 
-import { Button, Input, Label, toast } from "@cleanhub/ui";
+import type { AuthContext } from "@cleanhub/api-client";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button, Icon, Input, Label, toast } from "@cleanhub/ui";
+import { Eye, EyeOff, KeyRound, LoaderCircle, Mail } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
 
+import { getWebAdminHomePath } from "@/config/auth-routing";
 import { webAdminRoutes } from "@/config/routes";
-import { webAdminApi } from "@/lib/api-client";
+import { useWebAdminLocale } from "@/i18n";
 
+import { loginAction } from "../actions/login.action";
 import { getOrCreateWebAdminDeviceId } from "../utils";
+import {
+  createLoginFormSchema,
+  type LoginFormField,
+  type LoginFormValues,
+} from "../validators/login-form.validator";
 
-type LoginFormState = {
-  identifier: string;
-  password: string;
-  tenantCode: string;
-};
-
-const initialState: LoginFormState = {
+const defaultValues: LoginFormValues = {
   identifier: "",
   password: "",
-  tenantCode: "",
 };
-
-function resolveHomePath(role: string): string {
-  if (role === "super_admin" || role === "support") {
-    return webAdminRoutes.saas.home;
-  }
-
-  return webAdminRoutes.tenant.home;
-}
 
 function isSafeInternalPath(path: string | null): path is string {
   return Boolean(path) && path!.startsWith("/") && !path!.startsWith("//");
 }
 
-function isPathAllowedForRole(path: string, role: string): boolean {
-  if (role === "super_admin" || role === "support") {
-    return (
-      path === webAdminRoutes.saas.home ||
-      path.startsWith(`${webAdminRoutes.saas.home}/`)
-    );
-  }
-
+function isPathAllowedForHome(path: string, homePath: "/saas" | "/tenant") {
   return (
-    path === webAdminRoutes.tenant.home ||
-    path.startsWith(`${webAdminRoutes.tenant.home}/`)
+    path === homePath ||
+    path.startsWith(`${homePath}/`)
   );
 }
 
-function resolvePostLoginPath(role: string): string {
-  const defaultPath = resolveHomePath(role);
+function resolvePostLoginPath(
+  authContext: Pick<AuthContext, "role" | "tenantId">,
+): string {
+  const defaultPath = getWebAdminHomePath(authContext);
+
+  if (!defaultPath) {
+    return webAdminRoutes.login;
+  }
 
   if (typeof window === "undefined") {
     return defaultPath;
@@ -56,7 +51,10 @@ function resolvePostLoginPath(role: string): string {
 
   const nextPath = new URLSearchParams(window.location.search).get("next");
 
-  if (isSafeInternalPath(nextPath) && isPathAllowedForRole(nextPath, role)) {
+  if (
+    isSafeInternalPath(nextPath) &&
+    isPathAllowedForHome(nextPath, defaultPath)
+  ) {
     return nextPath;
   }
 
@@ -65,87 +63,160 @@ function resolvePostLoginPath(role: string): string {
 
 export function LoginForm() {
   const router = useRouter();
-  const [formState, setFormState] = useState<LoginFormState>(initialState);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { messages } = useWebAdminLocale();
+  const auth = messages.auth;
+  const [errorCode, setErrorCode] = useState<
+    "invalidForm" | "accessDenied" | "signInFailed" | null
+  >(null);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const errorMessage =
+    errorCode === "invalidForm"
+      ? auth.errors.checkForm
+      : errorCode === "accessDenied"
+        ? auth.errors.accessDenied
+        : errorCode === "signInFailed"
+          ? auth.errors.signInFailed
+          : null;
+  const localizedLoginFormSchema = useMemo(
+    () => createLoginFormSchema(auth.validation),
+    [auth.validation],
+  );
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setErrorMessage(null);
-    setSubmitting(true);
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormValues>({
+    defaultValues,
+    resolver: zodResolver(localizedLoginFormSchema),
+    mode: "onSubmit",
+  });
 
-    try {
-      const result = await webAdminApi.auth.login({
-        identifier: formState.identifier,
-        password: formState.password,
-        tenantCode: formState.tenantCode.trim() || undefined,
-        deviceId: getOrCreateWebAdminDeviceId(),
-      });
+  async function submit(values: LoginFormValues) {
+    setErrorCode(null);
 
-      toast.success("Signed in successfully.");
-      router.replace(resolvePostLoginPath(result.authContext.role));
-      router.refresh();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to sign in.";
-      setErrorMessage(message);
-      toast.error(message);
-    } finally {
-      setSubmitting(false);
+    const result = await loginAction({
+      ...values,
+      deviceId: getOrCreateWebAdminDeviceId(),
+    });
+
+    if (!result.ok) {
+      const localizedMessage =
+        result.errorCode === "invalidForm"
+          ? auth.errors.checkForm
+          : result.errorCode === "accessDenied"
+            ? auth.errors.accessDenied
+            : auth.errors.signInFailed;
+
+      // Map server-side field errors back onto react-hook-form so the inline
+      // messages stay consistent with the resolver-driven ones.
+      for (const [field, message] of Object.entries(result.errors)) {
+        if (typeof message === "string") {
+          const localizedFieldMessage =
+            field === "identifier"
+              ? values.identifier.trim()
+                ? auth.validation.identifierInvalid
+                : auth.validation.identifierRequired
+              : field === "password"
+                ? auth.validation.passwordRequired
+                : message;
+
+          setError(field as LoginFormField, {
+            message: localizedFieldMessage,
+          });
+        }
+      }
+
+      setErrorCode(result.errorCode);
+      toast.error(localizedMessage);
+      return;
     }
-  }
 
-  function updateField(field: keyof LoginFormState, value: string) {
-    setFormState((current) => ({
-      ...current,
-      [field]: value,
-    }));
+    toast.success(auth.signedIn);
+    router.replace(resolvePostLoginPath(result.data));
+    router.refresh();
   }
 
   return (
     <form
-      className="mt-8 grid gap-5 rounded-lg border border-border bg-background p-6 shadow-sm"
-      onSubmit={handleSubmit}
+      className="mt-6 grid gap-4 rounded-2xl border border-zinc-950/10 bg-white/[0.96] p-5 shadow-[0_28px_80px_-34px_rgba(0,0,0,0.58)] backdrop-blur-2xl dark:border-white/10 dark:bg-zinc-950/[0.88] dark:shadow-[0_24px_70px_-32px_rgba(0,0,0,0.8)] sm:p-6"
+      method="post"
+      onSubmit={handleSubmit(submit)}
+      noValidate
     >
-      <div className="grid gap-2">
-        <Label htmlFor="identifier">Email or phone</Label>
-        <Input
-          autoComplete="username"
-          id="identifier"
-          name="identifier"
-          onChange={(event) => updateField("identifier", event.target.value)}
-          placeholder="admin@cleanhub.local"
-          required
-          type="text"
-          value={formState.identifier}
-        />
+      <div>
+        <Label className="sr-only" htmlFor="identifier">
+          {auth.identifierLabel}
+        </Label>
+        <div className="relative">
+          <Icon
+            aria-hidden
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+            icon={Mail}
+            size={17}
+          />
+          <Input
+            aria-invalid={Boolean(errors.identifier)}
+            autoComplete="username"
+            className="h-11 rounded-lg bg-zinc-50 pl-10 dark:bg-zinc-900"
+            id="identifier"
+            inputMode="email"
+            placeholder={auth.identifierPlaceholder}
+            type="email"
+            {...register("identifier")}
+          />
+        </div>
+        {errors.identifier ? (
+          <p className="mt-1.5 text-xs text-destructive">
+            {errors.identifier.message}
+          </p>
+        ) : null}
       </div>
 
-      <div className="grid gap-2">
-        <Label htmlFor="password">Password</Label>
-        <Input
-          autoComplete="current-password"
-          id="password"
-          name="password"
-          onChange={(event) => updateField("password", event.target.value)}
-          placeholder="Enter password"
-          required
-          type="password"
-          value={formState.password}
-        />
-      </div>
-
-      <div className="grid gap-2">
-        <Label htmlFor="tenantCode">Tenant code</Label>
-        <Input
-          autoComplete="organization"
-          id="tenantCode"
-          name="tenantCode"
-          onChange={(event) => updateField("tenantCode", event.target.value)}
-          placeholder="Optional for SaaS Admin"
-          type="text"
-          value={formState.tenantCode}
-        />
+      <div>
+        <Label className="sr-only" htmlFor="password">
+          {auth.passwordLabel}
+        </Label>
+        <div className="relative">
+          <Icon
+            aria-hidden
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+            icon={KeyRound}
+            size={17}
+          />
+          <Input
+            aria-invalid={Boolean(errors.password)}
+            autoComplete="current-password"
+            className="h-11 rounded-lg bg-zinc-50 pl-10 pr-11 dark:bg-zinc-900"
+            id="password"
+            placeholder={auth.passwordPlaceholder}
+            type={passwordVisible ? "text" : "password"}
+            {...register("password")}
+          />
+          <Button
+            aria-label={
+              passwordVisible ? auth.passwordHide : auth.passwordShow
+            }
+            className="absolute right-1 top-1/2 size-9 -translate-y-1/2 text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-50"
+            onClick={() => setPasswordVisible((visible) => !visible)}
+            size="icon-sm"
+            title={passwordVisible ? auth.passwordHide : auth.passwordShow}
+            type="button"
+            variant="ghost"
+          >
+            <Icon
+              aria-hidden
+              icon={passwordVisible ? EyeOff : Eye}
+              size={16}
+            />
+          </Button>
+        </div>
+        {errors.password ? (
+          <p className="mt-1.5 text-xs text-destructive">
+            {auth.validation.passwordRequired}
+          </p>
+        ) : null}
       </div>
 
       {errorMessage ? (
@@ -154,8 +225,15 @@ export function LoginForm() {
         </p>
       ) : null}
 
-      <Button className="w-full" disabled={submitting} type="submit">
-        {submitting ? "Signing in..." : "Sign in"}
+      <Button
+        className="h-11 rounded-lg bg-zinc-950 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
+        disabled={isSubmitting}
+        type="submit"
+      >
+        {isSubmitting ? (
+          <Icon aria-hidden className="animate-spin" icon={LoaderCircle} size={16} />
+        ) : null}
+        {isSubmitting ? auth.submitting : auth.submit}
       </Button>
     </form>
   );

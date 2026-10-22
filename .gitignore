@@ -23,9 +23,17 @@ coverage
 # Hosting/build platform outputs
 .vercel
 .output
+release
 
 # Package manager debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Android signing material. The keystore is written outside the repository by
+# `pnpm pos:create-release-keystore`, but a stray copy here would publish the
+# key that signs every POS release.
+*.jks
+*.keystore
+*.secrets.txt

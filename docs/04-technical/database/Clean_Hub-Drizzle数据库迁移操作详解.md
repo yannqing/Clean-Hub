@@ -84,10 +84,10 @@ DATABASE_URL="postgres://postgres:postgres@localhost:5432/cleanhub"
 
 | 命令 | 用途 | 是否会改数据库 |
 | ---- | ---- | ---- |
-| `pnpm db:up` | 创建并启动本地 PostgreSQL 容器 | 会创建/启动容器 |
+| `pnpm db:up` | 创建并启动本地 PostgreSQL 与 MinIO 容器 | 会创建/启动容器 |
 | `pnpm db:down` | 停止本地 PostgreSQL 容器 | 不删除数据卷 |
 | `pnpm db:ps` | 查看数据库容器状态 | 否 |
-| `pnpm db:logs` | 查看数据库容器日志 | 否 |
+| `pnpm db:logs` | 查看 PostgreSQL 与 MinIO 容器日志 | 否 |
 | `pnpm db:generate` | 根据 schema 生成 migration 文件 | 不直接改数据库 |
 | `pnpm db:migrate` | 执行 migration 到当前数据库 | 会改数据库结构 |
 | `pnpm db:push` | 直接把 schema 推到数据库 | 会改数据库结构 |
@@ -115,13 +115,88 @@ POSTGRES_USER="postgres"
 POSTGRES_PASSWORD="postgres"
 POSTGRES_PORT="5432"
 DATABASE_URL="postgres://postgres:postgres@localhost:5432/cleanhub"
+OBJECT_STORAGE_ENDPOINT="http://localhost:9000"
+OBJECT_STORAGE_BUCKET="cleanhub-media"
+OBJECT_STORAGE_ACCESS_KEY="cleanhub"
+OBJECT_STORAGE_SECRET_KEY="cleanhub-minio-password"
 ```
 
-### 5.3 启动 PostgreSQL
+### 5.3 启动 PostgreSQL 与 MinIO
 
 ```bash
 pnpm db:up
 ```
+
+`pnpm db:up` 会启动：
+
+- `postgres`：本地 PostgreSQL。
+- `minio`：本地 S3 兼容对象存储。
+- `minio-init`：一次性创建 `OBJECT_STORAGE_BUCKET` 指定的私有 bucket。
+
+本地 MinIO 默认地址：
+
+```text
+S3 endpoint：http://localhost:9000
+Console：     http://localhost:9001
+```
+
+生产环境同样使用自托管 MinIO 或兼容 S3 的对象存储，但必须更换为独立强密钥、私有 bucket，并限制网络访问范围。
+
+### 5.3.1 媒体对象清理与回填
+
+配送拍照凭证与客户签名使用对象存储，不再把 base64 图片写入数据库。API 会在申请上传凭证时创建 `media_objects` pending 记录，业务提交对象 key 后标记为 `committed`。
+
+过期仍为 `pending` 的孤儿对象由独立 cron 清理：
+
+```bash
+pnpm --filter @cleanhub/api cron:media-cleanup
+```
+
+可选环境变量：
+
+```env
+MEDIA_CLEANUP_DISABLED="false"
+MEDIA_CLEANUP_INTERVAL_SECONDS="900"
+MEDIA_CLEANUP_BATCH_SIZE="100"
+```
+
+历史 `delivery_proofs.media_ref` 中的 `data:` 内联图片可通过一次性脚本回填到对象存储：
+
+```bash
+pnpm --filter @cleanhub/api backfill:delivery-proof-media
+```
+
+可选环境变量：
+
+```env
+MEDIA_BACKFILL_DRY_RUN="true"
+MEDIA_BACKFILL_BATCH_SIZE="50"
+MEDIA_BACKFILL_LIMIT="500"
+```
+
+### 5.3.2 Email 通知与本地 SMTP 测试
+
+Email 通知通过独立 cron 发送，不在业务请求路径同步连 SMTP。开发环境可以用 Mailpit 或 MailHog 暴露 SMTP `1025` 端口，再运行：
+
+```bash
+pnpm --filter @cleanhub/api cron:email-delivery
+```
+
+必要环境变量：
+
+```env
+EMAIL_SMTP_HOST="localhost"
+EMAIL_SMTP_PORT="1025"
+EMAIL_SMTP_SECURE="false"
+EMAIL_SMTP_USER=""
+EMAIL_SMTP_PASS=""
+EMAIL_FROM="CleanHub <no-reply@cleanhub.local>"
+EMAIL_DEFAULT_LOCALE="en"
+EMAIL_DELIVERY_INTERVAL_SECONDS="60"
+EMAIL_DELIVERY_BATCH_SIZE="50"
+```
+
+cron 每轮会先扫描逾期取件工单并按配置入队，再领取 `pending` 或到期可重试的 Email 投递。发送成功写入 `external_id`/`sent_at`，失败按指数退避更新 `next_retry_at`。
 
 查看状态：
 
@@ -142,6 +217,34 @@ pnpm db:migrate
 ```
 
 如果项目里已经有 migration 文件，这一步会把本地数据库升级到当前项目需要的结构。
+
+### 5.5 灌入开发种子数据
+
+```bash
+pnpm db:seed
+```
+
+这一步会写入本地开发用的初始数据（演示租户、角色、SaaS / 租户管理员账号等），方便直接登录联调。种子内容来自 `packages/db/src/seeds/`，可重复执行（基于 `ON CONFLICT DO UPDATE` 幂等）。
+
+开发账号（全部）：
+
+- 密码：`123456`
+- PIN：`1234`
+- SaaS：`saas.admin1@cleanhub.local`、`saas.admin2@cleanhub.local`、`saas.support1@cleanhub.local`
+- 租户管理员：`tenant.admin1@cleanhub.local`（CLEAN-001）、`tenant.admin2@cleanhub.local`（CLEAN-002）、`tenant.admin3@cleanhub.local`（CLEAN-003）
+
+### 5.6 重置本地数据库（清空重建）
+
+当迁移基线被重建、或本地数据结构错乱时，需要把本地数据库彻底清空后重新初始化：
+
+```bash
+docker compose down -v   # 注意 -v：删除数据卷，真正清空数据库
+pnpm db:up               # 重新启动空的 PostgreSQL
+pnpm db:migrate          # 应用迁移，重建表结构
+pnpm db:seed             # 重新灌入开发种子数据
+```
+
+> **关键提醒：`pnpm db:down`（即 `docker compose down`）不会删除数据卷**，旧表和旧的迁移记录会保留下来。此时直接 `pnpm db:migrate` 会因为"类型/表已存在"而报错。**只有 `docker compose down -v` 才会删除数据卷、真正清空数据库。**
 
 ## 6. 日常开发如何改表
 
@@ -514,7 +617,7 @@ PostgreSQL enum 和普通字符串不同，修改 enum 可能影响历史数据�
 - Migration：数据库结构变化，例如建表、加字段、建索引。
 - Seed：初始化业务数据，例如默认角色、默认权限、测试租户。
 
-后续项目可以单独增加 `db:seed`，但不要把大量测试数据混进结构迁移里。
+本项目已提供 `pnpm db:seed`（种子文件在 `packages/db/src/seeds/`），用于灌入开发初始数据。请保持结构归 migration、数据归 seed，不要把大量测试数据混进结构迁移里。
 
 ## 15. Clean Hub 当前推荐规则
 
@@ -538,11 +641,18 @@ Clean Hub 团队建议先按以下规则执行：
 cp .env.example .env
 pnpm db:up
 pnpm db:migrate
+pnpm db:seed
 
 # 修改表结构后
 pnpm db:generate
 pnpm db:migrate
 pnpm --filter @cleanhub/db typecheck
+
+# 重置本地数据库（清空重建）
+docker compose down -v
+pnpm db:up
+pnpm db:migrate
+pnpm db:seed
 
 # 查看数据库
 pnpm db:studio

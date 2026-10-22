@@ -9,10 +9,14 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
+    "db:seed": "tsx src/seeds/index.ts",
     "db:studio": "drizzle-kit studio",
+    "test:rls": "tsx src/rls.integration.ts",
+    "test": "tsx src/client.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@cleanhub/domain": "workspace:*",
     "@cleanhub/id": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.20.0"
@@ -21,6 +25,7 @@
     "@types/node": "^20.19.40",
     "@types/pg": "^8.20.0",
     "dotenv": "^17.4.2",
-    "drizzle-kit": "^0.31.10"
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.21.0"
   }
 }
