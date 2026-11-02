@@ -179,10 +179,10 @@ internal fun NativeSettingsWorkspace(
                         }
                         if (nativeCurrencyPayableStep(terminal?.currency) < 100) SettingsSave(copy, editable && rounding != settings?.roundingRule) { onSave(NativeTerminalSettingsPatch(roundingRule = rounding)) }
                         SettingsPanel {
-                            SettingsInfo(copy.taxSettingsLabel, if (checkoutSettings.taxEnabled) "${checkoutSettings.taxLabel.orEmpty()} ${formatNativeTaxRate(checkoutSettings.defaultTaxRate)}" else copy.taxDisabled)
+                            SettingsInfo(copy.taxSettingsLabel, if (checkoutSettings.taxEnabled) "${checkoutSettings.taxLabel.orEmpty()} ${copy.taxRate(checkoutSettings.defaultTaxRate)}" else copy.taxDisabled)
                             SettingsInfo(copy.settingsPriceMode, if (checkoutSettings.pricesIncludeTax) copy.pricesIncludeTax else copy.pricesExcludeTax)
                             SettingsInfo(copy.settingsTaxNumber, checkoutSettings.taxRegistrationNumber)
-                            checkoutSettings.taxComponents.forEach { SettingsInfo(it.name, formatNativeTaxRate(it.rate)) }
+                            checkoutSettings.taxComponents.forEach { SettingsInfo(it.name, copy.taxRate(it.rate)) }
                             NativeTaxReadinessNotice(copy, checkoutSettings, current.terminal?.role, busy, onSynchronize)
                         }
                     }
@@ -250,14 +250,14 @@ internal fun NativeSettingsWorkspace(
                             SettingsInfo(copy.settingsCatalogueCounts, copy.settingsCatalogueSummary.format(current.services.size, current.products.size))
                             SettingsInfo(copy.settingsSaleQueue, copy.settingsQueueSummary.format(current.pendingSales, current.failedSales))
                             SettingsInfo(copy.settingsPrintQueue, copy.settingsQueueSummary.format(receiptPrintQueue.pending, receiptPrintQueue.failed))
-                            settings?.lastSyncError?.let { SettingsNotice(it) }
+                            settings?.lastSyncError?.let { SettingsNotice(nativeFeedbackText(it, copy)) }
                         }
                         Button(onClick = onSynchronize, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) copy.loading else copy.syncNow) }
                         if (current.failedSales > 0) SettingsNotice(copy.failedSalesNeedManager.format(current.failedSales))
                     }
                     NativeSettingsSection.Hardware -> Unit
                 }
-                message?.let { SettingsNotice(it) }
+                message?.let { SettingsNotice(nativeFeedbackText(it, copy, preserveUnknown = true)) }
                 Spacer(Modifier.height(16.dp))
             }
         }

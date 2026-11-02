@@ -248,7 +248,7 @@ private fun NativeEntryAction(label: String, busyLabel: String, enabled: Boolean
 }
 
 @Composable
-private fun NativeEntryFeedback(message: String?, warning: Boolean = false) {
+private fun NativeEntryFeedback(copy: NativePosCopy, message: String?, warning: Boolean = false) {
     if (message.isNullOrBlank()) return
     val ink = if (warning) Color(0xFF92400E) else ENTRY_ERROR
     Surface(shape = RoundedCornerShape(12.dp), color = if (warning) Color(0xFFFFFBEB) else Color(0xFFFEF3F2),
@@ -256,7 +256,7 @@ private fun NativeEntryFeedback(message: String?, warning: Boolean = false) {
         Row(Modifier.fillMaxWidth().padding(12.dp).semantics { liveRegion = LiveRegionMode.Polite },
             horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             Icon(EntryIcons.Info, null, tint = ink, modifier = Modifier.size(18.dp))
-            Text(message, color = ink, fontSize = 13.sp, lineHeight = 20.sp, modifier = Modifier.weight(1f))
+            Text(nativeFeedbackText(message, copy, preserveUnknown = true), color = ink, fontSize = 13.sp, lineHeight = 20.sp, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -280,7 +280,7 @@ internal fun FirstLaunchView(
                     }
             }
         }
-        NativeEntryFeedback(if (!apiConfigured) copy.noApiUrl else message)
+        NativeEntryFeedback(copy, if (!apiConfigured) copy.noApiUrl else message)
         NativeEntryAction(copy.startInitialisation, copy.authVerifying, apiConfigured, busy, onStart)
     }
 }
@@ -318,7 +318,7 @@ private fun NativeAdministratorForm(
             copy.authEmailPlaceholder, EntryIcons.Mail, !busy, keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
         NativeEntryField(copy, password, { password = it; hideMessage = true }, copy.passwordLabel,
             copy.authPasswordPlaceholder, EntryIcons.Lock, !busy, secret = true, keyboardType = KeyboardType.Password, onDone = submit)
-        NativeEntryFeedback(if (hideMessage) null else message)
+        NativeEntryFeedback(copy, if (hideMessage) null else message)
         NativeEntryAction(action, copy.authVerifying, canSubmit, busy, submit)
     }
 }
@@ -336,8 +336,8 @@ internal fun TerminalEnrollmentView(
     val submit = { if (label.isNotBlank() && !busy) { keyboard?.hide(); onEnroll(branchId, label) } }
     NativeEntryShell(copy, language, onLanguageSelected, busy, step = 1, cardWidth = 640.dp) {
         NativeEntryTitle(if (requiresReenrollment) copy.rebindTerminal else copy.bindTerminal, copy.authStoreHint, EntryIcons.Store)
-        taxIssueCode?.let { NativeEntryFeedback(copy.checkoutSetupRequired + "\n" + copy.taxReadinessMessage(it), warning = true) }
-        if (requiresReenrollment) NativeEntryFeedback(copy.rebindWarning, warning = true)
+        taxIssueCode?.let { NativeEntryFeedback(copy, copy.checkoutSetupRequired + "\n" + copy.taxReadinessMessage(it), warning = true) }
+        if (requiresReenrollment) NativeEntryFeedback(copy, copy.rebindWarning, warning = true)
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val columns = if (maxWidth >= 460.dp) 2 else 1
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -368,7 +368,7 @@ internal fun TerminalEnrollmentView(
         NativeEntryField(copy, label, { label = it }, copy.terminalName, copy.authTerminalPlaceholder,
             EntryIcons.Device, !busy, onDone = submit)
         Text(copy.authTerminalHint, color = ENTRY_MUTED, fontSize = 12.sp, lineHeight = 18.sp)
-        NativeEntryFeedback(message)
+        NativeEntryFeedback(copy, message)
         NativeEntryAction(if (requiresReenrollment) copy.revokeAndRebind else copy.bindAndContinue,
             copy.authBinding, label.isNotBlank(), busy, submit)
     }

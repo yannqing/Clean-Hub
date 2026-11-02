@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -14,6 +15,8 @@ const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
  * rule; it only catches the drift that is visible as a list.
  */
 const failures = [];
+const copyCheck = spawnSync(process.execPath, [join(rootDir, "scripts/generate-native-pos-error-copy.mjs"), "--check"], { encoding: "utf8" });
+if (copyCheck.status !== 0) failures.push(copyCheck.stderr || copyCheck.stdout || "Native API error translations could not be verified.");
 
 function read(relativePath) {
   return readFileSync(join(rootDir, relativePath), "utf8");

@@ -186,11 +186,18 @@ through `copy.<key>`. Two rules follow from how that file is built:
 The API localises the errors it raises for POS and auth paths, so a
 server-supplied message arrives in the terminal's language. The POS sends
 `Accept-Language` on every request from `session.pinLanguageCode()`; the
-catalogue is `apps/api/src/http/error-messages.ts`, keyed by the **English
+catalogue is `packages/i18n/src/error-messages.ts`, re-exported by
+`apps/api/src/http/error-messages.ts` and keyed by the **English
 message text**, not by the error code. When adding or rewording an error
 message on a POS or auth path, add its `fr`/`zh-CN` translations there —
 `pnpm --filter @cleanhub/api smoke:error-messages` names any message that
-has drifted. Back-office modules keep English messages.
+has drifted. Tenant back-office controllers also use this catalogue. Browser
+and SSR requests carry the selected interface locale; raw diagnostic logs and
+merchant-authored content keep their original text. Regenerate the APK's
+offline error copy with `node scripts/generate-native-pos-error-copy.mjs`.
+Explicit schema guidance belongs in `packages/i18n/src/schema-error-messages.ts`;
+the same smoke check covers custom validation messages as well as thrown errors.
+Built-in schema failures are localized by `apps/api/src/http/validation-messages.ts`.
 
 **Server business rules are duplicated here.** Changing any of these in
 `apps/api` or `packages/domain` without changing the Kotlin lets the two drift

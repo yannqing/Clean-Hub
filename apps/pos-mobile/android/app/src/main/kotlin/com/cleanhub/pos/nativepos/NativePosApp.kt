@@ -157,6 +157,7 @@ private data class NativeMoreNotification(
     val createdAt: String,
     val relatedType: String?,
     val relatedId: String?,
+    val noticeType: String = "business",
 )
 internal data class NativeTerminalSettingsSummary(
     val label: String?,
@@ -224,7 +225,7 @@ private data class NativeMoreShiftData(
     val movements: List<NativeMoreCashMovement>,
     val zReports: List<NativeMoreZReport>,
 )
-private data class NativeMoreZReport(
+internal data class NativeMoreZReport(
     val id: String,
     val cutoffAt: String,
     val netSales: String,
@@ -240,8 +241,8 @@ private data class NativeMoreZReport(
     val discountAmount: String,
     val paymentBreakdown: List<NativeMoreZPayment>,
 )
-private data class NativeMoreZPayment(val method: String, val provider: String?, val netAmount: String)
-private data class NativeMoreZTaxComponent(val name: String, val rate: String, val taxAmount: String)
+internal data class NativeMoreZPayment(val method: String, val provider: String?, val netAmount: String)
+internal data class NativeMoreZTaxComponent(val name: String, val rate: String, val taxAmount: String)
 
 internal enum class NativePosTab(val symbol: String) {
     Workspace("⌂"),
@@ -282,7 +283,7 @@ internal enum class NativePinLanguage(val code: String, val label: String) {
     French("fr", "Français");
 
     companion object {
-        fun fromCode(code: String): NativePinLanguage = entries.firstOrNull { it.code == code } ?: Chinese
+        fun fromCode(code: String): NativePinLanguage = entries.firstOrNull { it.code == supportedPosLanguageCode(code) } ?: English
     }
 }
 
@@ -667,7 +668,7 @@ fun NativePosApp(applicationContext: Context) {
         }.exceptionOrNull()
         reload()
         val screenError = runCatching { refreshMoreShiftData() }.exceptionOrNull()
-        return screenError?.userMessage() ?: cacheError?.userMessage()
+        return screenError?.userMessage(copy) ?: cacheError?.userMessage(copy)
     }
 
     suspend fun executeReceiptPrint(
@@ -2722,7 +2723,11 @@ fun NativePosApp(applicationContext: Context) {
                             },
                             onStartSale = { activeTab = NativePosTab.Sale },
                             onAddProduct = ::addProductToSale,
-                            onCreateCustomer = ::createCustomer,
+                            onCreateServiceTicket = ::createServiceTicket,
+                            onCustomerChanged = {
+                                scope.launch { reload(refreshCart = false) }
+                                NativePosSyncWorker.schedule(applicationContext)
+                            },
                             onOpenTicket = { ticket ->
                                 activeTab = NativePosTab.Tickets
                                 openTicket(ticket)
@@ -3190,7 +3195,7 @@ private fun NativeWorkspaceView(
             }
         }
         OutlinedButton(onClick = onSynchronize, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) copy.synchronizing else copy.syncLocalData) }
-        message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
+        message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
@@ -3342,7 +3347,7 @@ private fun NativeIntakeView(
                 }
             }
         }
-        message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
+        message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
 
     if (customerDialogOpen) {
@@ -3414,7 +3419,7 @@ private fun NativeIntakeCustomerRow(copy: NativePosCopy, customer: NativeCustome
             contentAlignment = Alignment.Center,
         ) { Text(customer.fullName.trim().take(1).uppercase(), color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold) }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(customer.fullName, color = POS_INK, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(customer.fullName.ifBlank { copy.customerFallback }, color = POS_INK, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             Text(customer.accountName, color = POS_MUTED, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(customer.phone ?: copy.noPhoneOnFile, color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
         }
@@ -3444,18 +3449,18 @@ private fun NativeIntakeRecentTicketRow(copy: NativePosCopy, ticket: NativeServi
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                "${ticketStatusLabel(ticket.ticketStatus, copy)} · ${copy.itemsCountSuffix.format(ticket.itemCount)} · ${formatNativeActivityTime(ticket.updatedAt.ifBlank { ticket.createdAt })}",
+                "${ticketStatusLabel(ticket.ticketStatus, copy)} · ${copy.itemsCountSuffix.format(ticket.itemCount)} · ${formatNativeActivityTime(ticket.updatedAt.ifBlank { ticket.createdAt }, copy)}",
                 color = POS_MUTED,
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             ticket.expectedPickupAt?.let { pickupAt ->
-                Text(copy.expectedPickup.format(formatNativeActivityTime(pickupAt)), color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
+                Text(copy.expectedPickup.format(formatNativeActivityTime(pickupAt, copy)), color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
             }
         }
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(formatMoney(ticket.totalMinor, ticket.currency), color = POS_INK, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+            Text(copy.money(ticket.totalMinor, ticket.currency), color = POS_INK, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
             Text(copy.continueProcessing, color = POS_ACCENT, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
         }
     }
@@ -3550,7 +3555,7 @@ internal fun NativeCreateTicketDialog(
                 ) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(copy.ticketCustomer, color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
-                        Text(customer.fullName, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(customer.fullName.ifBlank { copy.customerFallback }, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(customer.phone ?: customer.accountName, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -3580,7 +3585,7 @@ internal fun NativeCreateTicketDialog(
                     }
                 }
                 if (!internetAvailable) Text(copy.intakeOfflineHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                message?.let { Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
+                message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
                 Button(
                     onClick = { onCreate(ticketType, priority, remark.trim(), expectedPickupText.trim()) },
                     enabled = !busy,
@@ -3770,7 +3775,8 @@ private fun NativeMoreView(
     onStartIntakeForCustomer: (NativeCustomer) -> Unit,
     onStartSale: () -> Unit,
     onAddProduct: (NativeProduct) -> Unit,
-    onCreateCustomer: (String, String) -> Unit,
+    onCreateServiceTicket: (NativeCustomer, String, String, String, String) -> Unit,
+    onCustomerChanged: () -> Unit,
     onOpenTicket: (NativeServiceTicket) -> Unit,
     searchResults: List<NativeMoreSearchResult>,
     onSearch: (String) -> Unit,
@@ -3818,14 +3824,16 @@ private fun NativeMoreView(
             destinations = overflowDestinations,
             onNavigate = onNavigateDestination,
         )
-        NativeMoreDestination.Customers -> NativeMoreCustomersView(copy,
-            customers = current.customers,
+        NativeMoreDestination.Customers -> NativeCustomersWorkspace(copy,
+            current = current,
+            internetAvailable = internetAvailable,
             busy = busy,
             message = message,
             onBack = ::backToMenu,
-            onStartIntake = onStartIntake,
-            onStartIntakeForCustomer = onStartIntakeForCustomer,
-            onCreateCustomer = onCreateCustomer,
+            onOpenTicket = onOpenTicket,
+            onOpenOrder = onOpenOrder,
+            onCreateTicket = onCreateServiceTicket,
+            onChanged = onCustomerChanged,
         )
         NativeMoreDestination.Catalog -> NativeMoreCatalogView(copy,
             products = current.products,
@@ -4264,7 +4272,7 @@ private fun NativeShiftHandoverView(
                             report.taxableAmount?.let { NativeReferenceRow(copy.taxableAmountLabel, it, report.currency) }
                             report.taxAmount?.let { NativeReferenceRow(copy.taxAmountLabel, it, report.currency) }
                             report.taxComponents.forEach { component ->
-                                NativeReferenceRow("${component.name} ${formatNativeTaxRate(component.rate)}", component.taxAmount, report.currency)
+                                NativeReferenceRow("${component.name} ${copy.taxRate(component.rate)}", component.taxAmount, report.currency)
                             }
                             NativeReferenceRow(copy.discountAmountLabel, report.discountAmount, report.currency)
                             NativeReferenceRow(copy.refundAmountLabel, report.refundAmount, report.currency)
@@ -4273,7 +4281,7 @@ private fun NativeShiftHandoverView(
                             }
                             OutlinedButton(
                                 onClick = {
-                                    pendingReportCsv = buildNativeZReportCsv(report)
+                                    pendingReportCsv = buildNativeZReportCsv(report, copy)
                                     createReportDocument.launch("z-report-${report.cutoffAt.take(10)}-${report.id}.csv")
                                 },
                                 modifier = Modifier.fillMaxWidth(),
@@ -4364,66 +4372,6 @@ internal fun NativeMoreMenuView(copy: NativePosCopy, current: NativePosSnapshot,
 }
 
 @Composable
-private fun NativeMoreCustomersView(
-    copy: NativePosCopy,
-    customers: List<NativeCustomer>,
-    busy: Boolean,
-    message: String?,
-    onBack: () -> Unit,
-    onStartIntake: () -> Unit,
-    onStartIntakeForCustomer: (NativeCustomer) -> Unit,
-    onCreateCustomer: (String, String) -> Unit,
-) {
-    var query by remember { mutableStateOf("") }
-    var creating by remember { mutableStateOf(false) }
-    var name by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    val normalized = query.trim().lowercase()
-    val matches = customers.filter {
-        normalized.isBlank() || it.fullName.lowercase().contains(normalized) ||
-            it.accountName.lowercase().contains(normalized) || it.phone.orEmpty().contains(normalized)
-    }
-    NativeMorePage(copy, copy.menuCustomers, onBack) {
-        Text(copy.customersCachedHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-        NativePosInput(value = query, onValueChange = { query = it }, label = { Text(copy.nameAccountOrPhone) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { creating = !creating }, enabled = !busy, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT)) { Text(if (creating) copy.collapseRegistration else copy.newCustomerToggle) }
-            OutlinedButton(onClick = onStartIntake, enabled = !busy, modifier = Modifier.weight(1f)) { Text(copy.newServiceTicket) }
-        }
-        if (creating) {
-            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
-                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(copy.customerRegistration, color = POS_INK, fontWeight = FontWeight.SemiBold)
-                    NativePosInput(value = name, onValueChange = { name = it }, label = { Text(copy.customerName) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    NativePosInput(value = phone, onValueChange = { phone = it }, label = { Text(copy.phoneNumber) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    Button(
-                        onClick = { onCreateCustomer(name, phone) },
-                        enabled = !busy && name.isNotBlank() && phone.isNotBlank(),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text(copy.createCustomer) }
-                }
-            }
-        }
-        if (matches.isEmpty()) Text(copy.noCachedMatches, color = POS_MUTED)
-        matches.forEach { customer ->
-            Card(
-                modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { onStartIntakeForCustomer(customer) },
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
-            ) {
-                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(customer.fullName, color = POS_INK, fontWeight = FontWeight.SemiBold)
-                    Text(customer.accountName, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                    Text(customer.phone ?: customer.email ?: copy.noContactOnFile, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                    Text(copy.tapToStartIntake, color = POS_ACCENT, style = MaterialTheme.typography.labelSmall)
-                }
-            }
-        }
-        message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
-    }
-}
-
-@Composable
 private fun NativeMoreCatalogView(
     copy: NativePosCopy,
     products: List<NativeProduct>,
@@ -4444,7 +4392,7 @@ private fun NativeMoreCatalogView(
                     NativeReferenceRow(
                         product.name,
                         "${product.sku} · ${if (internetAvailable) copy.syncedSellOffline else copy.usingLocalCatalog}",
-                        formatMoney(product.amountMinor, product.currency),
+                        copy.money(product.amountMinor, product.currency),
                     )
                     Button(
                         onClick = { onAddProduct(product) },
@@ -4459,10 +4407,10 @@ private fun NativeMoreCatalogView(
             NativeReferenceRow(
                 title = service.name,
                 detail = "${service.businessLine} · ${service.pricingUnit}",
-                amount = formatMoney(service.amountMinor, service.currency),
+                amount = copy.money(service.amountMinor, service.currency),
             )
         }
-        message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
+        message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
@@ -4505,13 +4453,13 @@ private fun NativeMoreScanView(
         }
         if (keyword.isBlank()) Text(copy.scanEmptyHint, color = POS_MUTED)
         ticketMatches.forEach { ticket ->
-            OutlinedButton(onClick = { onOpenTicket(ticket) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("${copy.ticketPrefix.format(ticket.ticketNo ?: ticket.id.takeLast(8))} · ${ticket.customerName}") }
+            OutlinedButton(onClick = { onOpenTicket(ticket) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("${copy.ticketPrefix.format(ticket.ticketNo ?: ticket.id.takeLast(8))} · ${ticket.customerName.ifBlank { copy.customerFallback }}") }
         }
         productMatches.forEach { product ->
             OutlinedButton(onClick = { onAddProduct(product) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.productAddToTill.format(product.name)) }
         }
         customerMatches.forEach { customer ->
-            OutlinedButton(onClick = { onStartIntakeForCustomer(customer) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.customerIntakePrefix.format(customer.fullName)) }
+            OutlinedButton(onClick = { onStartIntakeForCustomer(customer) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.customerIntakePrefix.format(customer.fullName.ifBlank { copy.customerFallback })) }
         }
         orderMatches.forEach { order ->
             OutlinedButton(onClick = { onOpenOrder(order.id) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
@@ -4534,7 +4482,7 @@ private fun NativeMoreScanView(
             }
         }
         if (keyword.isNotBlank() && ticketMatches.isEmpty() && productMatches.isEmpty() && customerMatches.isEmpty() && orderMatches.isEmpty() && searchResults.isEmpty()) Text(copy.noMatchFound, color = POS_MUTED)
-        message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
+        message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
@@ -4600,8 +4548,8 @@ internal fun NativeMoreOrdersView(
                                 Text(copy.itemsCountSuffix.format(order.itemCount), color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
                             }
                             Column(Modifier.weight(1.4f)) {
-                                Text(nativeOrderMoney(order.totalAmount, order.currency), color = POS_INK, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodySmall)
-                                Text("${copy.orderPaidAmount} ${nativeOrderMoney(order.paidAmount, order.currency)}", color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
+                                Text(copy.orderMoney(order.totalAmount, order.currency), color = POS_INK, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodySmall)
+                                Text("${copy.orderPaidAmount} ${copy.orderMoney(order.paidAmount, order.currency)}", color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
                             }
                             NativeOrderTableCell(nativeOrderStatusLabel(order.status, copy), 1f)
                             NativeOrderTableCell(nativePaymentStatusLabel(order.paymentStatus, copy), 1f)
@@ -4621,10 +4569,10 @@ internal fun NativeMoreOrdersView(
                                 }
                                 Text("${order.customerName ?: copy.walkInCustomer} · ${copy.itemsCountSuffix.format(order.itemCount)} · ${if (order.orderType == "ticket") copy.orderTypeTicket else copy.orderTypeManual}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text(nativeOrderMoney(order.totalAmount, order.currency), color = POS_INK, fontWeight = FontWeight.Bold)
+                                    Text(copy.orderMoney(order.totalAmount, order.currency), color = POS_INK, fontWeight = FontWeight.Bold)
                                     Text(nativePaymentStatusLabel(order.paymentStatus, copy), color = POS_MUTED)
                                 }
-                                Text("${copy.orderPaidAmount} ${nativeOrderMoney(order.paidAmount, order.currency)} · ${nativeOrderTime(order.createdAt, timeZone, copy.localeCode())}", color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
+                                Text("${copy.orderPaidAmount} ${copy.orderMoney(order.paidAmount, order.currency)} · ${nativeOrderTime(order.createdAt, timeZone, copy.localeCode())}", color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
@@ -4636,7 +4584,7 @@ internal fun NativeMoreOrdersView(
             Text(copy.detailPage.format(currentPage + 1, filtered.size), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
             OutlinedButton(onClick = { page = currentPage + 1 }, enabled = currentPage < pageCount - 1 && !busy) { Text(copy.detailNext) }
         }
-        message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
+        message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
@@ -4678,7 +4626,7 @@ private fun NativeMoreOrderDetailView(
         OutlinedButton(onClick = onRefresh, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) copy.loading else copy.refreshOrders) }
         if (order == null) {
             Text(copy.openOrderWhenOnline, color = POS_MUTED)
-            message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
+            message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
             return@NativeMorePage
         }
         val outstanding = outstandingAmount(order.totalAmount, order.paidAmount)
@@ -4769,7 +4717,7 @@ private fun NativeMoreOrderDetailView(
         if (order.adjustments.isNotEmpty()) {
             Text(copy.refundRecords, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             order.adjustments.filter { it.type == "refund" }.forEach { adjustment ->
-                NativeReferenceRow(copy.refundAmountLabel, "${adjustment.status} · ${adjustment.reason}", "${adjustment.amount} ${order.currency}")
+                NativeReferenceRow(copy.refundAmountLabel, "${nativePaymentStatusLabel(adjustment.status, copy)} · ${adjustment.reason}", copy.orderMoney(adjustment.amount, order.currency))
                 if (adjustment.status != "succeeded" && canResolveManualPayments) {
                     if (refundAdjustmentId == adjustment.id) {
                         NativePosInput(value = refundReference, onValueChange = { refundReference = it }, label = { Text(copy.refundReferenceLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -4784,7 +4732,7 @@ private fun NativeMoreOrderDetailView(
                 }
             }
         }
-        message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
+        message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
@@ -4815,7 +4763,7 @@ private fun NativeMoreStatisticsView(
         } else if (!busy) {
             Text(copy.statisticsWhenOnline, color = POS_MUTED)
         }
-        message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
+        message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
@@ -4840,11 +4788,12 @@ private fun NativeMoreNotificationsView(
         }
         if (!busy && notifications.isEmpty()) Text(copy.noNotifications, color = POS_MUTED)
         notifications.forEach { notification ->
+            val (title, content) = nativeSystemNotificationText(notification.title, notification.content, notification.noticeType, notification.relatedType, notification.relatedId, copy)
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(notification.title, color = POS_INK, fontWeight = FontWeight.SemiBold)
-                    Text(notification.content, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                    Text("${notification.priority} · ${notification.createdAt}", color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
+                    Text(title.ifBlank { copy.notificationFallback }, color = POS_INK, fontWeight = FontWeight.SemiBold)
+                    Text(content, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    Text("${nativeNotificationPriorityLabel(notification.priority, copy)} · ${formatNativeActivityTime(notification.createdAt, copy)}", color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
                     if (notification.readStatus == "unread") {
                         OutlinedButton(onClick = { onMarkRead(notification.deliveryId) }, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.markRead) }
                     }
@@ -4857,7 +4806,7 @@ private fun NativeMoreNotificationsView(
                 }
             }
         }
-        message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
+        message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
@@ -5050,7 +4999,7 @@ private fun NativeMoreHardwareView(
                 }
             }
         }
-        message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
+        message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
@@ -5093,7 +5042,7 @@ private fun CachedDataExpiredView(copy: NativePosCopy, busy: Boolean, message: S
     FormColumn(copy.catalogNeedsUpdate) {
         Text(copy.catalogExpired)
         Button(onClick = onSynchronize, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.syncNow) }
-        ErrorText(message)
+        ErrorText(message, copy)
     }
 }
 
@@ -5134,7 +5083,7 @@ private fun FormColumn(
     }
 }
 
-@Composable private fun ErrorText(message: String?) { message?.let { Text(it, color = MaterialTheme.colorScheme.error) } }
+@Composable private fun ErrorText(message: String?, copy: NativePosCopy) { message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = MaterialTheme.colorScheme.error) } }
 
 @Composable
 private fun NetworkStatusIndicator(copy: NativePosCopy, internetAvailable: Boolean) {
@@ -5351,7 +5300,7 @@ private fun CashOperationsView(
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(if (busy) copy.synchronizing else copy.syncLocalData) }
         }
-        ErrorText(message)
+        ErrorText(message, copy)
     }
 }
 
@@ -5425,7 +5374,7 @@ private fun ProductCatalogCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(product.sku, color = POS_MUTED, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(formatMoney(product.amountMinor, product.currency), color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(copy.money(product.amountMinor, product.currency), color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             }
             if (offlineStockUnavailable) {
                 Text(copy.offlineStockShortShort, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
@@ -5513,7 +5462,7 @@ internal fun CheckoutPanel(
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(copy.amountDueShort, color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
-                Text(formatMoney(totalMinor, cart.currency), color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(copy.money(totalMinor, cart.currency), color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
             message?.let {
                 Text(
@@ -5610,7 +5559,7 @@ private fun NativeCartDrawer(
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(copy.cartDetail, color = POS_INK, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            Text("${copy.itemsCountSuffix.format(cart.itemCount)} · ${formatMoney(cart.totalMinor, cart.currency)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                            Text("${copy.itemsCountSuffix.format(cart.itemCount)} · ${copy.money(cart.totalMinor, cart.currency)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                         }
                         TextButton(onClick = onDismiss, enabled = !busy) { Text(copy.close) }
                     }
@@ -5842,7 +5791,7 @@ internal fun NativeCheckoutDialog(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Text(copy.amountDue, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                        Text(formatMoney(totalMinor, cart.currency), color = POS_INK, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        Text(copy.money(totalMinor, cart.currency), color = POS_INK, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                         Text(copy.itemsCashSuffix.format(cart.itemCount), color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
                     }
                 }
@@ -5898,9 +5847,9 @@ internal fun NativeCheckoutDialog(
                             modifier = Modifier.fillMaxWidth().padding(14.dp),
                             verticalArrangement = Arrangement.spacedBy(7.dp),
                         ) {
-                            NativeCheckoutAmountRow(copy.productsAndServices, pricing.subtotalMinor, cart.currency)
+                            NativeCheckoutAmountRow(copy, copy.productsAndServices, pricing.subtotalMinor, cart.currency)
                             pricing.discounts.forEach { discount ->
-                                NativeCheckoutAmountRow(discount.title, -discount.amountMinor, cart.currency, Color(0xFF16803A))
+                                NativeCheckoutAmountRow(copy, discount.title.ifBlank { copy.discountFallback }, -discount.amountMinor, cart.currency, Color(0xFF16803A))
                             }
                             // One row per rate, as the receipt prints them: a basket of
                             // standard-rated and exempt items shows only the tax it pays.
@@ -5908,19 +5857,19 @@ internal fun NativeCheckoutDialog(
                                 val components = pricing.taxComponents.filter { it.parentRate == entry.taxRate }
                                 if (components.isNotEmpty()) {
                                     components.forEach { component ->
-                                        NativeCheckoutAmountRow("${component.name} ${formatNativeTaxRate(component.rate)}" + if (pricing.pricesIncludeTax) copy.taxIncluded else "", component.taxMinor, cart.currency)
+                                        NativeCheckoutAmountRow(copy, "${component.name} ${copy.taxRate(component.rate)}" + if (pricing.pricesIncludeTax) copy.taxIncluded else "", component.taxMinor, cart.currency)
                                     }
                                 } else {
-                                    val taxLabel = (pricing.taxLabel?.let { "$it ${formatNativeTaxRate(entry.taxRate)}" }
-                                        ?: copy.taxLabelWithRate.format(formatNativeTaxRate(entry.taxRate))) + if (pricing.pricesIncludeTax) copy.taxIncluded else ""
-                                    NativeCheckoutAmountRow(taxLabel, entry.taxMinor, cart.currency)
+                                    val taxLabel = (pricing.taxLabel?.let { "$it ${copy.taxRate(entry.taxRate)}" }
+                                        ?: copy.taxLabelWithRate.format(copy.taxRate(entry.taxRate))) + if (pricing.pricesIncludeTax) copy.taxIncluded else ""
+                                    NativeCheckoutAmountRow(copy, taxLabel, entry.taxMinor, cart.currency)
                                 }
                             }
                             if (pricing.roundingAdjustmentMinor != 0L) {
-                                NativeCheckoutAmountRow(copy.systemRounding, pricing.roundingAdjustmentMinor, cart.currency)
+                                NativeCheckoutAmountRow(copy, copy.systemRounding, pricing.roundingAdjustmentMinor, cart.currency)
                             }
                             if (cashRoundingDiscountMinor > 0L) {
-                                NativeCheckoutAmountRow(copy.cashRoundingLine, -cashRoundingDiscountMinor, cart.currency, Color(0xFF16803A))
+                                NativeCheckoutAmountRow(copy, copy.cashRoundingLine, -cashRoundingDiscountMinor, cart.currency, Color(0xFF16803A))
                             }
                         }
                     }
@@ -6012,7 +5961,7 @@ internal fun NativeCheckoutDialog(
                                             contentColor = POS_INK,
                                         )
                                     },
-                                ) { Text(formatMoney(amount, cart.currency)) }
+                                ) { Text(copy.money(amount, cart.currency)) }
                             }
                         }
                     }
@@ -6091,7 +6040,7 @@ internal fun NativeCheckoutDialog(
                     ) {
                         Text(copy.changeLabel, color = Color(0xFF16803A), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         Text(
-                            formatMoney(changeMinor, cart.currency),
+                            copy.money(changeMinor, cart.currency),
                             color = Color(0xFF16803A),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
@@ -6137,7 +6086,7 @@ internal fun NativeCheckoutDialog(
 }
 
 @Composable
-private fun NativeCheckoutAmountRow(label: String, amountMinor: Long, currency: String, color: Color = POS_MUTED) {
+private fun NativeCheckoutAmountRow(copy: NativePosCopy, label: String, amountMinor: Long, currency: String, color: Color = POS_MUTED) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -6145,7 +6094,7 @@ private fun NativeCheckoutAmountRow(label: String, amountMinor: Long, currency: 
     ) {
         Text(label, color = color, style = MaterialTheme.typography.bodySmall)
         Text(
-            text = if (amountMinor < 0) "−${formatMoney(-amountMinor, currency)}" else formatMoney(amountMinor, currency),
+            text = if (amountMinor < 0) "−${copy.money(-amountMinor, currency)}" else copy.money(amountMinor, currency),
             color = color,
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.SemiBold,
@@ -6270,7 +6219,7 @@ private fun JSONArray?.toNativeMoreOrderItems(): List<NativeMoreOrderItem> = bui
         val value = this@toNativeMoreOrderItems.optJSONObject(index) ?: continue
         add(NativeMoreOrderItem(
             id = value.optString("id"),
-            name = value.optString("itemName").ifBlank { nativePosCopy(null).orderItemFallback },
+            name = value.optString("itemName"),
             quantity = value.optString("quantity", "1"),
             lineAmount = value.optString("lineAmount", "0"),
             unitAmount = value.optString("chargedUnitAmount", value.optString("unitAmount", "0")),
@@ -6344,7 +6293,7 @@ private fun JSONObject.toNativeMoreTicket(currency: String): NativeServiceTicket
     id = optString("id"),
     ticketNo = optString("ticketNo").takeIf { it.isNotBlank() && it != "null" },
     customerId = optString("customerId"),
-    customerName = optString("customerName").ifBlank { nativePosCopy(null).customerFallback },
+    customerName = optString("customerName"),
     ticketType = optString("ticketType", "laundry"),
     ticketStatus = optString("ticketStatus", "pending"),
     priority = optString("priority", "normal"),
@@ -6360,8 +6309,8 @@ private fun JSONObject.toNativeMoreTicket(currency: String): NativeServiceTicket
 private fun JSONObject.toNativeMoreCustomer(): NativeCustomer = NativeCustomer(
     id = optString("id"),
     accountId = optString("customerAccountId"),
-    fullName = optString("fullName").ifBlank { nativePosCopy(null).customerFallback },
-    accountName = optString("accountName").ifBlank { optString("fullName", nativePosCopy(null).customerFallback) },
+    fullName = optString("fullName"),
+    accountName = optString("accountName").ifBlank { optString("fullName") },
     phone = optString("phone").takeIf { it.isNotBlank() && it != "null" },
     email = optString("email").takeIf { it.isNotBlank() && it != "null" },
     status = optString("status", "active"),
@@ -6455,24 +6404,24 @@ private fun JSONArray?.toNativeMoreZReports(): List<NativeMoreZReport> = buildLi
     }
 }
 
-private fun buildNativeZReportCsv(report: NativeMoreZReport): String {
+internal fun buildNativeZReportCsv(report: NativeMoreZReport, copy: NativePosCopy): String {
     val rows = listOf(
-        listOf("Z Report", report.id),
-        listOf("Date", report.cutoffAt),
-        listOf("Currency", report.currency),
-        listOf("Orders", report.orderCount.toString()),
-        listOf("Taxable amount", report.taxableAmount.orEmpty()),
-        listOf("Tax amount", report.taxAmount.orEmpty()),
-        listOf("Discount", report.discountAmount),
-        listOf("Refund", report.refundAmount),
-        listOf("Net sales", report.netSales),
-        listOf("Expected cash", report.expectedCash),
-        listOf("Counted cash", report.countedCash),
-        listOf("Variance", report.variance),
+        listOf(copy.zReportTitle, report.id),
+        listOf(copy.zReportDate, report.cutoffAt),
+        listOf(copy.zReportCurrency, report.currency),
+        listOf(copy.orderCountLabel, report.orderCount.toString()),
+        listOf(copy.taxableAmountLabel, report.taxableAmount.orEmpty()),
+        listOf(copy.taxAmountLabel, report.taxAmount.orEmpty()),
+        listOf(copy.discountAmountLabel, report.discountAmount),
+        listOf(copy.refundAmountLabel, report.refundAmount),
+        listOf(copy.netSales, report.netSales),
+        listOf(copy.expectedCash, report.expectedCash),
+        listOf(copy.zReportCountedCash, report.countedCash),
+        listOf(copy.varianceLabel, report.variance),
     ) + report.taxComponents.map { component ->
-        listOf("${component.name} ${formatNativeTaxRate(component.rate)}", component.taxAmount)
+        listOf("${component.name} ${copy.taxRate(component.rate)}", component.taxAmount)
     } + report.paymentBreakdown.map { payment ->
-        listOf("${payment.method}${payment.provider?.let { " / $it" }.orEmpty()}", payment.netAmount)
+        listOf("${nativePaymentMethodLabel(payment.method, copy)}${payment.provider?.let { " / ${nativePaymentProviderLabel(it, copy)}" }.orEmpty()}", payment.netAmount)
     }
     fun escape(value: String): String = if (value.any { it == ',' || it == '"' || it == '\r' || it == '\n' }) {
         "\"${value.replace("\"", "\"\"")}\""
@@ -6502,7 +6451,8 @@ private fun JSONArray?.toNativeMoreNotifications(): List<NativeMoreNotification>
         val deliveryId = value.optString("id").takeIf { it.isNotBlank() } ?: continue
         add(NativeMoreNotification(
             deliveryId = deliveryId,
-            title = value.optString("title", nativePosCopy(null).notificationFallback),
+            noticeType = value.optString("noticeType", "business"),
+            title = value.optString("title"),
             content = value.optString("content", ""),
             priority = value.optString("priority", "normal"),
             readStatus = value.optString("readStatus", "unread"),
@@ -6583,7 +6533,7 @@ private fun JSONObject.toNativeCartPricing(): NativeCartPricing = NativeCartPric
             val entry = source.optJSONObject(index) ?: continue
             add(
                 NativeCartPricingDiscount(
-                    title = entry.optString("title").ifBlank { entry.optString("code", nativePosCopy(null).discountFallback) },
+                    title = entry.optString("title").ifBlank { entry.optString("code") },
                     amountMinor = parseMoney(entry.optString("amount", "0")) ?: 0,
                 ),
             )
@@ -6706,49 +6656,49 @@ private fun buildNativeReceiptDraft(
             add("------------------------------")
             if (receiptProfile.shows("item_name")) {
                 cart.products.forEach { line ->
-                    add("${line.name}${if (receiptProfile.shows("item_quantity")) " ×${line.quantity}" else ""}${if (receiptProfile.shows("item_line_total")) "  ${formatMoney(line.amountMinor * line.quantity, cart.currency)}" else ""}")
+                    add("${line.name}${if (receiptProfile.shows("item_quantity")) " ×${line.quantity}" else ""}${if (receiptProfile.shows("item_line_total")) "  ${copy.money(line.amountMinor * line.quantity, cart.currency)}" else ""}")
                 }
                 cart.ticketItems.forEach { line ->
-                    add("${line.name}${if (receiptProfile.shows("item_quantity")) " ×${line.quantity}" else ""}${if (receiptProfile.shows("item_line_total")) "  ${formatMoney(line.lineAmountMinor, cart.currency)}" else ""}")
+                    add("${line.name}${if (receiptProfile.shows("item_quantity")) " ×${line.quantity}" else ""}${if (receiptProfile.shows("item_line_total")) "  ${copy.money(line.lineAmountMinor, cart.currency)}" else ""}")
                 }
             }
             add("------------------------------")
-            if (receiptProfile.shows("subtotal")) add(copy.receiptSubtotalPrefix.format(formatMoney(pricing.subtotalMinor, cart.currency)))
+            if (receiptProfile.shows("subtotal")) add(copy.receiptSubtotalPrefix.format(copy.money(pricing.subtotalMinor, cart.currency)))
             if (receiptProfile.shows("discount")) pricing.discounts.forEach { discount ->
-                add("${discount.title}  -${formatMoney(discount.amountMinor, cart.currency)}")
+                add("${discount.title.ifBlank { copy.discountFallback }}  -${copy.money(discount.amountMinor, cart.currency)}")
             }
             // Tax and registration number remain visible when present: they are
             // part of the fiscal record even if a legacy field list hides them.
             pricing.taxBreakdown.forEach { entry ->
                 add(copy.receiptTaxableLine.format(
-                    formatNativeTaxRate(entry.taxRate),
-                    formatMoney(entry.taxableMinor, cart.currency),
+                    copy.taxRate(entry.taxRate),
+                    copy.money(entry.taxableMinor, cart.currency),
                 ))
                 val components = pricing.taxComponents.filter { it.parentRate == entry.taxRate }
                 if (components.isNotEmpty()) {
                     components.forEach { component ->
-                        add("${component.name} ${formatNativeTaxRate(component.rate)}: ${formatMoney(component.taxMinor, cart.currency)}" + if (pricing.pricesIncludeTax) copy.taxIncluded else "")
+                        add("${component.name} ${copy.taxRate(component.rate)}: ${copy.money(component.taxMinor, cart.currency)}" + if (pricing.pricesIncludeTax) copy.taxIncluded else "")
                     }
                 } else {
-                    val label = pricing.taxLabel?.let { "$it ${formatNativeTaxRate(entry.taxRate)}" }
-                        ?: copy.taxLabelWithRate.format(formatNativeTaxRate(entry.taxRate))
-                    add("$label: ${formatMoney(entry.taxMinor, cart.currency)}" + if (pricing.pricesIncludeTax) copy.taxIncluded else "")
+                    val label = pricing.taxLabel?.let { "$it ${copy.taxRate(entry.taxRate)}" }
+                        ?: copy.taxLabelWithRate.format(copy.taxRate(entry.taxRate))
+                    add("$label: ${copy.money(entry.taxMinor, cart.currency)}" + if (pricing.pricesIncludeTax) copy.taxIncluded else "")
                 }
             }
             // System rounding plus any cash rounding the cashier chose: the
             // amount due is what was actually collected against the total.
             val roundingMinor = total - (pricing.totalMinor - pricing.roundingAdjustmentMinor)
             if (roundingMinor != 0L && receiptProfile.shows("rounding")) {
-                add(copy.receiptRoundingPrefix.format(formatSignedMoney(roundingMinor, cart.currency)))
+                add(copy.receiptRoundingPrefix.format(copy.signedMoney(roundingMinor, cart.currency)))
             }
-            add(copy.receiptDuePrefix.format(formatMoney(total, cart.currency)))
+            add(copy.receiptDuePrefix.format(copy.money(total, cart.currency)))
             if (paymentMethod == "cash") {
-                if (receiptProfile.shows("cash_tendered")) add(copy.receiptTenderedPrefix.format(formatMoney(tenderedMinor, cart.currency)))
-                if (change > 0 && receiptProfile.shows("change")) add(copy.receiptChangePrefix.format(formatMoney(change, cart.currency)))
+                if (receiptProfile.shows("cash_tendered")) add(copy.receiptTenderedPrefix.format(copy.money(tenderedMinor, cart.currency)))
+                if (change > 0 && receiptProfile.shows("change")) add(copy.receiptChangePrefix.format(copy.money(change, cart.currency)))
             } else if (paymentMethod == "later") {
                 add(copy.receiptPayLater.format(balanceDueAt.orEmpty()))
             } else {
-                add(copy.receiptPendingPayment.format(paymentMethod, externalReference.orEmpty()))
+                add(copy.receiptPendingPayment.format(nativePaymentMethodLabel(paymentMethod, copy), externalReference.orEmpty()))
             }
             pricing.taxRegistrationNumber?.let { add(copy.receiptTaxNumberPrefix.format(it)) }
             taxExemptionReason?.takeIf { it.isNotBlank() }?.let {
@@ -6760,17 +6710,12 @@ private fun buildNativeReceiptDraft(
     )
 }
 
-internal fun formatMoney(minor: Long, currency: String): String = "%s %d.%02d".format(java.util.Locale.ROOT, currency, minor / 100, minor % 100)
-
-private fun formatSignedMoney(minor: Long, currency: String): String =
-    if (minor < 0) "-${formatMoney(-minor, currency)}" else formatMoney(minor, currency)
-
-private fun formatNativeActivityTime(value: String): String {
-    if (value.isBlank()) return nativePosCopy(null).justUpdated
+private fun formatNativeActivityTime(value: String, copy: NativePosCopy): String {
+    if (value.isBlank()) return copy.justUpdated
     return runCatching {
         java.time.Instant.parse(value)
             .atZone(java.time.ZoneId.systemDefault())
-            .format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm"))
+            .format(java.time.format.DateTimeFormatter.ofPattern(if (copy.localeCode() == "fr") "dd/MM HH:mm" else "MM-dd HH:mm", java.util.Locale.forLanguageTag(copy.localeCode())))
     }.getOrDefault(value)
 }
 
@@ -6781,35 +6726,13 @@ private fun JSONArray?.toSetupBranches(): List<NativeSetupBranch> = buildList {
         if (branch.optString("status") == "active") add(NativeSetupBranch(branch.getString("id"), branch.getString("name")))
     }
 }
-private fun Throwable.administratorLoginMessage(copy: NativePosCopy = nativePosCopy(null)): String {
+private fun Throwable.administratorLoginMessage(copy: NativePosCopy): String {
     if (this is NativePosApiException) {
         return when (code) {
             "INVALID_CREDENTIALS" -> copy.invalidCredentials
             "ACCOUNT_LOCKED" -> copy.accountLocked
-            else -> userMessage()
+            else -> userMessage(copy)
         }
     }
-    return userMessage()
-}
-
-/**
- * A message the cashier can act on.
- *
- * `copy` carries the terminal's language. A server-supplied `message` is passed
- * through as-is: the API is not localised per terminal, so translating only the
- * device's own failures is the honest half of the job -- the rest is listed in
- * the review as still outstanding.
- */
-private fun Throwable.userMessage(copy: NativePosCopy = nativePosCopy(null)): String = when (this) {
-    // A transport failure now arrives as a NETWORK_ERROR rather than a raw
-    // IOException, so it has to be recognised here or the cashier sees the
-    // underlying socket message instead of something actionable.
-    is NativePosApiException -> when {
-        code == "INVALID_CREDENTIALS" -> copy.pinIncorrectShort
-        code == "NETWORK_ERROR" -> copy.networkError
-        else -> message ?: copy.cannotReachPos
-    }
-    is IOException -> copy.networkError
-    is NativePosValidationException -> message ?: copy.invalidInput
-    else -> copy.genericFailure
+    return userMessage(copy)
 }

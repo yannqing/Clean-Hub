@@ -109,7 +109,7 @@ internal fun NativeTicketList(
                     if (query.isNotBlank() || status.isNotEmpty() || type.isNotEmpty() || priority.isNotEmpty()) TextButton(onClick = { query=""; status=""; type=""; priority="" }) { Text(copy.ticketsClear) }
                 }
                 Text(copy.ticketsResultsSummary.format(visible.size, tickets.size), color = POS_MUTED, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 14.dp))
-                message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 12.dp)) }
+                message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = POS_MUTED, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 12.dp)) }
                 if (table && visible.isNotEmpty()) Row(Modifier.fillMaxWidth().background(POS_BORDER.copy(alpha = 0.35f)).padding(14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     TicketCell(copy.serviceTicket, Modifier.weight(1.2f), muted = true)
                     TicketCell(copy.customerName, Modifier.weight(1.3f), muted = true)
@@ -132,12 +132,12 @@ internal fun NativeTicketList(
                         horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         TicketCell(ticket.ticketNo ?: copy.serviceTicket, Modifier.weight(1.2f), strong = true)
                         Column(Modifier.weight(1.3f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            TicketCell(ticket.customerName, Modifier.fillMaxWidth(), strong = true)
+                            TicketCell(ticket.customerName.ifBlank { copy.customerFallback }, Modifier.fillMaxWidth(), strong = true)
                             phoneById[ticket.customerId]?.let { TicketCell(it, Modifier.fillMaxWidth(), muted = true) }
                         }
                         TicketCell(nativeTicketTypeTitle(ticket.ticketType, copy), Modifier.weight(0.8f))
                         Box(Modifier.weight(1f)) { NativeTicketStatusBadge(copy, ticket.ticketStatus) }
-                        TicketCell(formatMoney(ticket.totalMinor, ticket.currency), Modifier.weight(1f))
+                        TicketCell(copy.money(ticket.totalMinor, ticket.currency), Modifier.weight(1f))
                         Column(Modifier.weight(1.15f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(nativeTicketTime(ticket.expectedPickupAt,timeZone,language), color = if (nativeTicketIsOverdue(ticket,now)) POS_ERROR else POS_MUTED, style = MaterialTheme.typography.bodySmall)
                             if (ticket.priority != "normal") Text(ticket.priorityLabel(copy), color = POS_ERROR, style = MaterialTheme.typography.labelSmall)
@@ -160,11 +160,11 @@ internal fun NativeTicketCompactRow(copy: NativePosCopy, ticket: NativeServiceTi
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(ticket.customerName, color = POS_INK, fontWeight = FontWeight.SemiBold)
+                Text(ticket.customerName.ifBlank { copy.customerFallback }, color = POS_INK, fontWeight = FontWeight.SemiBold)
                 phone?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
                 Text("${nativeTicketTypeTitle(ticket.ticketType,copy)} · ${copy.itemsCountSuffix.format(ticket.itemCount)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
             }
-            Text(formatMoney(ticket.totalMinor,ticket.currency), color = POS_INK, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
+            Text(copy.money(ticket.totalMinor,ticket.currency), color = POS_INK, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
             Text("›", color = POS_MUTED, modifier = Modifier.padding(start = 12.dp))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

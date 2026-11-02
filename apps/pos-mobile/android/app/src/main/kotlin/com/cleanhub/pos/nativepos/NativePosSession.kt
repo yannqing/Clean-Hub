@@ -245,7 +245,7 @@ class NativePosSession(context: Context) {
     }
 }
 
-private fun supportedPosLanguageCode(code: String?): String? = when (code?.trim()?.lowercase()) {
+internal fun supportedPosLanguageCode(code: String?): String? = when (code?.trim()?.lowercase()) {
     "zh", "zh-cn" -> "zh-CN"
     "en" -> "en"
     "fr" -> "fr"

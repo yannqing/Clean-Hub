@@ -234,7 +234,7 @@ class NativeIntakeExperienceInstrumentedTest {
         compose.onNodeWithText("Shirt").performClick()
         compose
             .onNodeWithText(
-                "${service.name} · ${nativeMinorMoney(service.amountMinor,service.currency)}"
+                "${service.name} · ${copy.minorMoney(service.amountMinor, service.currency)}"
             )
             .performClick()
         compose

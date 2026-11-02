@@ -1712,6 +1712,22 @@ class NativePosDatabase(
         })
     }
 
+    internal fun cacheCustomer(terminal: NativeTerminal, customer: NativeCustomer) {
+        cacheCustomers(terminal, listOf(customer))
+    }
+
+    internal fun cacheCustomers(terminal: NativeTerminal, customers: List<NativeCustomer>) {
+        writableDatabase.beginTransaction()
+        try {
+            check(isCurrentOrderScope(terminal)) { "Customer cache scope changed" }
+            customers.forEach { customer ->
+                writableDatabase.delete("customer_profile", "id=?", arrayOf(customer.id))
+                insertCustomer(customer)
+            }
+            writableDatabase.setTransactionSuccessful()
+        } finally { writableDatabase.endTransaction() }
+    }
+
     private fun insertCustomer(customer: NativeCustomer) {
         writableDatabase.insertOrThrow("customer_profile", null, ContentValues().apply {
             put("id", customer.id)

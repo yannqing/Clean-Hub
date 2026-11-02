@@ -27,15 +27,55 @@ internal class NativePosCopy(
     /**
      * A key with no entry is a programming error, not something a cashier
      * should discover as a blank label -- fail loudly in debug, and fall back
-     * to Chinese rather than to empty space.
+     * to English rather than to empty space.
      */
     private fun get(key: String): String =
-        values[key] ?: COPY_ZH_VALUES[key] ?: error("Missing copy key: $key ($languageCode)")
+        values[key] ?: COPY_EN_VALUES[key] ?: error("Missing copy key: $key ($languageCode)")
 
     fun localeCode(): String = languageCode
 
     /** Keys every language must define; the test reads this. */
     internal fun keys(): Set<String> = values.keys
+
+    val systemSyncErrorTitle: String get() = get("systemSyncErrorTitle")
+    val systemSyncErrorBody: String get() = get("systemSyncErrorBody")
+    val zReportTitle: String get() = get("zReportTitle")
+    val otherPayment: String get() = get("otherPayment")
+    val zReportDate: String get() = get("zReportDate")
+    val zReportCurrency: String get() = get("zReportCurrency")
+    val zReportCountedCash: String get() = get("zReportCountedCash")
+    val notificationPriorityLow: String get() = get("notificationPriorityLow")
+    val notificationPriorityHigh: String get() = get("notificationPriorityHigh")
+    val offlineReplayExhausted: String get() = get("offlineReplayExhausted")
+
+    val customerDirectoryAccountDisabled: String get() = get("customerDirectoryAccountDisabled")
+    val customerDirectoryRefresh: String get() = get("customerDirectoryRefresh")
+    val customerDirectoryActions: String get() = get("customerDirectoryActions")
+    val customerDirectoryActive: String get() = get("customerDirectoryActive")
+    val customerDirectoryAll: String get() = get("customerDirectoryAll")
+    val customerDirectoryBack: String get() = get("customerDirectoryBack")
+    val customerDirectoryContact: String get() = get("customerDirectoryContact")
+    val customerDirectoryCreateHint: String get() = get("customerDirectoryCreateHint")
+    val customerDirectoryDescription: String get() = get("customerDirectoryDescription")
+    val customerDirectoryDetails: String get() = get("customerDirectoryDetails")
+    val customerDirectoryEmpty: String get() = get("customerDirectoryEmpty")
+    val customerDirectoryEmptyHint: String get() = get("customerDirectoryEmptyHint")
+    val customerDirectoryFallback: String get() = get("customerDirectoryFallback")
+    val customerDirectoryOffline: String get() = get("customerDirectoryOffline")
+    val customerDirectoryOfflineEmpty: String get() = get("customerDirectoryOfflineEmpty")
+    val customerDirectoryOnline: String get() = get("customerDirectoryOnline")
+    val customerDirectoryPageActive: String get() = get("customerDirectoryPageActive")
+    val customerDirectoryPageDisabled: String get() = get("customerDirectoryPageDisabled")
+    val customerDirectoryProfile: String get() = get("customerDirectoryProfile")
+    val customerDirectoryReset: String get() = get("customerDirectoryReset")
+    val customerDirectoryResults: String get() = get("customerDirectoryResults")
+    val customerDirectorySearch: String get() = get("customerDirectorySearch")
+    val customerDirectoryStatus: String get() = get("customerDirectoryStatus")
+    val customerDirectorySynced: String get() = get("customerDirectorySynced")
+    val customerDirectoryDisable: String get() = get("customerDirectoryDisable")
+    val customerDirectoryEnable: String get() = get("customerDirectoryEnable")
+    val customerDirectoryStatusHint: String get() = get("customerDirectoryStatusHint")
+    val customerDirectoryEmailError: String get() = get("customerDirectoryEmailError")
 
     val attributeSearch: String get() = get("attributeSearch")
     val attributeUseCustom: String get() = get("attributeUseCustom")
@@ -1044,6 +1084,44 @@ internal class NativePosCopy(
 }
 
 private val COPY_ZH_VALUES: Map<String, String> = mapOf(
+    "systemSyncErrorTitle" to "POS 同步错误",
+    "systemSyncErrorBody" to "终端 %s 无法同步销售数据，请联系支持人员。",
+    "otherPayment" to "其他支付",
+    "zReportTitle" to "Z 报表",
+    "zReportDate" to "日期",
+    "zReportCurrency" to "币种",
+    "zReportCountedCash" to "盘点现金",
+    "notificationPriorityLow" to "低",
+    "notificationPriorityHigh" to "高",
+    "offlineReplayExhausted" to "同步尝试 %d 次后停止：%s",
+    "customerDirectoryRefresh" to "刷新",
+    "customerDirectoryAccountDisabled" to "所属客户账户已停用，暂不能新建工单。请联系管理员恢复账户。",
+    "customerDirectoryActions" to "操作",
+    "customerDirectoryActive" to "正常",
+    "customerDirectoryAll" to "全部状态",
+    "customerDirectoryBack" to "返回列表",
+    "customerDirectoryContact" to "联系方式",
+    "customerDirectoryCreateHint" to "填写客户资料，手机号或邮箱至少填写一项。系统将同时建立同名客户账户与客户档案。",
+    "customerDirectoryDescription" to "查询客户资料、查看服务记录，并为客户创建工单。",
+    "customerDirectoryDetails" to "查看详情",
+    "customerDirectoryEmpty" to "暂无符合条件的客户",
+    "customerDirectoryEmptyHint" to "请调整搜索词或状态筛选，也可以新增客户。",
+    "customerDirectoryFallback" to "联网查询暂时不可用，当前显示本机已保存的匹配客户。",
+    "customerDirectoryOffline" to "离线模式：仅查询本机已保存的客户资料，数据可能已变化；新增、编辑及状态修改需要联网。",
+    "customerDirectoryOfflineEmpty" to "本机没有匹配的客户缓存，请联网同步或调整搜索条件。",
+    "customerDirectoryOnline" to "正在显示联网查询结果；已加载的客户会保存到本机，供断网时查看。",
+    "customerDirectoryPageActive" to "本页正常",
+    "customerDirectoryPageDisabled" to "本页停用",
+    "customerDirectoryProfile" to "客户档案",
+    "customerDirectoryReset" to "清除筛选",
+    "customerDirectoryResults" to "匹配客户",
+    "customerDirectorySearch" to "搜索姓名、账户、电话或邮箱",
+    "customerDirectoryStatus" to "客户状态",
+    "customerDirectorySynced" to "最近同步：%s",
+    "customerDirectoryDisable" to "停用客户",
+    "customerDirectoryEnable" to "恢复客户",
+    "customerDirectoryStatusHint" to "停用后将无法为该客户新建工单，但历史工单、订单和服务记录仍会保留。恢复后可继续办理服务。",
+    "customerDirectoryEmailError" to "请输入有效的邮箱地址。",
     "attributeSearch" to "搜索或输入自定义内容",
     "attributeUseCustom" to "使用“%s”",
     "attributeClear" to "清空选择",
@@ -2043,6 +2121,44 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_EN_VALUES: Map<String, String> = mapOf(
+    "systemSyncErrorTitle" to "POS synchronization error",
+    "systemSyncErrorBody" to "Terminal %s cannot synchronize its sales. Please contact support.",
+    "otherPayment" to "Other payment",
+    "zReportTitle" to "Z Report",
+    "zReportDate" to "Date",
+    "zReportCurrency" to "Currency",
+    "zReportCountedCash" to "Counted cash",
+    "notificationPriorityLow" to "Low",
+    "notificationPriorityHigh" to "High",
+    "offlineReplayExhausted" to "Synchronization stopped after %d attempts: %s",
+    "customerDirectoryRefresh" to "Refresh",
+    "customerDirectoryAccountDisabled" to "The owning customer account is disabled. Ask an administrator to enable it before creating new tickets.",
+    "customerDirectoryActions" to "Actions",
+    "customerDirectoryActive" to "Active",
+    "customerDirectoryAll" to "All statuses",
+    "customerDirectoryBack" to "Back to list",
+    "customerDirectoryContact" to "Contact details",
+    "customerDirectoryCreateHint" to "Enter at least a phone number or email. A customer account and profile will be created with the same name.",
+    "customerDirectoryDescription" to "Find customer profiles, review service history and create service tickets.",
+    "customerDirectoryDetails" to "View details",
+    "customerDirectoryEmpty" to "No matching customers",
+    "customerDirectoryEmptyHint" to "Adjust the search or status filter, or create a customer.",
+    "customerDirectoryFallback" to "Online search is unavailable. Showing matching customers saved on this terminal.",
+    "customerDirectoryOffline" to "Offline: searching saved profiles only. Data may have changed; creating, editing and changing status require a connection.",
+    "customerDirectoryOfflineEmpty" to "No saved customer matches. Connect and sync, or adjust the search.",
+    "customerDirectoryOnline" to "Showing online results. Loaded profiles are saved for offline viewing.",
+    "customerDirectoryPageActive" to "Active on this page",
+    "customerDirectoryPageDisabled" to "Disabled on this page",
+    "customerDirectoryProfile" to "Customer profile",
+    "customerDirectoryReset" to "Clear filters",
+    "customerDirectoryResults" to "Matching customers",
+    "customerDirectorySearch" to "Search name, account, phone or email",
+    "customerDirectoryStatus" to "Status",
+    "customerDirectorySynced" to "Last synced: %s",
+    "customerDirectoryDisable" to "Disable customer",
+    "customerDirectoryEnable" to "Enable customer",
+    "customerDirectoryStatusHint" to "Disabling prevents new service tickets. Existing tickets, orders and history are retained. Enable the customer to resume service.",
+    "customerDirectoryEmailError" to "Enter a valid email address.",
     "attributeSearch" to "Search or enter a custom value",
     "attributeUseCustom" to "Use “%s”",
     "attributeClear" to "Clear selection",
@@ -3042,6 +3158,44 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_FR_VALUES: Map<String, String> = mapOf(
+    "systemSyncErrorTitle" to "Erreur de synchronisation POS",
+    "systemSyncErrorBody" to "Le terminal %s ne peut pas synchroniser ses ventes. Veuillez contacter l’assistance.",
+    "otherPayment" to "Autre paiement",
+    "zReportTitle" to "Rapport Z",
+    "zReportDate" to "Date",
+    "zReportCurrency" to "Devise",
+    "zReportCountedCash" to "Espèces comptées",
+    "notificationPriorityLow" to "Faible",
+    "notificationPriorityHigh" to "Élevée",
+    "offlineReplayExhausted" to "Synchronisation interrompue après %d tentatives : %s",
+    "customerDirectoryRefresh" to "Actualiser",
+    "customerDirectoryAccountDisabled" to "Le compte client est désactivé. Demandez à un administrateur de le réactiver avant de créer un ticket.",
+    "customerDirectoryActions" to "Actions",
+    "customerDirectoryActive" to "Actif",
+    "customerDirectoryAll" to "Tous les statuts",
+    "customerDirectoryBack" to "Retour à la liste",
+    "customerDirectoryContact" to "Coordonnées",
+    "customerDirectoryCreateHint" to "Renseignez au moins un téléphone ou un e-mail. Un compte et une fiche client seront créés au même nom.",
+    "customerDirectoryDescription" to "Consultez les fiches et leur historique, puis créez un ticket de service.",
+    "customerDirectoryDetails" to "Voir la fiche",
+    "customerDirectoryEmpty" to "Aucun client correspondant",
+    "customerDirectoryEmptyHint" to "Modifiez la recherche ou le statut, ou ajoutez un client.",
+    "customerDirectoryFallback" to "La recherche en ligne est indisponible. Les clients enregistrés sur ce terminal sont affichés.",
+    "customerDirectoryOffline" to "Hors ligne : recherche parmi les fiches enregistrées. Les données peuvent avoir changé ; les modifications nécessitent une connexion.",
+    "customerDirectoryOfflineEmpty" to "Aucune fiche enregistrée ne correspond. Connectez-vous pour synchroniser ou modifiez la recherche.",
+    "customerDirectoryOnline" to "Résultats en ligne. Les fiches chargées sont enregistrées pour consultation hors ligne.",
+    "customerDirectoryPageActive" to "Actifs sur cette page",
+    "customerDirectoryPageDisabled" to "Désactivés sur cette page",
+    "customerDirectoryProfile" to "Fiche client",
+    "customerDirectoryReset" to "Effacer les filtres",
+    "customerDirectoryResults" to "Clients correspondants",
+    "customerDirectorySearch" to "Rechercher par nom, compte, téléphone ou e-mail",
+    "customerDirectoryStatus" to "Statut",
+    "customerDirectorySynced" to "Dernière synchronisation : %s",
+    "customerDirectoryDisable" to "Désactiver le client",
+    "customerDirectoryEnable" to "Réactiver le client",
+    "customerDirectoryStatusHint" to "La désactivation bloque les nouveaux tickets. Les tickets, commandes et historiques sont conservés. Réactivez le client pour reprendre le service.",
+    "customerDirectoryEmailError" to "Saisissez une adresse e-mail valide.",
     "attributeSearch" to "Rechercher ou saisir une valeur",
     "attributeUseCustom" to "Utiliser « %s »",
     "attributeClear" to "Effacer la sélection",
@@ -4051,10 +4205,11 @@ internal val NATIVE_POS_COPY_BY_LANGUAGE: Map<String, Map<String, String>> = map
     "fr" to COPY_FR_VALUES,
 )
 
-/** Copy for the terminal's selected language, falling back to Chinese. */
+/** Copy for the terminal's selected language, falling back to English. */
 internal fun nativePosCopy(languageCode: String?): NativePosCopy =
     when (languageCode?.trim()?.lowercase()) {
+        "zh", "zh-cn", "zh-hans" -> COPY_ZH
         "en" -> COPY_EN
         "fr" -> COPY_FR
-        else -> COPY_ZH
+        else -> COPY_EN
     }

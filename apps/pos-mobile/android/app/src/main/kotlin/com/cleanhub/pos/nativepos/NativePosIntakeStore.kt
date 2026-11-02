@@ -187,6 +187,24 @@ internal class NativePosIntakeStore(context: Context) :
             )
             .use { if (it.moveToFirst()) JSONObject(it.getString(0)) else null }
 
+    fun cachedAll(t: NativeTerminal, kind: String): List<JSONObject> =
+        readableDatabase.rawQuery(
+            "SELECT body FROM detail_cache WHERE scope=? AND kind=? ORDER BY rowid",
+            arrayOf(scope(t), kind),
+        ).use { cursor -> buildList { while (cursor.moveToNext()) add(JSONObject(cursor.getString(0))) } }
+
+    fun removeCached(t: NativeTerminal, kind: String, id: String) {
+        writableDatabase.delete("detail_cache", "scope=? AND kind=? AND id=?", arrayOf(scope(t), kind, id))
+    }
+
+    fun trimCached(t: NativeTerminal, kind: String, limit: Int) {
+        require(limit > 0)
+        writableDatabase.execSQL(
+            "DELETE FROM detail_cache WHERE scope=? AND kind=? AND rowid NOT IN (SELECT rowid FROM detail_cache WHERE scope=? AND kind=? ORDER BY rowid DESC LIMIT ?)",
+            arrayOf(scope(t), kind, scope(t), kind, limit),
+        )
+    }
+
     fun ticketJson(t: NativeTerminal, id: String): JSONObject? =
         cached(t, "ticket", id)
             ?: operations(t, id).firstOrNull { it.kind == "ticket" }?.let { JSONObject(it.local) }
@@ -401,7 +419,7 @@ internal fun JSONObject.nativeTicket(currency: String): NativeServiceTicket =
         customerName =
             nativeText("customerName")
                 ?: nativeText("customerProfileName")
-                ?: nativePosCopy(null).customerFallback,
+                ?: "",
         ticketType = optString("ticketType", "laundry"),
         ticketStatus = optString("ticketStatus", "draft"),
         priority = optString("priority", "normal"),

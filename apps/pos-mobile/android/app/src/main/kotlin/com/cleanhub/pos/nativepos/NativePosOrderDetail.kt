@@ -142,8 +142,8 @@ internal fun nativePaymentStatusLabel(status: String, copy: NativePosCopy): Stri
     else -> copy.orderUnknownStatus
 }
 
-internal fun nativeOrderMoney(value: String, currency: String): String = runCatching {
-    "$currency ${BigDecimal(value).setScale(nativeCurrencyMinorUnits(currency), RoundingMode.UNNECESSARY).toPlainString()}"
+internal fun nativeOrderMoney(value: String, currency: String, language: String = "en"): String = runCatching {
+    "$currency ${nativeAmountText(BigDecimal(value).setScale(nativeCurrencyMinorUnits(currency), RoundingMode.UNNECESSARY), nativeCurrencyMinorUnits(currency), language)}"
 }.getOrDefault("$currency $value")
 
 internal fun nativeOrderRate(value: String): String = runCatching {
@@ -155,7 +155,7 @@ internal fun nativeOrderBalance(total: String, paid: String): String = runCatchi
 }.getOrDefault("0")
 
 internal fun nativeOrderTime(value: String?, timeZone: String, language: String): String = value?.let {
-    runCatching { java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", java.util.Locale.forLanguageTag(language)).withZone(java.time.ZoneId.of(timeZone)).format(java.time.Instant.parse(it)) }.getOrDefault(it)
+    runCatching { java.time.format.DateTimeFormatter.ofPattern(if (language == "fr") "dd/MM/yyyy HH:mm" else "yyyy-MM-dd HH:mm", java.util.Locale.forLanguageTag(language)).withZone(java.time.ZoneId.of(timeZone)).format(java.time.Instant.parse(it)) }.getOrDefault(it)
 } ?: "—"
 
 @Composable
@@ -168,11 +168,11 @@ internal fun NativeOrderOverview(copy: NativePosCopy, order: NativeMoreOrderDeta
         Text(copy.orderPrefix.format(order.id.takeLast(8).uppercase()), color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text(order.customerName ?: copy.walkInCustomer, color = POS_MUTED)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OrderMetric(copy.orderAmount, nativeOrderMoney(order.totalAmount, order.currency), Modifier.weight(1f))
-            OrderMetric(copy.orderPaidAmount, nativeOrderMoney(order.paidAmount, order.currency), Modifier.weight(1f))
+            OrderMetric(copy.orderAmount, copy.orderMoney(order.totalAmount, order.currency), Modifier.weight(1f))
+            OrderMetric(copy.orderPaidAmount, copy.orderMoney(order.paidAmount, order.currency), Modifier.weight(1f))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OrderMetric(copy.orderOutstanding, nativeOrderMoney(nativeOrderBalance(order.totalAmount, order.paidAmount), order.currency), Modifier.weight(1f))
+            OrderMetric(copy.orderOutstanding, copy.orderMoney(nativeOrderBalance(order.totalAmount, order.paidAmount), order.currency), Modifier.weight(1f))
             OrderMetric(copy.orderLineCount, order.items.size.toString(), Modifier.weight(1f))
         }
     }
@@ -189,39 +189,39 @@ internal fun NativeOrderOverview(copy: NativePosCopy, order: NativeMoreOrderDeta
 
 @Composable
 internal fun NativeOrderItemCard(copy: NativePosCopy, item: NativeMoreOrderItem, currency: String) {
-    OrderSection(item.name) {
+    OrderSection(item.name.ifBlank { copy.orderItemFallback }) {
         item.variantName?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
         item.sku?.let { OrderInfoRow(copy.orderSku, it) }
-        OrderInfoRow(copy.orderUnitPrice, "${nativeOrderMoney(item.unitAmount, currency)} × ${item.quantity}")
+        OrderInfoRow(copy.orderUnitPrice, "${copy.orderMoney(item.unitAmount, currency)} × ${item.quantity}")
         item.weight?.let { OrderInfoRow(copy.orderWeight, it) }
         item.bagCount?.let { OrderInfoRow(copy.bagCount, it.toString()) }
         item.notes?.let { OrderInfoRow(copy.orderNotes, it) }
-        OrderInfoRow(copy.total, nativeOrderMoney(item.lineAmount, currency), true)
+        OrderInfoRow(copy.total, copy.orderMoney(item.lineAmount, currency), true)
     }
 }
 
 @Composable
 internal fun NativeOrderFinancialSummary(copy: NativePosCopy, order: NativeMoreOrderDetail) {
     OrderSection(copy.orderTaxSummary) {
-        OrderInfoRow(copy.subtotal, nativeOrderMoney(order.subtotalAmount, order.currency))
-        OrderInfoRow(copy.discountAmountLabel, nativeOrderMoney(order.discountAmount, order.currency))
+        OrderInfoRow(copy.subtotal, copy.orderMoney(order.subtotalAmount, order.currency))
+        OrderInfoRow(copy.discountAmountLabel, copy.orderMoney(order.discountAmount, order.currency))
         order.discounts.forEach { discount ->
-            OrderInfoRow(listOfNotNull(discount.title.takeIf { it.isNotBlank() } ?: copy.discountFallback, discount.code).joinToString(" · "), nativeOrderMoney(discount.amount, order.currency))
+            OrderInfoRow(listOfNotNull(discount.title.takeIf { it.isNotBlank() } ?: copy.discountFallback, discount.code).joinToString(" · "), copy.orderMoney(discount.amount, order.currency))
         }
         Text(if (order.pricesIncludeTax) copy.pricesIncludeTax else copy.pricesExcludeTax, color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
-        OrderInfoRow(copy.taxableAmountLabel, nativeOrderMoney(order.taxableAmount, order.currency))
+        OrderInfoRow(copy.taxableAmountLabel, copy.orderMoney(order.taxableAmount, order.currency))
         if (order.taxLines.isEmpty()) {
-            OrderInfoRow("${order.taxLabel ?: copy.tax} ${nativeOrderRate(order.taxRate)}", nativeOrderMoney(order.taxAmount, order.currency))
+            OrderInfoRow("${order.taxLabel ?: copy.tax} ${copy.orderRate(order.taxRate)}", copy.orderMoney(order.taxAmount, order.currency))
         } else order.taxLines.forEach { line ->
-            OrderInfoRow("${line.name ?: order.taxLabel ?: copy.tax} ${nativeOrderRate(line.rate)}", nativeOrderMoney(line.taxAmount, order.currency))
-            OrderInfoRow(copy.taxableAmountLabel, nativeOrderMoney(line.taxableAmount, order.currency))
+            OrderInfoRow("${line.name ?: order.taxLabel ?: copy.tax} ${copy.orderRate(line.rate)}", copy.orderMoney(line.taxAmount, order.currency))
+            OrderInfoRow(copy.taxableAmountLabel, copy.orderMoney(line.taxableAmount, order.currency))
         }
-        OrderInfoRow(copy.taxAmountLabel, nativeOrderMoney(order.taxAmount, order.currency))
+        OrderInfoRow(copy.taxAmountLabel, copy.orderMoney(order.taxAmount, order.currency))
         order.taxNumber?.let { OrderInfoRow(copy.settingsTaxNumber, it) }
         order.taxExemptionReason?.let { OrderInfoRow(copy.taxExemptReason, it) }
-        OrderInfoRow(copy.rounding, nativeOrderMoney(order.roundingAmount, order.currency))
+        OrderInfoRow(copy.rounding, copy.orderMoney(order.roundingAmount, order.currency))
         HorizontalDivider(color = POS_BORDER)
-        OrderInfoRow(copy.total, nativeOrderMoney(order.totalAmount, order.currency), true)
+        OrderInfoRow(copy.total, copy.orderMoney(order.totalAmount, order.currency), true)
     }
 }
 
@@ -236,7 +236,7 @@ internal fun NativeOrderTicketReferences(copy: NativePosCopy, order: NativeMoreO
             ticket.pickupAt?.let { OrderInfoRow(copy.expectedPickup, nativeOrderTime(it, timeZone, copy.localeCode())) }
             ticket.assistant?.let { OrderInfoRow(copy.assistantLabel, it) }
             ticket.remark?.let { OrderInfoRow(copy.orderNotes, it) }
-            OrderInfoRow(copy.itemsCountSuffix.format(ticket.count.toLong()), nativeOrderMoney(ticket.amount, order.currency))
+            OrderInfoRow(copy.itemsCountSuffix.format(ticket.count.toLong()), copy.orderMoney(ticket.amount, order.currency))
         }
     }
 }
@@ -249,11 +249,11 @@ internal fun NativeOrderPaymentCard(copy: NativePosCopy, payment: NativeMorePaym
     OrderSection(method) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             OrderStatusChip(nativePaymentStatusLabel(payment.status, copy))
-            Text(nativeOrderMoney(payment.amount, currency), fontWeight = FontWeight.Bold, color = POS_INK)
+            Text(copy.orderMoney(payment.amount, currency), fontWeight = FontWeight.Bold, color = POS_INK)
         }
         Text(nativeOrderTime(payment.createdAt, timeZone, copy.localeCode()), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-        payment.tenderedAmount?.let { OrderInfoRow(copy.tenderedForChange, nativeOrderMoney(it, currency)) }
-        payment.changeAmount?.let { OrderInfoRow(copy.changeLabel, nativeOrderMoney(it, currency)) }
+        payment.tenderedAmount?.let { OrderInfoRow(copy.tenderedForChange, copy.orderMoney(it, currency)) }
+        payment.changeAmount?.let { OrderInfoRow(copy.changeLabel, copy.orderMoney(it, currency)) }
         payment.externalReference?.let { OrderInfoRow(copy.paymentReference, it) }
     }
 }

@@ -1,6 +1,7 @@
 package com.cleanhub.pos.nativepos
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -8,6 +9,18 @@ import org.junit.Test
 class NativePosCopyTest {
 
     private val languages = listOf("zh-CN", "en", "fr")
+
+    @Test fun frenchDoesNotSilentlyReuseEnglishOrChineseUi() {
+        val sharedTerms = setOf("Actions", "Article", "WhatsApp", "Wave", "Orange Money", "Notes", "SKU", "Catalogue", "Terminal", "%d minutes", "CleanHub", "Notification", "Total", "Notifications", "Normal", "Scanner", "Contact", "%s copies", "Date")
+        val english = NATIVE_POS_COPY_BY_LANGUAGE.getValue("en")
+        NATIVE_POS_COPY_BY_LANGUAGE.getValue("fr").forEach { (key, value) ->
+            // Official brand names are user-selectable data and retain their spelling.
+            if (key != "itemBrandChoices") {
+                assertFalse("Chinese UI copy in $key", Regex("[\\u3400-\\u9fff]").containsMatchIn(value))
+                assertTrue("English fallback in $key", value != english[key] || value in sharedTerms)
+            }
+        }
+    }
 
     @Test
     fun everyLanguageResolves() {
@@ -128,12 +141,12 @@ class NativePosCopyTest {
         Regex("%[sd]").findAll(value).map { it.value }.toList()
 
     @Test
-    fun anUnknownOrMissingLanguageFallsBackToChinese() {
-        val chinese = nativePosCopy("zh-CN")
+    fun anUnknownOrMissingLanguageFallsBackToEnglish() {
+        val english = nativePosCopy("en")
 
-        assertEquals(chinese.checkout, nativePosCopy(null).checkout)
-        assertEquals(chinese.checkout, nativePosCopy("").checkout)
-        assertEquals(chinese.checkout, nativePosCopy("de").checkout)
+        assertEquals(english.checkout, nativePosCopy(null).checkout)
+        assertEquals(english.checkout, nativePosCopy("").checkout)
+        assertEquals(english.checkout, nativePosCopy("de").checkout)
     }
 
     @Test

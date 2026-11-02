@@ -61,10 +61,10 @@ internal fun isTransientReplayFailure(error: NativePosApiException): Boolean =
 /** Synchronizes immutable local cash commands before refreshing POS reference data. */
 class NativePosSyncEngine(context: Context) {
     private val appContext = context.applicationContext
-    private val brandingCache = NativeBrandLogoCache(context.applicationContext)
-    private val database = NativePosDatabase(context.applicationContext)
-    private val intakeStore = database.intakeStore
     private val session = NativePosSession(context.applicationContext)
+    private val brandingCache = NativeBrandLogoCache(context.applicationContext)
+    private val database = NativePosDatabase(context.applicationContext) { session.pinLanguageCode() }
+    private val intakeStore = database.intakeStore
     private val api = NativePosApiClient(session)
     private var checkoutGateway: NativeCheckoutGateway = object : NativeCheckoutGateway {
         override fun submit(payload: JSONObject): JSONObject = api.post("/pos/orders/checkout", payload)
@@ -180,9 +180,7 @@ class NativePosSyncEngine(context: Context) {
             if (isTransientReplayFailure(error) && attempt < NATIVE_REPLAY_MAX_ATTEMPTS) {
                 NativeCheckoutSubmission("pending", error = error)
             } else {
-                val reason = if (attempt >= NATIVE_REPLAY_MAX_ATTEMPTS) {
-                    "Offline cash replay gave up after $attempt attempts: ${error.message.orEmpty()}".trim()
-                } else error.message ?: "Offline cash replay failed."
+                val reason = nativeStoredFeedback(error, if (attempt >= NATIVE_REPLAY_MAX_ATTEMPTS) attempt else 0)
                 database.markCheckoutFailed(operationId, reason)
                 // Losing the exception-report response must not make a rejected sale printable.
                 runCatching { reportCashException(command, error) }
@@ -210,7 +208,7 @@ class NativePosSyncEngine(context: Context) {
                 intakeStore
                     .operations(t, ticketId)
                     .filter { it.status == "pending" && it.userId == t.userId }
-                    .forEach { intakeStore.failed(it.id, error.message.orEmpty(), false, error.status) }
+                    .forEach { intakeStore.failed(it.id, nativeStoredFeedback(error), false, error.status) }
                 throw error
             }
             if (retryFailed && ticketId != null) intakeStore.retry(t, ticketId)
@@ -246,7 +244,7 @@ class NativePosSyncEngine(context: Context) {
                     val transient = isTransientReplayFailure(error) || error.status == 429
                     intakeStore.failed(
                         op.id,
-                        error.message.orEmpty(),
+                        nativeStoredFeedback(error),
                         !transient || op.attempt + 1 >= NATIVE_REPLAY_MAX_ATTEMPTS,
                         error.status,
                     )
@@ -341,6 +339,11 @@ class NativePosSyncEngine(context: Context) {
             itemCatalogJson = catalog.optJSONObject("itemCatalog"),
         )
         intakeStore.cache(terminal, "terminal-settings", "current", JSONObject().put("branch", branch).put("settings", printSettings))
+        runCatching {
+            NativeCustomerDirectory(database, nativeCustomerDirectoryGateway(api)).rememberPage(
+                terminal, api.get("/pos/customers?resultType=profile&limit=100&offset=0"),
+            )
+        }
         // Orders are reference data. A failed order fetch must not prevent a
         // successful catalogue/checkout sync from making the till usable.
         runCatching {
@@ -550,7 +553,7 @@ class NativePosSyncEngine(context: Context) {
                 id = ticket.requiredString("id"),
                 ticketNo = ticket.optString("ticketNo").takeIf { it.isNotBlank() && it != "null" },
                 customerId = ticket.requiredString("customerId"),
-                customerName = ticket.optString("customerName").ifBlank { nativePosCopy(null).customerFallback },
+                customerName = ticket.optString("customerName"),
                 ticketType = ticket.optString("ticketType", "laundry"),
                 ticketStatus = ticket.optString("ticketStatus", "pending"),
                 priority = ticket.optString("priority", "normal"),
@@ -578,7 +581,7 @@ class NativePosSyncEngine(context: Context) {
                 id = item.requiredString("id"),
                 ticketId = ticketId,
                 serviceId = item.optString("serviceId").takeIf { it.isNotBlank() && it != "null" },
-                itemName = item.optString("itemName").ifBlank { nativePosCopy(null).serviceItemFallback },
+                itemName = item.optString("itemName"),
                 itemType = item.optString("itemType").takeIf { it.isNotBlank() && it != "null" },
                 catalogItemId = item.nativeText("catalogItemId"),
                 itemTypeName = item.nativeText("itemTypeName"),
@@ -671,7 +674,7 @@ class NativePosSyncWorker(appContext: Context, params: WorkerParameters) : Corou
  * visible order's complete detail available after the background pass. */
 class NativePosOrderDetailWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
-        val database = NativePosDatabase(applicationContext)
+        val database = NativePosDatabase(applicationContext) { NativePosSession(applicationContext).pinLanguageCode() }
         val terminal = database.intakeTerminal() ?: return Result.success()
         val api = NativePosApiClient(NativePosSession(applicationContext))
         for (id in database.orderDetailsNeedingRefresh(terminal)) {

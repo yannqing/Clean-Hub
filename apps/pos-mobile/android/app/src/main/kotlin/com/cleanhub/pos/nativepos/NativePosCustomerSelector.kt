@@ -93,7 +93,7 @@ internal fun NativeSaleCustomerSelector(
                         Surface(Modifier.fillMaxWidth().clickable { onSelect(customer); open = false }, shape = RoundedCornerShape(12.dp), color = if (cart.customer?.id == customer.id) POS_PAGE_BACKGROUND else POS_PANEL_BACKGROUND) {
                             Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    Text(customer.fullName, color = POS_INK, fontWeight = FontWeight.SemiBold)
+                                    Text(customer.fullName.ifBlank { copy.customerFallback }, color = POS_INK, fontWeight = FontWeight.SemiBold)
                                     Text(listOfNotNull(customer.accountName.takeIf { it != customer.fullName }, customer.phone, customer.email).joinToString(" · ").ifBlank { copy.noContactOnFile }, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                                 }
                                 if (cart.customer?.id == customer.id) Text("✓", color = POS_ACCENT)

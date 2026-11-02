@@ -34,11 +34,13 @@ internal fun NativeCustomerDetailPanel(
     onOpenTicket: (NativeServiceTicket) -> Unit,
     onOpenOrder: (String) -> Unit,
     onUpdated: (NativeCustomer) -> Unit,
+    backLabel: String = copy.change,
 ) {
     val context = LocalContext.current
     val database = remember { NativePosDatabase(context.applicationContext) }
-    val store = remember { NativePosIntakeStore(context.applicationContext) }
+    val store = remember { database.intakeStore }
     val api = remember { NativePosApiClient(NativePosSession(context.applicationContext)) }
+    val directory = remember { NativeCustomerDirectory(database, nativeCustomerDirectoryGateway(api)) }
     val terminal = remember(customer.id) { database.snapshot().terminal }
     val scope = rememberCoroutineScope()
     var profile by remember(customer.id) { mutableStateOf<JSONObject?>(null) }
@@ -56,6 +58,8 @@ internal fun NativeCustomerDetailPanel(
     var editing by remember(customer.id) { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
+    var confirmingStatus by remember(customer.id) { mutableStateOf(false) }
+    var recentTickets by remember(customer.id) { mutableStateOf<JSONObject?>(null) }
     DisposableEffect(Unit) {
         onDispose {
             store.close()
@@ -72,6 +76,7 @@ internal fun NativeCustomerDetailPanel(
                 account = store.cached(t, "account", customer.accountId)
                 stats = store.cached(t, "customer-stats", customer.id)
                 ticketTotal = store.cached(t, "customer-ticket-count", customer.id)?.optInt("total")
+                recentTickets = store.cached(t, "customer-page", "${customer.id}:tickets:0")
             }
             if (internetAvailable) {
                 val results =
@@ -80,17 +85,21 @@ internal fun NativeCustomerDetailPanel(
                                 "customer" to "/pos/customers/${customer.id}",
                                 "account" to "/pos/accounts/${customer.accountId}",
                                 "customer-stats" to "/pos/customers/${customer.id}/order-stats",
-                                "customer-ticket-count" to
-                                    "/pos/service-tickets?customerId=${customer.id}&limit=1&offset=0",
+                                "tickets" to "/pos/service-tickets?customerId=${customer.id}&limit=20&offset=0",
+                                "orders" to "/pos/orders?customerId=${customer.id}&limit=20&offset=0",
+                                "items" to "/pos/customers/${customer.id}/service-items?limit=20&offset=0",
                             )
                             .map { (kind, path) ->
                                 kind to
                                     runCatching {
                                         api.get(path).also {
+                                            directory.requireScope(t)
+                                            it.put("cachedAt", System.currentTimeMillis())
                                             store.cache(
                                                 t,
-                                                kind,
+                                                if (kind in listOf("tickets", "orders", "items")) "customer-page" else kind,
                                                 if (kind == "account") customer.accountId
+                                                else if (kind in listOf("tickets", "orders", "items")) "${customer.id}:$kind:0"
                                                 else customer.id,
                                                 it,
                                             )
@@ -104,20 +113,14 @@ internal fun NativeCustomerDetailPanel(
                             "customer" -> profile = body
                             "account" -> account = body
                             "customer-stats" -> stats = body
-                            "customer-ticket-count" -> ticketTotal = body.optInt("total")
+                            "tickets" -> { ticketTotal = body.optInt("total"); recentTickets = body }
                         }
                     }
                     if (result.isFailure) failed = true
                 }
-                profile?.let { value ->
-                    onUpdated(
-                        customer.copy(
-                            fullName = value.optString("fullName", customer.fullName),
-                            phone = value.nativeText("phone"),
-                            email = value.nativeText("email"),
-                            status = value.optString("status", customer.status),
-                        )
-                    )
+                results.firstOrNull { it.first == "customer" }?.second?.getOrNull()?.let { value ->
+                    val updated = withContext(Dispatchers.IO) { directory.rememberProfile(t, value, account?.nativeText("accountName") ?: customer.accountName) }
+                    onUpdated(updated)
                 }
             }
         } catch (cancelled: CancellationException) {
@@ -148,7 +151,7 @@ internal fun NativeCustomerDetailPanel(
                                 else ->
                                     "/pos/customers/${customer.id}/service-items?limit=20&offset=$offset"
                             }
-                        api.get(path).also { store.cache(t, "customer-page", key, it) }
+                        api.get(path).also { directory.requireScope(t); store.cache(t, "customer-page", key, it) }
                     }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -162,14 +165,14 @@ internal fun NativeCustomerDetailPanel(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    profile?.nativeText("fullName") ?: customer.fullName,
+                    (profile?.nativeText("fullName") ?: customer.fullName).ifBlank { copy.customerFallback },
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = POS_INK,
                 )
-                Text(account?.nativeText("accountName") ?: customer.accountName, color = POS_MUTED)
+                Text((account?.nativeText("accountName") ?: customer.accountName).ifBlank { copy.customerFallback }, color = POS_MUTED)
             }
-            TextButton(onClick = onChange, enabled = !busy && !saving) { Text(copy.change) }
+            TextButton(onClick = onChange, enabled = !busy && !saving) { Text(backLabel) }
             TextButton(
                 onClick = { retry++ },
                 enabled = internetAvailable && !loading && !pageLoading && !saving,
@@ -178,10 +181,21 @@ internal fun NativeCustomerDetailPanel(
             }
         }
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        NativeCustomerStatusBadge(copy, profile?.nativeText("status") ?: customer.status)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { editing = true; saveError = null }, enabled = !busy && !saving && internetAvailable && profile != null) { Text(copy.detailEditInformation) }
+            OutlinedButton(onClick = { confirmingStatus = true; saveError = null }, enabled = !busy && !saving && internetAvailable && profile != null) {
+                Text(if ((profile?.nativeText("status") ?: customer.status) == "active") copy.customerDirectoryDisable else copy.customerDirectoryEnable)
+            }
+        }
+        if (account?.nativeText("status") == "disabled") Text(copy.customerDirectoryAccountDisabled, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+        Button(onClick = onNewTicket, enabled = !busy && !saving && account?.nativeText("status") != "disabled" && (profile?.nativeText("status") ?: customer.status) == "active",
+            modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp)) { Text(copy.detailNewTicket) }
+        saveError?.let { Text(nativeFeedbackText(it, copy), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         if (!internetAvailable) Text(copy.detailCachedNotice, color = POS_MUTED)
         if (failed || pageFailed) {
             Text(copy.detailLoadFailed, color = MaterialTheme.colorScheme.error)
-            TextButton(onClick = { retry++ }, enabled = !loading && !pageLoading) {
+            TextButton(onClick = { retry++ }, enabled = internetAvailable && !loading && !pageLoading) {
                 Text(copy.detailRefresh)
             }
         }
@@ -202,6 +216,10 @@ internal fun NativeCustomerDetailPanel(
         )
         when (tab) {
             "overview" -> {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CustomerDetailMetric(copy.detailOrderCount, stats?.optInt("orderCount")?.toString() ?: "—", Modifier.weight(1f))
+                    CustomerDetailMetric(copy.detailTicketCount, (ticketTotal ?: recentTickets?.optInt("total"))?.toString() ?: "—", Modifier.weight(1f))
+                }
                 NativeDetailValue(
                     copy.detailPhone,
                     profile?.nativeText("phone") ?: account?.nativeText("phone") ?: customer.phone,
@@ -219,11 +237,9 @@ internal fun NativeCustomerDetailPanel(
                 NativeDetailValue(
                     copy.ticketsStatus,
                     if ((profile?.optString("status") ?: customer.status) == "active")
-                        copy.customerStatusActive
+                        copy.customerDirectoryActive
                     else copy.detailCustomerDisabled,
                 )
-                NativeDetailValue(copy.detailOrderCount, stats?.optInt("orderCount")?.toString())
-                NativeDetailValue(copy.detailTicketCount, ticketTotal?.toString())
                 NativeDetailValue(
                     copy.orderCreatedAt,
                     nativeOrderTime(
@@ -240,18 +256,11 @@ internal fun NativeCustomerDetailPanel(
                         copy.localeCode(),
                     ),
                 )
-                OutlinedButton(
-                    onClick = {
-                        editing = true
-                        saveError = null
-                    },
-                    enabled = !busy && !saving && internetAvailable && profile != null,
-                ) {
-                    Text(copy.detailEditInformation)
-                }
                 Text(copy.recentWork, fontWeight = FontWeight.SemiBold)
-                val recent =
-                    cachedTickets
+                val recentRows = recentTickets?.optJSONArray("data")
+                val recent = if (recentRows != null) buildList {
+                    for (i in 0 until recentRows.length()) recentRows.optJSONObject(i)?.let { add(it.nativeTicket(terminal?.currency.orEmpty())) }
+                }.take(5) else cachedTickets
                         .filter { it.customerId == customer.id }
                         .sortedByDescending { it.updatedAt }
                         .take(5)
@@ -393,20 +402,12 @@ internal fun NativeCustomerDetailPanel(
                 }
             }
         }
-        Button(
-            onClick = onNewTicket,
-            enabled =
-                !busy && !saving && (profile?.optString("status") ?: customer.status) == "active",
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(14.dp),
-        ) {
-            Text(copy.detailNewTicket)
-        }
     }
     if (editing && profile != null)
-        NativeCustomerEditDialog(copy, profile!!, saving, saveError, { editing = false }) { payload
+        NativeCustomerEditDialog(copy, profile!!, saving, internetAvailable, saveError, { editing = false }) { payload
             ->
-            if (!saving) {
+            if (!internetAvailable) saveError = copy.requiresNetwork
+            else if (!saving) {
                 saving = true
                 saveError = null
                 scope.launch {
@@ -414,7 +415,7 @@ internal fun NativeCustomerDetailPanel(
                         val updated =
                             withContext(Dispatchers.IO) {
                                 api.patch("/pos/customers/${customer.id}", payload).also { body ->
-                                    terminal?.let { store.cache(it, "customer", customer.id, body) }
+                                    terminal?.let { directory.rememberProfile(it, body, customer.accountName) }
                                 }
                             }
                         profile = updated
@@ -435,6 +436,42 @@ internal fun NativeCustomerDetailPanel(
                 }
             }
         }
+    if (confirmingStatus) AlertDialog(
+        onDismissRequest = { if (!saving) confirmingStatus = false },
+        title = { Text(if ((profile?.nativeText("status") ?: customer.status) == "active") copy.customerDirectoryDisable else copy.customerDirectoryEnable) },
+        text = { Text(copy.customerDirectoryStatusHint) },
+        dismissButton = { TextButton(onClick = { confirmingStatus = false }, enabled = !saving) { Text(copy.cancel) } },
+        confirmButton = { Button(enabled = !saving && internetAvailable, onClick = {
+            val t = terminal ?: return@Button
+            saving = true; saveError = null
+            scope.launch {
+                try {
+                    val updated = withContext(Dispatchers.IO) {
+                        api.post("/pos/customers/${customer.id}/status-changes", JSONObject().put("status", if ((profile?.nativeText("status") ?: customer.status) == "active") "disabled" else "active"))
+                            .also { directory.rememberProfile(t, it, customer.accountName) }
+                    }
+                    profile = updated
+                    onUpdated(updated.directoryCustomer(customer.accountName))
+                    confirmingStatus = false
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) { saveError = error.message ?: copy.detailLoadFailed; confirmingStatus = false }
+                finally { saving = false }
+            }
+        }) {
+            if (saving) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+            else Text(if ((profile?.nativeText("status") ?: customer.status) == "active") copy.customerDirectoryDisable else copy.customerDirectoryEnable)
+        } },
+    )
+}
+
+@Composable
+private fun CustomerDetailMetric(label: String, value: String, modifier: Modifier) {
+    Surface(modifier, shape = RoundedCornerShape(12.dp), color = POS_PAGE_BACKGROUND) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(label, color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
+            Text(value, color = POS_INK, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+        }
+    }
 }
 
 @Composable
@@ -455,7 +492,7 @@ private fun NativeCustomerTicketRow(
                 color = POS_MUTED,
             )
             Text(
-                nativeMinorMoney(ticket.totalMinor, ticket.currency),
+                copy.minorMoney(ticket.totalMinor, ticket.currency),
                 fontWeight = FontWeight.SemiBold,
             )
         }
@@ -467,6 +504,7 @@ private fun NativeCustomerEditDialog(
     copy: NativePosCopy,
     profile: JSONObject,
     busy: Boolean,
+    internetAvailable: Boolean,
     error: String?,
     onDismiss: () -> Unit,
     onSave: (JSONObject) -> Unit,
@@ -490,7 +528,7 @@ private fun NativeCustomerEditDialog(
                 )
                 NativePosInput(
                     value = name,
-                    onValueChange = { name = it.take(120) },
+                    onValueChange = { name = it.take(200) },
                     label = { Text(copy.customerName) },
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),
@@ -504,14 +542,15 @@ private fun NativeCustomerEditDialog(
                 )
                 NativePosInput(
                     value = email,
-                    onValueChange = { email = it.take(254) },
+                    onValueChange = { email = it.take(320) },
                     label = { Text(copy.detailEmail) },
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (!nativeCustomerEmailValid(email)) Text(copy.customerDirectoryEmailError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 NativePosInput(
                     value = address,
-                    onValueChange = { address = it.take(500) },
+                    onValueChange = { address = it.take(1000) },
                     label = { Text(copy.detailAddress) },
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),
@@ -530,7 +569,7 @@ private fun NativeCustomerEditDialog(
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                error?.let { Text(nativeFeedbackText(it, copy), color = MaterialTheme.colorScheme.error) }
                 Button(
                     onClick = {
                         onSave(
@@ -552,7 +591,7 @@ private fun NativeCustomerEditDialog(
                             }
                         )
                     },
-                    enabled = !busy && name.isNotBlank(),
+                    enabled = internetAvailable && !busy && name.isNotBlank() && nativeCustomerEmailValid(email),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     NativeBusyLabel(busy, copy.saving, copy.saveItem)

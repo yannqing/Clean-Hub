@@ -79,19 +79,19 @@ internal fun NativeSaleResultDialog(copy: NativePosCopy, result: NativeSaleResul
                     Text(if (paid) "✓" else "!", color = tone, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 }
                 Text(title, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text(formatMoney(result.totalMinor, result.currency), color = tone, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text(copy.money(result.totalMinor, result.currency), color = tone, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text(copy.orderPrefix.format(result.orderId.takeLast(8).uppercase()), color = POS_MUTED)
                 Text(copy.customerPrefixShort.format(result.customerName ?: copy.walkInCustomer), color = POS_MUTED)
                 Text(result.description(copy), color = POS_INK, style = MaterialTheme.typography.bodyMedium)
                 if (result.paymentMethod == "cash" && result.state != NativeSaleState.NeedsReview) {
                     HorizontalDivider(color = POS_BORDER)
-                    SaleResultRow(copy.tenderedForChange, formatMoney(result.tenderedMinor, result.currency))
-                    SaleResultRow(copy.changeLabel, formatMoney((result.tenderedMinor - result.totalMinor).coerceAtLeast(0), result.currency))
+                    SaleResultRow(copy.tenderedForChange, copy.money(result.tenderedMinor, result.currency))
+                    SaleResultRow(copy.changeLabel, copy.money((result.tenderedMinor - result.totalMinor).coerceAtLeast(0), result.currency))
                 }
                 if (result.printQueued && result.state != NativeSaleState.NeedsReview) {
                     Text(copy.checkoutBackgroundHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                 }
-                result.followUpMessage?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
+                result.followUpMessage?.let { Text(nativeFeedbackText(it, copy), color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
                 Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT)) { Text(copy.checkoutContinue) }
                 onViewOrder?.let { OutlinedButton(onClick = it, modifier = Modifier.fillMaxWidth()) { Text(copy.checkoutViewOrder) } }
             }

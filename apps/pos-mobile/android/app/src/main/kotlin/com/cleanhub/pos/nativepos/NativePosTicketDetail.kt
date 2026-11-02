@@ -197,7 +197,7 @@ internal fun NativeTicketDetailView(
                     color = POS_MUTED,
                 )
                 Text(
-                    nativeOrderMoney(
+                    copy.orderMoney(
                         BigDecimal(ticket.totalMinor).movePointLeft(2).toPlainString(),
                         ticket.currency,
                     ),
@@ -215,7 +215,7 @@ internal fun NativeTicketDetailView(
                     color = POS_MUTED,
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                detail.intakeError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                detail.intakeError?.let { Text(nativeFeedbackText(it, copy), color = MaterialTheme.colorScheme.error) }
                 if (ticket.id in detail.discardableIntakeIds)
                     TextButton(onClick = { discardId = ticket.id }, enabled = !busy) {
                         Text(copy.intakeRemoveRejected)
@@ -236,7 +236,7 @@ internal fun NativeTicketDetailView(
                 style = MaterialTheme.typography.bodySmall,
             )
         NativeDetailSection(copy.detailBasicInformation) {
-            NativeDetailValue(copy.ticketCustomer, ticket.customerName)
+            NativeDetailValue(copy.ticketCustomer, ticket.customerName.ifBlank { copy.customerFallback })
             NativeDetailValue(
                 copy.detailPhone,
                 detail.information?.nativeText("customerProfilePhone")
@@ -369,15 +369,15 @@ internal fun NativeTicketDetailView(
                         NativeDetailValue(copy.bagCount, item.bagCount?.toString())
                     NativeDetailValue(
                         copy.detailStandardPrice,
-                        nativeMinorMoney(item.standardUnitAmountMinor, item.currency),
+                        copy.minorMoney(item.standardUnitAmountMinor, item.currency),
                     )
                     NativeDetailValue(
                         copy.detailChargedPrice,
-                        nativeMinorMoney(item.chargedUnitAmountMinor, item.currency),
+                        copy.minorMoney(item.chargedUnitAmountMinor, item.currency),
                     )
                     NativeDetailValue(
                         if (pending) copy.detailEstimatedAmount else copy.orderAmount,
-                        nativeMinorMoney(item.lineAmountMinor, item.currency),
+                        copy.minorMoney(item.lineAmountMinor, item.currency),
                     )
                     NativeDetailValue(copy.detailLabelCode, item.labelCode)
                     item.defectNotes?.let { NativeDetailValue(copy.defectsOptional, it) }
@@ -434,8 +434,8 @@ internal fun NativeTicketDetailView(
                         },
                         enabled = !busy && editable,
                     )
-                    Text(item.itemName, Modifier.weight(1f))
-                    Text(nativeMinorMoney(item.lineAmountMinor, item.currency))
+                    Text(item.itemName.ifBlank { copy.serviceItemFallback }, Modifier.weight(1f))
+                    Text(copy.minorMoney(item.lineAmountMinor, item.currency))
                 }
             }
             if (available.isEmpty()) Text(copy.nothingToCharge, color = POS_MUTED)
@@ -446,7 +446,7 @@ internal fun NativeTicketDetailView(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
-                    "${copy.addToCartTitle} · ${nativeMinorMoney(selected.sumOf { it.lineAmountMinor },ticket.currency)}"
+                    "${copy.addToCartTitle} · ${copy.minorMoney(selected.sumOf { it.lineAmountMinor },ticket.currency)}"
                 )
             }
         }
@@ -459,7 +459,7 @@ internal fun NativeTicketDetailView(
                     NativeIntakeOrderRow(copy, order, timeZone, onViewOrder)
                 }
         }
-        message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
+        message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
     discardId?.let { id ->
         AlertDialog(
@@ -555,7 +555,7 @@ internal fun NativeTicketDetailView(
                             label = { Text(copy.cancelReasonRequired) },
                             modifier = Modifier.fillMaxWidth(),
                         )
-                    message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = MaterialTheme.colorScheme.error) }
                 }
             },
             confirmButton = {
@@ -587,7 +587,7 @@ internal fun NativeTicketDetailView(
                         onValueChange = { deleteReason = it.take(500) },
                         label = { Text(copy.deleteReasonRequired) },
                     )
-                    message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = MaterialTheme.colorScheme.error) }
                 }
             },
             confirmButton = {
@@ -605,8 +605,8 @@ internal fun NativeTicketDetailView(
     }
 }
 
-internal fun nativeMinorMoney(amount: Long, currency: String) =
-    nativeOrderMoney(BigDecimal(amount).movePointLeft(2).toPlainString(), currency)
+internal fun NativePosCopy.minorMoney(amount: Long, currency: String) =
+    orderMoney(BigDecimal(amount).movePointLeft(2).toPlainString(), currency)
 
 internal fun nativeTicketSourceLabel(source: String, copy: NativePosCopy) =
     when (source) {
@@ -639,7 +639,7 @@ internal fun NativeIntakeOrderRow(
                 color = POS_MUTED,
             )
             Text(
-                nativeOrderMoney(order.optString("totalAmount", "0"), order.optString("currency")),
+                copy.orderMoney(order.optString("totalAmount", "0"), order.optString("currency")),
                 fontWeight = FontWeight.Bold,
             )
             Text(
@@ -738,7 +738,7 @@ private fun NativeTicketInformationDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (invalid) Text(copy.pickupTimeInvalid, color = MaterialTheme.colorScheme.error)
-                message?.let { Text(it, color = POS_MUTED) }
+                message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = POS_MUTED) }
                 Button(
                     onClick = {
                         val instant =
@@ -969,7 +969,7 @@ internal fun NativeTicketItemForm(
                                         enabled = !busy,
                                         label = {
                                             Text(
-                                                "${candidate.name} · ${nativeMinorMoney(candidate.amountMinor,candidate.currency)}"
+                                                "${candidate.name} · ${copy.minorMoney(candidate.amountMinor,candidate.currency)}"
                                             )
                                         },
                                     )
@@ -1010,7 +1010,7 @@ internal fun NativeTicketItemForm(
                                 )
                             NativeDetailValue(
                                 copy.detailStandardPrice,
-                                standard?.let { amount -> nativeMinorMoney(amount, it.currency) },
+                                standard?.let { amount -> copy.minorMoney(amount, it.currency) },
                             )
                             if (canOverride) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1042,7 +1042,7 @@ internal fun NativeTicketItemForm(
                             NativeDetailValue(
                                 copy.detailEstimatedAmount,
                                 estimate?.let { amount ->
-                                    nativeMinorMoney(amount, ticket.currency)
+                                    copy.minorMoney(amount, ticket.currency)
                                 },
                             )
                         }
@@ -1115,7 +1115,7 @@ internal fun NativeTicketItemForm(
                         NativeItemQuickPhrases(copy, remark, copy.itemRemarkPhrases, !busy) {
                             remark = it
                         }
-                        message?.let { Text(it, color = POS_MUTED) }
+                        message?.let { Text(nativeFeedbackText(it, copy, preserveUnknown = true), color = POS_MUTED) }
                     }
                     Button(
                         onClick = {
