@@ -30,7 +30,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 export function SecurityEventDetailView({ eventId }: { eventId: string }) {
-  const { m, formatDateTime } = useSaasI18n();
+  const { feedback, m, formatDateTime } = useSaasI18n();
   const [securityEvent, setSecurityEvent] =
     useState<SecurityEventDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,7 +102,7 @@ export function SecurityEventDetailView({ eventId }: { eventId: string }) {
         </div>
       ) : error || !securityEvent ? (
         <div className="border-y border-destructive/30 bg-destructive/5 px-4 py-5 text-sm text-destructive">
-          <p>{error ?? m.security.events.loadError}</p>
+          <p>{feedback(error ?? m.security.events.loadError)}</p>
           <Button
             className="mt-3 h-8 text-xs"
             onClick={loadEvent}

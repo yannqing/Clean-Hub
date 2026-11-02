@@ -57,7 +57,7 @@ export function TenantCustomerAccountsView({
   initialSearchQuery?: string;
 }) {
   const router = useRouter();
-  const { formatDateTime, locale, m } = useTenantI18n();
+  const { feedback, formatDateTime, locale, m } = useTenantI18n();
   const copy = m.customers.accounts;
   const [accounts, setAccounts] = useState<TenantCustomerAccountSummary[]>([]);
   const [overview, setOverview] =
@@ -221,7 +221,7 @@ export function TenantCustomerAccountsView({
 
       {overviewError ? (
         <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          <span>{overviewError}</span>
+          <span>{feedback(overviewError)}</span>
           <Button onClick={refresh} size="sm" type="button" variant="outline">
             {m.common.retry}
           </Button>
@@ -348,7 +348,7 @@ export function TenantCustomerAccountsView({
         ) : error ? (
           <div className="p-4">
             <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-              <span>{error || copy.loadError}</span>
+              <span>{feedback(error || copy.loadError)}</span>
               <Button
                 onClick={refresh}
                 size="sm"

@@ -173,7 +173,7 @@ const copy = {
 } as const;
 
 export function PlatformTaxTemplatesView() {
-  const { locale } = useSaasI18n();
+  const { locale, feedback } = useSaasI18n();
   const text = copy[locale];
   const [templates, setTemplates] = useState<PlatformTaxTemplate[]>([]);
   const [form, setForm] = useState<UpsertPlatformTaxTemplateRequest>(emptyTemplate);
@@ -195,10 +195,10 @@ export function PlatformTaxTemplatesView() {
         }
       })
       .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : text.loadError);
+        if (active) setError(cause instanceof Error ? feedback(cause.message) : text.loadError);
       });
     return () => { active = false; };
-  }, [text.loadError]);
+  }, [text.loadError, feedback]);
 
   function updateRate(index: number, change: Partial<TemplateRate>) {
     setForm((current) => ({
@@ -220,7 +220,7 @@ export function PlatformTaxTemplatesView() {
       setForm(templateToForm(updated));
       setNotice(text.saved);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(cause instanceof Error ? feedback(cause.message) : text.loadError);
     } finally {
       setSaving(false);
     }
@@ -237,9 +237,9 @@ export function PlatformTaxTemplatesView() {
       const codes = parsed.map((entry) => entry.countryCode);
       if (new Set(codes).size !== codes.length) throw new Error(text.importInvalid);
       setPendingImport(parsed);
-    } catch (cause) {
+    } catch {
       setPendingImport([]);
-      setError(cause instanceof Error ? cause.message : text.importInvalid);
+      setError(text.importInvalid);
     }
   }
 
@@ -255,7 +255,7 @@ export function PlatformTaxTemplatesView() {
       setPendingImport([]);
       setNotice(text.importSuccess);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(cause instanceof Error ? feedback(cause.message) : text.loadError);
     } finally {
       setSaving(false);
     }

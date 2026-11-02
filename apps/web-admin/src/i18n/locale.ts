@@ -9,9 +9,23 @@ export const webAdminLocales = [
 ] as const satisfies readonly WebAdminLocale[];
 
 export const webAdminLocaleCookieName = "cleanhub_web_admin_locale";
-export const webAdminLocalePreferenceCookieName = "cleanhub_web_admin_locale_preference";
+export const webAdminLocalePreferenceCookieName =
+  "cleanhub_web_admin_locale_preference";
 
 export const webAdminDefaultLocale: WebAdminLocale = "en";
+
+/** Read only the public interface preference; authentication stays in HttpOnly cookies. */
+export function getWebAdminClientLocale(): WebAdminLocale {
+  if (typeof document === "undefined") return webAdminDefaultLocale;
+  const cookie = document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${webAdminLocaleCookieName}=`));
+  return parseWebAdminLocale(
+    cookie?.slice(webAdminLocaleCookieName.length + 1) ??
+      document.documentElement.lang,
+  );
+}
 
 export function isWebAdminLocale(value: string): value is WebAdminLocale {
   return webAdminLocales.includes(value as WebAdminLocale);

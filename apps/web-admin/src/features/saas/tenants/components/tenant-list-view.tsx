@@ -106,7 +106,7 @@ function getEmptyStateMessage(
 
 export function TenantListView() {
   const router = useRouter();
-  const { locale, m, formatDate } = useSaasI18n();
+  const { feedback, locale, m, formatDate } = useSaasI18n();
   const captionId = useId();
   const requestIdRef = useRef(0);
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
@@ -382,7 +382,7 @@ export function TenantListView() {
         ) : error ? (
           <div className="p-4">
             <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
-              <span>{error}</span>
+              <span>{feedback(error)}</span>
               <Button
                 className="h-8 px-2.5 text-xs"
                 onClick={loadTenants}
@@ -482,7 +482,9 @@ export function TenantListView() {
             formatCountLabel={({ from, to, total: itemTotal }) =>
               locale === "zh-CN"
                 ? `${from}–${to} / 共 ${itemTotal} 条`
-                : `${from}–${to} of ${itemTotal}`
+                : locale === "fr"
+                  ? `${from}–${to} sur ${itemTotal}`
+                  : `${from}–${to} of ${itemTotal}`
             }
             nextLabel={m.common.nextPage}
             offset={offset}

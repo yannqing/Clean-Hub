@@ -32,21 +32,6 @@ function isActivePath(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function getRoleLabel(authContext: AuthContext | null): string {
-  if (!authContext) {
-    return "Admin User";
-  }
-
-  return authContext.role
-    .split("_")
-    .map((part: string) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function getDisplayName(authContext: AuthContext | null): string {
-  return authContext?.displayName.trim() || getRoleLabel(authContext);
-}
-
 export function AdminDashboardShell({
   children,
   scope,
@@ -69,7 +54,7 @@ export function AdminDashboardShell({
   );
   const settingsActive = isActivePath(pathname, platformSettingsHref);
   const SettingsIcon = getNavIcon(platformSettingsHref);
-  const displayName = useMemo(() => getDisplayName(authContext), [authContext]);
+  const displayName = authContext?.displayName.trim() || messages.shell.saas.header.accountLabel;
 
   useEffect(() => {
     let active = true;
@@ -164,7 +149,7 @@ export function AdminDashboardShell({
           data-testid="saas-sidebar"
         >
           <nav
-            aria-label="saas sidebar"
+            aria-label={messages.shell.saas.title}
             className="grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pb-5"
           >
             {sidebarItems.map((item) => {

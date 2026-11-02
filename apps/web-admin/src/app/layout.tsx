@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Toaster } from "@cleanhub/ui";
+import { LocalizedToaster } from "@/components/i18n/localized-toaster";
 
 import { AppProviders } from "@/components/providers";
 import { ThemeInitializer } from "@/components/theme/theme-initializer";
@@ -11,15 +11,19 @@ import {
 
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "CleanHub Admin",
-  description: "CleanHub SaaS administration and back office",
-  icons: {
-    icon: "/cleanhub-logo-mark.jpg",
-    shortcut: "/cleanhub-logo-mark.jpg",
-    apple: "/cleanhub-logo-mark.jpg",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getWebAdminLocaleFromCookies();
+  const messages = await getWebAdminMessages(locale);
+  return {
+    title: messages.saas.common.badge,
+    description: messages.shell.saas.description,
+    icons: {
+      icon: "/cleanhub-logo-mark.jpg",
+      shortcut: "/cleanhub-logo-mark.jpg",
+      apple: "/cleanhub-logo-mark.jpg",
+    },
+  };
+}
 
 export default async function RootLayout({
   children,
@@ -44,8 +48,8 @@ export default async function RootLayout({
           initialMessages={initialMessages}
         >
           <AppProviders>{children}</AppProviders>
+          <LocalizedToaster />
         </WebAdminLocaleProvider>
-        <Toaster />
       </body>
     </html>
   );

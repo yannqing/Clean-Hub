@@ -77,7 +77,7 @@ function getSeverityVariant(
 }
 
 export function SecurityEventListView() {
-  const { m, formatDateTime } = useSaasI18n();
+  const { feedback, m, formatDateTime } = useSaasI18n();
   const router = useRouter();
   const [events, setEvents] = useState<SecurityEventListItem[]>([]);
   const [severity, setSeverity] = useState<SeverityFilter>("all");
@@ -296,7 +296,7 @@ export function SecurityEventListView() {
         ) : error ? (
           <div className="p-4">
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-              {error}
+              {feedback(error)}
             </div>
           </div>
         ) : events.length === 0 ? (

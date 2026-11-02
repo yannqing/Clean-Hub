@@ -1,5 +1,7 @@
 "use client";
 
+import { LocalizedDialogContent as DialogContent } from "@/components/i18n/localized-overlay-content";
+
 import {
   type PosTerminalOperationalStatus,
   type TenantDeviceRealtimeState,
@@ -8,7 +10,6 @@ import {
   Badge,
   Button,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
@@ -144,7 +145,7 @@ export function PointOfSaleDevicesView({
 }: PointOfSaleDevicesViewProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { formatDateTime, locale, m } = useTenantI18n();
+  const { feedback, formatDateTime, locale, m } = useTenantI18n();
   const {
     connectionState: realtimeConnectionState,
     serviceHealth: realtimeServiceHealth,
@@ -380,7 +381,7 @@ export function PointOfSaleDevicesView({
             />
             {mutationError ? (
               <p className="text-xs text-destructive" role="alert">
-                {mutationError}
+                {feedback(mutationError)}
               </p>
             ) : null}
           </div>

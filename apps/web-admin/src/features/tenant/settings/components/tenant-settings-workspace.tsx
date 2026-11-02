@@ -154,7 +154,7 @@ export function TenantSettingsWorkspace({
 }: TenantSettingsWorkspaceProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const [authContext, setAuthContext] = useState<AuthContext | null>(
     initialAuthContext ?? null,
   );
@@ -284,7 +284,7 @@ export function TenantSettingsWorkspace({
       <section className="min-h-[calc(100vh-4rem)] bg-[#f1f1f1] px-4 py-8">
         <div className="mx-auto max-w-2xl rounded-xl border border-destructive/30 bg-white p-5 text-sm text-destructive shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <span>{loadError ?? m.settings.unavailable}</span>
+            <span>{feedback(loadError ?? m.settings.unavailable)}</span>
             <Button
               onClick={loadWorkspace}
               size="sm"

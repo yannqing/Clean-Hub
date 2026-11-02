@@ -1,10 +1,11 @@
 "use client";
 
+import { LocalizedDialogContent as DialogContent } from "@/components/i18n/localized-overlay-content";
+
 import {
   Badge,
   Button,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -50,7 +51,7 @@ export function TaxRatesSection({
   initialRates: TaxRate[];
   loadFailed: boolean;
 }) {
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const text = m.taxRates;
   const [rates, setRates] = useState(() => sortRates(initialRates));
   const [editor, setEditor] = useState<EditorState | null>(null);
@@ -116,7 +117,7 @@ export function TaxRatesSection({
     });
     setBusyId(null);
     if (!result.ok) {
-      toast.error(errorMessage(result.code));
+      toast.error(feedback(errorMessage(result.code)));
       return;
     }
     replaceRate(result.data);
@@ -131,7 +132,7 @@ export function TaxRatesSection({
     const result = await deleteTaxRateAction(rate.id);
     setBusyId(null);
     if (!result.ok) {
-      toast.error(errorMessage(result.code));
+      toast.error(feedback(errorMessage(result.code)));
       return;
     }
     setRates((current) => current.filter((entry) => entry.id !== rate.id));
@@ -303,7 +304,7 @@ export function TaxRatesSection({
             </div>
             {fieldError ? (
               <p className="text-xs text-destructive" role="alert">
-                {fieldError}
+                {feedback(fieldError)}
               </p>
             ) : null}
             <DialogFooter>

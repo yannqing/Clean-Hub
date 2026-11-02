@@ -1,4 +1,5 @@
 "use client";
+import { localizeSystemNotification } from "@cleanhub/i18n/system-notifications";
 
 import type {
   TenantNotificationInboxItem,
@@ -64,7 +65,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 export function TenantNotificationsView() {
-  const { formatDateTime, m } = useTenantI18n();
+  const { feedback, formatDateTime, m, locale } = useTenantI18n();
   const copy = m.notificationCenter;
   const [items, setItems] = useState<TenantNotificationInboxItem[]>([]);
   const [overview, setOverview] =
@@ -219,7 +220,7 @@ export function TenantNotificationsView() {
           : current,
       );
     } catch (error) {
-      toast.error(getErrorMessage(error, copy.loadError));
+      toast.error(feedback(getErrorMessage(error, copy.loadError)));
     } finally {
       setActionId(null);
     }
@@ -239,7 +240,7 @@ export function TenantNotificationsView() {
         );
       }
     } catch (error) {
-      toast.error(getErrorMessage(error, copy.loadError));
+      toast.error(feedback(getErrorMessage(error, copy.loadError)));
     } finally {
       setActionId(null);
     }
@@ -266,7 +267,7 @@ export function TenantNotificationsView() {
       );
       setOverview((current) => (current ? { ...current, unreadCount: 0 } : current));
     } catch (error) {
-      toast.error(getErrorMessage(error, copy.loadError));
+      toast.error(feedback(getErrorMessage(error, copy.loadError)));
     } finally {
       setActionId(null);
     }
@@ -451,7 +452,7 @@ export function TenantNotificationsView() {
 
       {loadError ? (
         <div className="grid gap-3 rounded-lg border bg-background px-5 py-10 text-center">
-          <p className="text-sm font-semibold">{loadError}</p>
+          <p className="text-sm font-semibold">{feedback(loadError)}</p>
           <Button className="mx-auto" onClick={refresh} size="sm" type="button" variant="outline">
             <Icon aria-hidden icon={RefreshCw} size={14} />
             {copy.retry}
@@ -486,7 +487,8 @@ export function TenantNotificationsView() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((item) => {
+                  {items.map((storedItem) => {
+                    const item = localizeSystemNotification(storedItem, locale);
                     const unread = item.readStatus === "unread";
                     const actionBusy = actionId === item.id || actionId === `archive:${item.id}`;
                     const typeLabel =

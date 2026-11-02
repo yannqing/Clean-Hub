@@ -18,7 +18,7 @@ type CreateBackupJobFormProps = {
 };
 
 export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,7 +35,7 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
       setReason("");
       onCreated(result.data);
     } else {
-      toast.error(result.error);
+      toast.error(feedback(result.error));
     }
 
     setSubmitting(false);

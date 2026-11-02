@@ -17,7 +17,7 @@ export function CreateRestoreRequestForm({
   backupJobId,
   onCreated,
 }: CreateRestoreRequestFormProps) {
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -34,7 +34,7 @@ export function CreateRestoreRequestForm({
       setReason("");
       onCreated?.();
     } else {
-      toast.error(result.error);
+      toast.error(feedback(result.error));
     }
 
     setSubmitting(false);

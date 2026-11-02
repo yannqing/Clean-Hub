@@ -1,9 +1,10 @@
 "use client";
 
+import { LocalizedDialogContent as DialogContent } from "@/components/i18n/localized-overlay-content";
+
 import {
   Button,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -119,7 +120,7 @@ export function DiscountListView({
 }: DiscountListViewProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { formatDateTime, locale, m } = useTenantI18n();
+  const { feedback, formatDateTime, locale, m } = useTenantI18n();
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState(query.q ?? "");
   const [exporting, setExporting] = useState(false);
@@ -197,7 +198,7 @@ export function DiscountListView({
 
   function exportRows(rows: TenantDiscountSummary[]) {
     if (rows.length === 0) {
-      toast.error(m.discounts.exportEmpty);
+      toast.error(feedback(m.discounts.exportEmpty));
       return;
     }
 
@@ -239,13 +240,13 @@ export function DiscountListView({
       });
 
       if (!actionResult.ok) {
-        toast.error(m.discounts.loadError);
+        toast.error(feedback(m.discounts.loadError));
         return;
       }
 
       exportRows(actionResult.data);
     } catch {
-      toast.error(m.discounts.loadError);
+      toast.error(feedback(m.discounts.loadError));
     } finally {
       setExporting(false);
     }
@@ -263,9 +264,9 @@ export function DiscountListView({
 
       if (!actionResult.ok) {
         toast.error(
-          isVersionConflict(actionResult)
+          feedback(isVersionConflict(actionResult)
             ? m.discounts.form.versionConflict
-            : m.discounts.form.saveFailed,
+            : m.discounts.form.saveFailed),
         );
         return;
       }
@@ -273,7 +274,7 @@ export function DiscountListView({
       toast.success(m.discounts.statusUpdated);
       router.refresh();
     } catch {
-      toast.error(m.discounts.form.saveFailed);
+      toast.error(feedback(m.discounts.form.saveFailed));
     } finally {
       setMutatingId(null);
     }
@@ -292,9 +293,9 @@ export function DiscountListView({
 
       if (!actionResult.ok) {
         toast.error(
-          isVersionConflict(actionResult)
+          feedback(isVersionConflict(actionResult)
             ? m.discounts.form.versionConflict
-            : m.discounts.form.saveFailed,
+            : m.discounts.form.saveFailed),
         );
         return;
       }
@@ -303,7 +304,7 @@ export function DiscountListView({
       toast.success(m.discounts.deleted);
       router.refresh();
     } catch {
-      toast.error(m.discounts.form.saveFailed);
+      toast.error(feedback(m.discounts.form.saveFailed));
     } finally {
       setMutatingId(null);
     }

@@ -4,6 +4,7 @@ import {
   Icon,
   Input,
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -22,6 +23,7 @@ import {
   Search,
   Settings,
   Users,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -165,7 +167,10 @@ export function SaasHeaderAssistant({
         </button>
       </SheetTrigger>
 
-      <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+      <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md" showCloseButton={false}>
+        <SheetClose aria-label={copy.assistant.closeLabel} className="absolute right-4 top-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2">
+          <Icon aria-hidden icon={X} size={16} />
+        </SheetClose>
         <SheetHeader className="border-b px-5 py-5 text-left">
           <SheetTitle>{copy.assistant.title}</SheetTitle>
           <SheetDescription>{copy.assistant.description}</SheetDescription>

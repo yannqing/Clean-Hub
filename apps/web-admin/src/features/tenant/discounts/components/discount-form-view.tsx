@@ -71,9 +71,10 @@ function RequiredMark() {
 }
 
 function FieldError({ message }: { message?: string }) {
+  const { feedback } = useTenantI18n();
   return message ? (
     <p className="text-xs text-destructive" role="alert">
-      {message}
+      {feedback(message)}
     </p>
   ) : null;
 }
@@ -170,7 +171,7 @@ export function DiscountFormView({
   options,
 }: DiscountFormViewProps) {
   const router = useRouter();
-  const { locale, m } = useTenantI18n();
+  const { feedback, locale, m } = useTenantI18n();
   const isEdit = mode === "edit";
   const canManage =
     options.canManage && (!initialDiscount || initialDiscount.canManage);
@@ -344,7 +345,7 @@ export function DiscountFormView({
     const validation = validateDiscountForm(form, options.timezone);
     if (!validation.ok) {
       setErrors(validation.errors);
-      toast.error(m.discounts.form.validation.checkForm);
+      toast.error(feedback(m.discounts.form.validation.checkForm));
       return;
     }
 
@@ -365,7 +366,7 @@ export function DiscountFormView({
       if (!result.ok) {
         setErrors(result.errors);
         toast.error(
-          isVersionConflict(result)
+          feedback(isVersionConflict(result)
             ? m.discounts.form.versionConflict
             : result.code?.includes("CODE") &&
                 (result.code.includes("DUPLICATE") ||
@@ -373,7 +374,7 @@ export function DiscountFormView({
               ? m.discounts.form.codeConflict
               : Object.keys(result.errors).length > 0
                 ? m.discounts.form.validation.checkForm
-                : m.discounts.form.saveFailed,
+                : m.discounts.form.saveFailed),
         );
         return;
       }
@@ -383,7 +384,7 @@ export function DiscountFormView({
       router.push(webAdminRoutes.tenant.discounts);
       router.refresh();
     } catch {
-      toast.error(m.discounts.form.saveFailed);
+      toast.error(feedback(m.discounts.form.saveFailed));
     } finally {
       setSaving(false);
     }

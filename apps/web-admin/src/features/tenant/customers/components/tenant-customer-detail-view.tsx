@@ -101,7 +101,7 @@ export function TenantCustomerDetailView({
   totalOrders: number;
 }) {
   const router = useRouter();
-  const { formatDateTime, locale, m } = useTenantI18n();
+  const { feedback, formatDateTime, locale, m } = useTenantI18n();
   const detail = m.customers.detail;
   const [customer, setCustomer] = useState(initialCustomer);
   const [editing, setEditing] = useState(initialEditing);
@@ -381,7 +381,7 @@ export function TenantCustomerDetailView({
                       className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
                       role="alert"
                     >
-                      {formError}
+                      {feedback(formError)}
                     </p>
                   ) : null}
                 </div>

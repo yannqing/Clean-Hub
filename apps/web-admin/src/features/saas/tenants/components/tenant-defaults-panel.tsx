@@ -33,7 +33,7 @@ export function TenantDefaultsPanel({
   onSaved: (settings: TenantSettings) => void;
   tenantId: string;
 }) {
-  const { m } = useSaasI18n();
+  const { feedback, m } = useSaasI18n();
   const languageId = useId();
   const currencyHintId = useId();
   const [language, setLanguage] = useState(defaultLanguage);
@@ -54,7 +54,7 @@ export function TenantDefaultsPanel({
           result.message ??
           m.tenants.settings.defaultsSaveFailed;
         setError(message);
-        toast.error(message);
+        toast.error(feedback(message));
         return;
       }
       setLanguage(result.data.defaultLanguage);
@@ -62,7 +62,7 @@ export function TenantDefaultsPanel({
       toast.success(m.tenants.settings.defaultsSaved);
     } catch {
       setError(m.tenants.settings.defaultsSaveFailed);
-      toast.error(m.tenants.settings.defaultsSaveFailed);
+      toast.error(feedback(m.tenants.settings.defaultsSaveFailed));
     } finally {
       setSubmitting(false);
     }
@@ -127,7 +127,7 @@ export function TenantDefaultsPanel({
         </div>
         {error ? (
           <p className="text-xs text-destructive" role="alert">
-            {error}
+            {feedback(error)}
           </p>
         ) : null}
         <Button

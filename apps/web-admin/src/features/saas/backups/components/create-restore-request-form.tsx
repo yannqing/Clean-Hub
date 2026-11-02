@@ -16,7 +16,7 @@ export function CreateRestoreRequestForm({
   backupJobId,
   onCreated,
 }: CreateRestoreRequestFormProps) {
-  const { m } = useSaasI18n();
+  const { feedback, m } = useSaasI18n();
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -33,14 +33,14 @@ export function CreateRestoreRequestForm({
       setReason("");
       onCreated(result.data);
     } else {
-      toast.error(result.error);
+      toast.error(feedback(result.error));
     }
 
     setSubmitting(false);
   }
 
   return (
-    <form className="grid gap-3" onSubmit={handleSubmit}>
+    <form className="grid gap-3" noValidate onSubmit={handleSubmit}>
       <div className="grid gap-2">
         <Label htmlFor={`restore-reason-${backupJobId}`}>
           {m.backups.restoreReason}

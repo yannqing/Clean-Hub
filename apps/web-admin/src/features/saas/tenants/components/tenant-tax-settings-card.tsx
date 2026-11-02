@@ -15,7 +15,7 @@ export function TenantTaxSettingsCard({ tenantId, canEdit, templateApplied, onSa
   templateApplied: boolean;
   onSaved: () => void;
 }) {
-  const { locale } = useSaasI18n();
+  const { feedback, locale } = useSaasI18n();
   const copy = locale === "zh-CN"
     ? { title: "租户税务配置", enabled: "启用税务", included: "价格含税", rate: "默认税率", number: "税务登记号", yes: "是", no: "否", source: "已应用国家税务模板", missing: "尚未应用国家税务模板。请让租户店主在 POS 设置中选择并应用模板；完成前 POS 无法结款。", stale: "国家税务模板已有更新或与租户国家不一致。请让店主在 POS 设置中重新应用模板；完成前 POS 无法结款。", managed: "税率和含税方式由国家税务模板及租户的模板选择管理。SaaS 在此可协助填写税务登记号。", templates: "管理国家税务模板", save: "保存税务登记号", saved: "已保存，租户与 POS 将使用更新后的税务登记号", loadError: "无法加载税务配置" }
     : locale === "fr"
@@ -37,10 +37,10 @@ export function TenantTaxSettingsCard({ tenantId, canEdit, templateApplied, onSa
     webAdminApi.saas.tenants.getTaxSettings(tenantId)
       .then((data) => { if (active) { setForm(data); setSavedTaxNumber(data.taxRegistrationNumber); } })
       .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : copy.loadError);
+        if (active) setError(cause instanceof Error ? feedback(cause.message) : copy.loadError);
       });
     return () => { active = false; };
-  }, [tenantId, copy.loadError]);
+  }, [tenantId, copy.loadError, feedback]);
 
   async function save() {
     if (!form) return;
@@ -57,7 +57,7 @@ export function TenantTaxSettingsCard({ tenantId, canEdit, templateApplied, onSa
       setNotice(copy.saved);
       onSaved();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(cause instanceof Error ? feedback(cause.message) : copy.loadError);
     } finally {
       setSaving(false);
     }
@@ -75,7 +75,7 @@ export function TenantTaxSettingsCard({ tenantId, canEdit, templateApplied, onSa
       setNotice(applyCopy.done);
       onSaved();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(cause instanceof Error ? feedback(cause.message) : copy.loadError);
     } finally {
       setSaving(false);
     }

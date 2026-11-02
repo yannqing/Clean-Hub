@@ -4,7 +4,6 @@ import { RESET_USER_PASSWORD, RESET_USER_PIN } from "@cleanhub/domain/initial-ow
 import {
   Button,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -15,6 +14,7 @@ import {
 } from "@cleanhub/ui";
 import { useId, useState } from "react";
 import { useSaasI18n } from "@/i18n";
+import { SaasDialogContent } from "@/features/saas/shared";
 import { interpolate } from "@/i18n/messages/saas";
 import { resetUserCredentialAction } from "../actions/reset-user-credential.action";
 
@@ -31,7 +31,7 @@ export function UserCredentialResetDialog({
   target: UserCredentialResetTarget;
   onClose: () => void;
 }) {
-  const { m } = useSaasI18n();
+  const { feedback, m } = useSaasI18n();
   const reasonId = useId();
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +78,7 @@ export function UserCredentialResetDialog({
         if (!open && !submitting) onClose();
       }}
     >
-      <DialogContent
+      <SaasDialogContent
         className="sm:max-w-md"
         onEscapeKeyDown={(event) => {
           if (submitting) event.preventDefault();
@@ -115,7 +115,7 @@ export function UserCredentialResetDialog({
             />
             {error ? (
               <p className="text-sm text-destructive" role="alert">
-                {error}
+                {feedback(error)}
               </p>
             ) : null}
           </div>
@@ -155,7 +155,7 @@ export function UserCredentialResetDialog({
             </Button>
           )}
         </DialogFooter>
-      </DialogContent>
+      </SaasDialogContent>
     </Dialog>
   );
 }

@@ -100,7 +100,7 @@ export function PointOfSaleSettingsView({
   error,
   initialSettings,
 }: PointOfSaleSettingsViewProps) {
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const [settings, setSettings] = useState(initialSettings);
   const [form, setForm] = useState<PointOfSaleSettingsFormValues | null>(
     initialSettings ? toFormValues(initialSettings) : null,
@@ -136,7 +136,7 @@ export function PointOfSaleSettingsView({
     }
 
     if (form.deviceOfflineAfterSeconds < form.syncIntervalSeconds * 2) {
-      toast.error(m.pointOfSale.settings.validation.offlineThresholdMinimum);
+      toast.error(feedback(m.pointOfSale.settings.validation.offlineThresholdMinimum));
       return;
     }
 
@@ -146,7 +146,7 @@ export function PointOfSaleSettingsView({
       const result = await updatePointOfSaleSettingsAction(form);
 
       if (!result.ok) {
-        toast.error(m.pointOfSale.settings.saveError);
+        toast.error(feedback(m.pointOfSale.settings.saveError));
         return;
       }
 
@@ -154,7 +154,7 @@ export function PointOfSaleSettingsView({
       setForm(toFormValues(result.data));
       toast.success(m.pointOfSale.settings.saved);
     } catch {
-      toast.error(m.pointOfSale.settings.saveError);
+      toast.error(feedback(m.pointOfSale.settings.saveError));
     } finally {
       setSaving(false);
     }

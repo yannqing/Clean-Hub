@@ -106,9 +106,10 @@ function validTimezone(value: string): boolean {
 }
 
 function FieldError({ id, message }: { id: string; message?: string }) {
+  const { feedback } = useSaasI18n();
   return message ? (
     <p className="text-xs text-destructive" id={id} role="alert">
-      {message}
+      {feedback(message)}
     </p>
   ) : null;
 }

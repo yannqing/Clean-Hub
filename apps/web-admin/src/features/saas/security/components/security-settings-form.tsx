@@ -21,7 +21,7 @@ export function SecuritySettingsForm({
   initialValues = securitySettingsDefaultValues,
   onUpdated,
 }: SecuritySettingsFormProps) {
-  const { m } = useSaasI18n();
+  const { feedback, m } = useSaasI18n();
   const [values, setValues] =
     useState<SecuritySettingsFormValues>(initialValues);
   const [submitting, setSubmitting] = useState(false);
@@ -54,7 +54,7 @@ export function SecuritySettingsForm({
       });
       onUpdated(result.data);
     } else {
-      toast.error(result.error);
+      toast.error(feedback(result.error));
     }
 
     setSubmitting(false);
@@ -63,6 +63,7 @@ export function SecuritySettingsForm({
   return (
     <form
       className="grid gap-5 rounded-xl border bg-background px-5 py-6 shadow-sm"
+      noValidate
       onSubmit={handleSubmit}
     >
       <p className="text-sm font-semibold">{m.security.settings.title}</p>

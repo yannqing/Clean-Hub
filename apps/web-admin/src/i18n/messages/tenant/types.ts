@@ -1143,6 +1143,7 @@ export type TenantMessages = {
   };
 
   branches: {
+    unavailable: { badge: string; title: string; description: string; back: string };
     // 三页共享
     eyebrow: string;
     title: string;
@@ -2275,6 +2276,10 @@ export type TenantMessages = {
       save: string;
     };
     paymentIntegrations: {
+      waveApiKey: string;
+      clientId: string;
+      clientSecret: string;
+      merchantKey: string;
       unbind: string;
       savedAndVerified: string;
       unbound: string;

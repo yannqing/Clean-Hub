@@ -1,19 +1,63 @@
 import { webAdminRoutes } from "@/config/routes";
 
 import { tenantMessagesFr } from "./tenant/fr";
-import { enMessages } from "./en";
+import { saasMessagesFr } from "./saas/fr";
 import type { WebAdminMessages } from "../messages-types";
 
 /**
- * French tenant-admin bundle.
- *
- * The SaaS operator workspace intentionally keeps its English feature catalog
- * until that separate product surface receives a complete French translation.
+ * Complete French bundle for the platform and tenant workspaces.
  */
 export const frMessages: WebAdminMessages = {
-  ...enMessages,
+  utilityPages: {
+    home: {
+      title: "Administration Web CleanHub",
+      description: "Point d’entrée de l’administration CleanHub. Ouvrez /saas pour gérer la plateforme ou /tenant pour gérer les opérations d’un locataire.",
+      items: ["Administration SaaS", "Administration du locataire", "Authentification", "État de l’API"],
+    },
+    apiHealth: {
+      title: "État de l’API",
+      description: "Page réservée au contrôle de la connexion à l’API et de l’état des services backend.",
+      items: ["État de l’API", "État de la base de données", "État de la file de synchronisation", "État des webhooks"],
+    },
+  },
   shell: {
-    ...enMessages.shell,
+    saas: {
+      eyebrow: "Administration SaaS",
+      title: "Gestion de la plateforme",
+      description: "Gérez les locataires, les utilisateurs, la configuration, les journaux et les contrôles système.",
+      header: {
+        searchLabel: "Rechercher dans l’espace de la plateforme",
+        searchPlaceholder: "Rechercher des locataires, utilisateurs, tickets ou paramètres...",
+        assistantLabel: "Assistant CleanHub",
+        accountLabel: "Utilisateur connecté",
+        assistant: {
+          title: "Assistant CleanHub",
+          description: "Accédez rapidement aux pages et outils de gestion de la plateforme.",
+          closeLabel: "Fermer l’assistant",
+          searchLabel: "Rechercher des actions de la plateforme",
+          searchPlaceholder: "Rechercher des locataires, utilisateurs, journaux...",
+          quickActionsTitle: "Raccourcis de la plateforme",
+          emptyTitle: "Aucune action correspondante",
+          emptyDescription: "Essayez une destination comme les locataires, les utilisateurs, les tickets ou la sécurité.",
+          actions: {
+            overview: { label: "Vue d’ensemble", description: "Consultez l’activité de la plateforme et ses indicateurs clés." },
+            tenants: { label: "Locataires", description: "Gérez les comptes locataires et leurs accès à la plateforme." },
+            users: { label: "Gestion des utilisateurs", description: "Gérez les opérateurs SaaS et leurs rôles." },
+            feedbackTickets: { label: "Tickets de retour", description: "Consultez et traitez les demandes d’assistance reçues." },
+            todos: { label: "Mes tâches", description: "Retrouvez les actions en attente de la plateforme." },
+            auditLogs: { label: "Audit et sécurité", description: "Consultez les actions enregistrées et les événements de sécurité." },
+            operationLogs: { label: "Journaux d’activité", description: "Examinez l’activité des applications et des services." },
+            settings: { label: "Paramètres de la plateforme", description: "Configurez les valeurs par défaut et le fonctionnement de la plateforme." },
+          },
+        },
+        account: {
+          menuLabel: "Ouvrir le menu du compte",
+          roleLabel: "Rôle",
+          profile: "Espace personnel",
+          settings: "Paramètres de la plateforme",
+        },
+      },
+    },
     tenant: {
       eyebrow: "Administration du locataire",
       title: "Opérations des magasins",
@@ -125,7 +169,34 @@ export const frMessages: WebAdminMessages = {
     },
   },
   sidebar: {
-    ...enMessages.sidebar,
+    saas: [
+      {
+        title: "Principal",
+        items: [
+          { label: "Vue d’ensemble", href: webAdminRoutes.saas.home },
+          { label: "Gestion des locataires", href: webAdminRoutes.saas.config.tenants },
+          { label: "Gestion des utilisateurs", href: webAdminRoutes.saas.users },
+          { label: "Tickets de retour", href: webAdminRoutes.saas.feedbackTickets },
+          { label: "Mes tâches", href: webAdminRoutes.saas.todos },
+        ],
+      },
+      {
+        title: "Configuration",
+        items: [
+          { label: "Fonctionnalités", href: webAdminRoutes.saas.config.featureFlags },
+          { label: "Paramètres régionaux", href: webAdminRoutes.saas.config.localization },
+          { label: "Paramètres de la plateforme", href: webAdminRoutes.saas.config.platformSettings },
+        ],
+      },
+      {
+        title: "Paramètres système",
+        items: [
+          { label: "Audit et sécurité", href: webAdminRoutes.saas.auditLogs },
+          { label: "Journaux d’activité", href: webAdminRoutes.saas.system.logs },
+          { label: "Sauvegardes des données", href: webAdminRoutes.saas.system.backups },
+        ],
+      },
+    ],
     tenant: [
       {
         title: "Principal",
@@ -177,6 +248,7 @@ export const frMessages: WebAdminMessages = {
     ],
   },
   common: {
+    close: "Fermer",
     personalCenter: "Espace personnel",
     language: "Langue",
     languageLabels: {
@@ -348,5 +420,6 @@ export const frMessages: WebAdminMessages = {
         "Ce compte ne peut pas accéder à l’administration du locataire. Connectez-vous avec un compte propriétaire ou responsable.",
     },
   },
+  saas: saasMessagesFr,
   tenant: tenantMessagesFr,
 };

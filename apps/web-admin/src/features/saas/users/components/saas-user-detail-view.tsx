@@ -6,7 +6,6 @@ import {
   Card,
   CardContent,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -20,7 +19,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
-import { SaasBreadcrumbs } from "@/features/saas/shared";
+import { SaasBreadcrumbs, SaasDialogContent } from "@/features/saas/shared";
 import { useSaasI18n } from "@/i18n";
 
 import { updateSaasUserStatusAction } from "../actions";
@@ -90,7 +89,7 @@ export function SaasUserDetailView({
   initialUser,
   isCurrentUser,
 }: SaasUserDetailViewProps) {
-  const { m, formatDate } = useSaasI18n();
+  const { feedback, m, formatDate } = useSaasI18n();
   const [user, setUser] = useState(initialUser);
   const [statusOpen, setStatusOpen] = useState(false);
   const [statusReason, setStatusReason] = useState("");
@@ -171,7 +170,7 @@ export function SaasUserDetailView({
     } catch (error) {
       const message = getErrorMessage(error) || m.users.loadError;
       setStatusError(message);
-      toast.error(message);
+      toast.error(feedback(message));
     } finally {
       setStatusSubmitting(false);
     }
@@ -401,7 +400,7 @@ export function SaasUserDetailView({
         }}
         open={statusOpen}
       >
-        <DialogContent className="sm:max-w-md">
+        <SaasDialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
               {nextStatus === "disabled"
@@ -428,7 +427,7 @@ export function SaasUserDetailView({
               value={statusReason}
             />
             {statusError ? (
-              <p className="text-xs text-destructive">{statusError}</p>
+              <p className="text-xs text-destructive">{feedback(statusError)}</p>
             ) : null}
           </div>
           <DialogFooter>
@@ -453,7 +452,7 @@ export function SaasUserDetailView({
                   : m.users.actions.enable}
             </Button>
           </DialogFooter>
-        </DialogContent>
+        </SaasDialogContent>
       </Dialog>
 
       {resetTarget ? (

@@ -40,7 +40,7 @@ export function PointOfSaleDeviceFormView({
   availableBranches,
 }: PointOfSaleDeviceFormViewProps) {
   const router = useRouter();
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const copy = m.pointOfSale.devices;
   const [label, setLabel] = useState(device.label ?? device.deviceId);
   const [branchId, setBranchId] = useState(device.branchId);
@@ -130,7 +130,7 @@ export function PointOfSaleDeviceFormView({
           className="rounded-lg border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm text-destructive"
           role="alert"
         >
-          {error}
+          {feedback(error)}
         </p>
       ) : null}
 

@@ -40,9 +40,10 @@ export type BranchCreateViewProps = {
 };
 
 function FieldError({ message }: { message?: string }) {
+  const { feedback } = useTenantI18n();
   return message ? (
     <p className="text-xs text-destructive" role="alert">
-      {message}
+      {feedback(message)}
     </p>
   ) : null;
 }
@@ -54,7 +55,7 @@ export function BranchCreateView({
   initialDefaultLanguage,
 }: BranchCreateViewProps = {}) {
   const router = useRouter();
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const [formValues, setFormValues] = useState<BranchFormValues>(() => ({
     ...emptyBranchFormValues,
     defaultCurrency:
@@ -116,7 +117,7 @@ export function BranchCreateView({
                 ? m.branches.create.logoTooLarge
                 : m.branches.create.logoUploadFailed;
           setFormError(uploadMessage);
-          toast.error(uploadMessage);
+          toast.error(feedback(uploadMessage));
           return;
         }
 
@@ -134,7 +135,7 @@ export function BranchCreateView({
       if (!result.ok) {
         setErrors(result.errors);
         setFormError(result.message);
-        toast.error(result.message);
+        toast.error(feedback(result.message));
         return;
       }
 
@@ -147,7 +148,7 @@ export function BranchCreateView({
           ? submitError.message
           : m.common.requestFailed;
       setFormError(message);
-      toast.error(message);
+      toast.error(feedback(message));
     } finally {
       setSaving(false);
     }
@@ -237,7 +238,7 @@ export function BranchCreateView({
                       required
                       value={formValues.name}
                     />
-                    <FieldError message={errors.name} />
+                    <FieldError message={feedback(errors.name)} />
                   </div>
 
                   <div className="grid gap-2">
@@ -252,12 +253,12 @@ export function BranchCreateView({
                       }
                       value={formValues.phone}
                     />
-                    <FieldError message={errors.phone} />
+                    <FieldError message={feedback(errors.phone)} />
                   </div>
 
                   <BranchLogoField
                     disabled={saving}
-                    error={errors.logoObjectKey}
+                    error={feedback(errors.logoObjectKey)}
                     onRemove={handleLogoRemove}
                     onSelect={handleLogoSelect}
                     previewUrl={logoPreviewUrl}
@@ -279,12 +280,12 @@ export function BranchCreateView({
                       }
                       value={formValues.address}
                     />
-                    <FieldError message={errors.address} />
+                    <FieldError message={feedback(errors.address)} />
                   </div>
 
                   <BranchBusinessHoursEditor
                     disabled={saving}
-                    error={errors.businessHours}
+                    error={feedback(errors.businessHours)}
                     onChange={(value) => updateForm("businessHours", value)}
                     value={formValues.businessHours}
                   />
@@ -342,7 +343,7 @@ export function BranchCreateView({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FieldError message={errors.defaultLanguage} />
+                    <FieldError message={feedback(errors.defaultLanguage)} />
                   </div>
 
                   <div className="grid gap-2">
@@ -367,7 +368,7 @@ export function BranchCreateView({
                         </SelectItem>
                       </SelectContent>
                     </Select>
-                    <FieldError message={errors.status} />
+                    <FieldError message={feedback(errors.status)} />
                   </div>
                 </CardContent>
               </Card>
@@ -379,7 +380,7 @@ export function BranchCreateView({
               className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
               role="alert"
             >
-              {formError}
+              {feedback(formError)}
             </p>
           ) : null}
 

@@ -24,7 +24,7 @@ type CreateBackupJobFormProps = {
 };
 
 export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
-  const { m } = useSaasI18n();
+  const { feedback, m } = useSaasI18n();
   const [scope, setScope] = useState<BackupJobScope>("platform");
   const [tenantId, setTenantId] = useState("");
   const [reason, setReason] = useState("");
@@ -45,7 +45,7 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
       setReason("");
       onCreated(result.data);
     } else {
-      toast.error(result.error);
+      toast.error(feedback(result.error));
     }
 
     setSubmitting(false);
@@ -54,6 +54,7 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
   return (
     <form
       className="grid gap-4 border-y bg-background px-4 py-4"
+      noValidate
       onSubmit={handleSubmit}
     >
       <h2 className="text-sm font-semibold">{m.backups.manualBackup}</h2>

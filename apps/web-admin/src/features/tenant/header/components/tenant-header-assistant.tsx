@@ -1,12 +1,13 @@
 "use client";
 
+import { LocalizedSheetContent as SheetContent } from "@/components/i18n/localized-overlay-content";
+
 import type { AuthContext } from "@cleanhub/api-client";
 import {
   Icon,
   Input,
   Sheet,
   SheetClose,
-  SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,

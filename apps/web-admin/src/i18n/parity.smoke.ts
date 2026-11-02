@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 
 import { saasMessagesByLocale } from "./messages/saas";
 import { tenantMessagesByLocale } from "./messages/tenant";
+import { enMessages } from "./messages/en";
+import { frMessages } from "./messages/fr";
+import { zhCNMessages } from "./messages/zh-CN";
 
 /**
  * Guards the web-admin catalogues the way packages/i18n guards the POS ones.
@@ -12,10 +15,8 @@ import { tenantMessagesByLocale } from "./messages/tenant";
  *   - Chinese left in a translated bundle, which is how a missing translation
  *     usually arrives: the source pasted across.
  *
- * The saas bundle deliberately maps `fr` to the English messages -- there is no
- * French SaaS catalogue yet -- so French and English are expected to be equal
- * there. That is asserted rather than ignored, so the day a real French bundle
- * lands this test says so instead of silently passing.
+ * SaaS French must have its own translations; only explicitly reviewed French
+ * cognates and protocol identifiers may match English.
  */
 function flatten(
   value: unknown,
@@ -27,7 +28,9 @@ function flatten(
     return out;
   }
   if (value && typeof value === "object") {
-    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    for (const [key, child] of Object.entries(
+      value as Record<string, unknown>,
+    )) {
       flatten(child, prefix ? `${prefix}.${key}` : key, out);
     }
   }
@@ -43,6 +46,7 @@ let failures = 0;
 for (const [name, byLocale] of [
   ["tenant", tenantMessagesByLocale],
   ["saas", saasMessagesByLocale],
+  ["web-admin", { en: enMessages, fr: frMessages, "zh-CN": zhCNMessages }],
 ] as const) {
   const flat = new Map(
     Object.entries(byLocale).map(([locale, messages]) => [
@@ -96,38 +100,76 @@ for (const [name, byLocale] of [
   }
 }
 
-// The tenant bundle is fully translated, so no Chinese may survive in en/fr.
-// The saas bundle has no French copy yet (fr falls back to English), so only
-// its English side is checked.
 const tenantFlat = new Map(
   Object.entries(tenantMessagesByLocale).map(([locale, messages]) => [
     locale,
     flatten(messages),
   ]),
 );
-for (const locale of ["en", "fr"] as const) {
-  for (const [key, value] of tenantFlat.get(locale)!) {
+for (const [locale, messages] of [
+  ["en", enMessages],
+  ["fr", frMessages],
+] as const) {
+  for (const [key, value] of flatten(messages)) {
     if (han.test(value)) {
-      console.error(`UNTRANSLATED tenant.${locale}: ${key} = ${value}`);
+      console.error(`UNTRANSLATED web-admin.${locale}: ${key} = ${value}`);
       failures++;
     }
   }
 }
-for (const [key, value] of flatten(saasMessagesByLocale.en)) {
-  if (han.test(value)) {
-    console.error(`UNTRANSLATED saas.en: ${key} = ${value}`);
+
+assert.notEqual(
+  saasMessagesByLocale.fr,
+  saasMessagesByLocale.en,
+  "SaaS French must not fall back to the English catalogue",
+);
+assert.equal(
+  frMessages.saas,
+  saasMessagesByLocale.fr,
+  "Wire French into the active message bundle",
+);
+
+const sharedFrenchTerms = new Map([
+  ["common.actions", "Actions"],
+  ["common.priorityLabels.urgent", "Urgent"],
+  ["tenants.list.metrics.total", "Total"],
+  [
+    "tenants.settings.featureFlagOptions.notificationsEnabled.label",
+    "Notifications",
+  ],
+  ["tenants.form.featureFlags.notifications.label", "Notifications"],
+  ["users.metrics.total", "Total"],
+  ["systemLogs.service", "Service"],
+  ["systemLogs.servicePlaceholder", "cleanhub-api"],
+  ["systemLogs.columns.message", "Message"],
+  ["backups.restoreColumns.actions", "Actions"],
+  ["security.events.eventTypePlaceholder", "login_failed"],
+  ["security.events.columns.description", "Description"],
+  ["security.events.columns.ip", "IP"],
+  ["feedbackTickets.columns.ticket", "Ticket"],
+  ["feedbackTickets.columns.sla", "SLA"],
+  ["feedbackTickets.fields.description", "Description"],
+  ["feedbackTickets.sla.label", "SLA"],
+  ["placeholders.profile.items.3", "Sessions"],
+]);
+const saasFrench = flatten(saasMessagesByLocale.fr);
+for (const [key, source] of flatten(saasMessagesByLocale.en)) {
+  if (saasFrench.get(key) === source && sharedFrenchTerms.get(key) !== source) {
+    console.error(`ENGLISH FALLBACK saas.fr: ${key} = ${source}`);
     failures++;
   }
 }
-
-// The saas French fallback is deliberate. Pinning it means the day a real
-// French saas bundle is added, this line fails and asks to be updated rather
-// than letting a half-wired bundle ship unnoticed.
-assert.equal(
-  saasMessagesByLocale.fr,
-  saasMessagesByLocale.en,
-  "saas `fr` is expected to fall back to the English bundle; if a French saas catalogue now exists, translate this assertion into a real parity check",
-);
+for (const area of ["saas", "tenant"] as const) {
+  const destinations = (messages: typeof enMessages) =>
+    messages.sidebar[area].map((section) =>
+      section.items.map((item) => item.href),
+    );
+  assert.deepEqual(
+    destinations(frMessages),
+    destinations(enMessages),
+    `French ${area} navigation must preserve destinations`,
+  );
+}
 
 assert.equal(failures, 0, `${failures} web-admin i18n parity problems`);
 console.log(

@@ -69,7 +69,7 @@ export function SaasUserEditView({
   roleLoadFailed,
   roles,
 }: SaasUserEditViewProps) {
-  const { m } = useSaasI18n();
+  const { feedback, m } = useSaasI18n();
   const router = useRouter();
   const [user, setUser] = useState(initialUser);
   const [values, setValues] = useState<UpdateSaasUserFormInput>({
@@ -151,7 +151,7 @@ export function SaasUserEditView({
     } catch (error) {
       const message = getErrorMessage(error) || m.users.edit.failed;
       setFormError(message);
-      toast.error(message);
+      toast.error(feedback(message));
     } finally {
       setSubmitting(false);
     }
@@ -184,7 +184,7 @@ export function SaasUserEditView({
     } catch (error) {
       const message = getErrorMessage(error) || m.users.roles.failed;
       setRoleError(message);
-      toast.error(message);
+      toast.error(feedback(message));
     } finally {
       setRolesSubmitting(false);
     }
@@ -239,7 +239,7 @@ export function SaasUserEditView({
                   />
                   {errors.displayName ? (
                     <p className="text-xs text-destructive">
-                      {errors.displayName}
+                      {feedback(errors.displayName)}
                     </p>
                   ) : null}
                 </div>
@@ -262,7 +262,7 @@ export function SaasUserEditView({
                     value={values.email}
                   />
                   {errors.email ? (
-                    <p className="text-xs text-destructive">{errors.email}</p>
+                    <p className="text-xs text-destructive">{feedback(errors.email)}</p>
                   ) : null}
                 </div>
 
@@ -282,7 +282,7 @@ export function SaasUserEditView({
                     value={values.phone}
                   />
                   {errors.phone ? (
-                    <p className="text-xs text-destructive">{errors.phone}</p>
+                    <p className="text-xs text-destructive">{feedback(errors.phone)}</p>
                   ) : null}
                 </div>
 
@@ -317,7 +317,7 @@ export function SaasUserEditView({
                   </Select>
                   {errors.language ? (
                     <p className="text-xs text-destructive">
-                      {errors.language}
+                      {feedback(errors.language)}
                     </p>
                   ) : null}
                 </div>
@@ -339,7 +339,7 @@ export function SaasUserEditView({
                   />
                   {errors.timezone ? (
                     <p className="text-xs text-destructive">
-                      {errors.timezone}
+                      {feedback(errors.timezone)}
                     </p>
                   ) : null}
                 </div>
@@ -349,7 +349,7 @@ export function SaasUserEditView({
 
           {formError ? (
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              {formError}
+              {feedback(formError)}
             </div>
           ) : null}
 
@@ -395,7 +395,7 @@ export function SaasUserEditView({
                   </p>
                 ) : null}
                 {roleError ? (
-                  <p className="text-xs text-destructive">{roleError}</p>
+                  <p className="text-xs text-destructive">{feedback(roleError)}</p>
                 ) : null}
 
                 <Button

@@ -24,7 +24,7 @@ export function BranchBusinessHoursEditor({
   onChange,
   value,
 }: BranchBusinessHoursEditorProps) {
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
 
   function updateDay(
     weekday: BranchWeekday,
@@ -99,7 +99,7 @@ export function BranchBusinessHoursEditor({
 
       {error ? (
         <p className="text-xs text-destructive" role="alert">
-          {error}
+          {feedback(error)}
         </p>
       ) : null}
     </div>

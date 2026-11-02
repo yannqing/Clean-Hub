@@ -1395,6 +1395,7 @@ export const tenantMessagesZhCN: TenantMessages = {
   },
 
   branches: {
+    unavailable: { badge: "门店不可用", title: "无法加载门店", description: "该门店暂不可用或超出您的访问范围。", back: "返回门店列表" },
     eyebrow: "租户门店",
     title: "门店",
     listDescription:
@@ -2553,6 +2554,10 @@ export const tenantMessagesZhCN: TenantMessages = {
       syncHint: "保存后，终端下次联网同步时更新；已同步的图标离线仍可显示。此设置不修改租户名称或收据抬头。",
     },
     paymentIntegrations: {
+      waveApiKey: "Wave API 密钥",
+      clientId: "客户端标识",
+      clientSecret: "客户端密钥",
+      merchantKey: "Orange Money 商户密钥",
       unbind: "解除绑定",
       savedAndVerified: "{provider} 已验证并保存。",
       unbound: "{provider} 已解除绑定。",

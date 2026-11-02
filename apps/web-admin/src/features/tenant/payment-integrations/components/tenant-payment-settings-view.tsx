@@ -82,7 +82,7 @@ export function TenantPaymentSettingsView({
   loadError?: string | null;
 }) {
   const { canUpdateSettings } = useTenantSettingsWorkspace();
-  const { formatDateTime, m } = useTenantI18n();
+  const { feedback, formatDateTime, m } = useTenantI18n();
   const copy = m.settings.paymentIntegrations;
   const [integrations, setIntegrations] = useState(initialIntegrations);
   const [editingProvider, setEditingProvider] =
@@ -128,7 +128,7 @@ export function TenantPaymentSettingsView({
     setBusyProvider(null);
 
     if (!result.ok) {
-      toast.error(result.message);
+      toast.error(feedback(result.message));
       return;
     }
     setIntegrations((current) => replaceIntegration(current, result.data));
@@ -149,7 +149,7 @@ export function TenantPaymentSettingsView({
     const result = await verifyPaymentIntegrationAction(provider);
     setBusyProvider(null);
     if (!result.ok) {
-      toast.error(result.message);
+      toast.error(feedback(result.message));
       return;
     }
     setIntegrations((current) => replaceIntegration(current, result.data));
@@ -161,10 +161,10 @@ export function TenantPaymentSettingsView({
       );
     } else {
       toast.error(
-        result.data.lastVerificationError ??
+        feedback(result.data.lastVerificationError ??
           interpolate(copy.verifyFailed, {
             provider: PROVIDER_NAMES[provider],
-          }),
+          })),
       );
     }
   }
@@ -180,7 +180,7 @@ export function TenantPaymentSettingsView({
     );
     setBusyProvider(null);
     if (!result.ok) {
-      toast.error(result.message);
+      toast.error(feedback(result.message));
       return;
     }
     setIntegrations((current) => replaceIntegration(current, result.data));
@@ -201,7 +201,7 @@ export function TenantPaymentSettingsView({
     const result = await removePaymentIntegrationAction(provider);
     setBusyProvider(null);
     if (!result.ok) {
-      toast.error(result.message);
+      toast.error(feedback(result.message));
       return;
     }
     setIntegrations((current) =>
@@ -231,7 +231,7 @@ export function TenantPaymentSettingsView({
         </div>
         {loadError ? (
           <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:px-5">
-            {loadError}
+            {feedback(loadError)}
           </div>
         ) : null}
         {!canUpdateSettings ? (
@@ -357,7 +357,7 @@ export function TenantPaymentSettingsView({
 
             {integration.lastVerificationError ? (
               <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-xs leading-5 text-red-700 sm:px-5">
-                {integration.lastVerificationError}
+                {feedback(integration.lastVerificationError)}
               </div>
             ) : null}
 
@@ -372,7 +372,7 @@ export function TenantPaymentSettingsView({
                 {integration.provider === "wave" ? (
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="grid gap-2 sm:col-span-2">
-                      <Label htmlFor="wave-api-key">Wave API Key</Label>
+                      <Label htmlFor="wave-api-key">{copy.waveApiKey}</Label>
                       <Input
                         autoComplete="new-password"
                         id="wave-api-key"
@@ -407,7 +407,7 @@ export function TenantPaymentSettingsView({
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="grid gap-2">
-                      <Label htmlFor="orange-client-id">Client ID</Label>
+                      <Label htmlFor="orange-client-id">{copy.clientId}</Label>
                       <Input
                         autoComplete="new-password"
                         id="orange-client-id"
@@ -424,7 +424,7 @@ export function TenantPaymentSettingsView({
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="orange-client-secret">
-                        Client Secret
+                        {copy.clientSecret}
                       </Label>
                       <Input
                         autoComplete="new-password"
@@ -442,7 +442,7 @@ export function TenantPaymentSettingsView({
                     </div>
                     <div className="grid gap-2 sm:col-span-2">
                       <Label htmlFor="orange-merchant-key">
-                        Orange Money Merchant Key
+                        {copy.merchantKey}
                       </Label>
                       <Input
                         autoComplete="new-password"

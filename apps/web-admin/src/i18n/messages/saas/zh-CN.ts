@@ -1,3 +1,4 @@
+import { countrySetupZhCN } from "./country-setup";
 import type { SaasMessages } from "./types";
 
 export const saasMessagesZhCN: SaasMessages = {
@@ -15,6 +16,7 @@ export const saasMessagesZhCN: SaasMessages = {
     allPriorities: "全部优先级",
     tryAgain: "重试",
     cancel: "取消",
+    close: "关闭",
     saving: "保存中...",
     creating: "创建中...",
     submitting: "提交中...",
@@ -275,6 +277,7 @@ export const saasMessagesZhCN: SaasMessages = {
       flagsUpdated: "功能开关已更新",
     },
     form: {
+      countrySetup: countrySetupZhCN,
       profileSection: "租户资料",
       defaultsSection: "默认值",
       ownerSection: "初始所有者",

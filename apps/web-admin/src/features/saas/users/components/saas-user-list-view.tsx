@@ -94,7 +94,7 @@ function getStatusVariant(
 }
 
 export function SaasUserListView() {
-  const { m, formatDate } = useSaasI18n();
+  const { feedback, m, formatDate } = useSaasI18n();
   const router = useRouter();
   const captionId = useId();
   const requestIdRef = useRef(0);
@@ -259,7 +259,7 @@ export function SaasUserListView() {
 
       {authError ? (
         <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-800">
-          {interpolate(m.users.sessionReadOnlyHint, { error: authError })}
+          {interpolate(m.users.sessionReadOnlyHint, { error: feedback(authError) })}
         </div>
       ) : null}
 
@@ -389,7 +389,7 @@ export function SaasUserListView() {
         ) : error ? (
           <div className="p-3">
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-              {error}
+              {feedback(error)}
             </div>
           </div>
         ) : users.length === 0 ? (

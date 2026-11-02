@@ -254,7 +254,7 @@ export function BranchReceiptFieldsEditor({
   onChange: (value: PosReceiptField[]) => void;
   value: PosReceiptField[];
 }) {
-  const { locale } = useTenantI18n();
+  const { feedback, locale } = useTenantI18n();
   const text = copy[locale];
 
   function update(field: PosReceiptField, checked: boolean) {
@@ -335,7 +335,7 @@ export function BranchReceiptFieldsEditor({
 
       {error ? (
         <p className="text-xs text-destructive" role="alert">
-          {error}
+          {feedback(error)}
         </p>
       ) : null}
     </div>

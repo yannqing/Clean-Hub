@@ -28,7 +28,7 @@ export function TenantFeatureFlagsEditor({
   onUpdated,
   tenantId,
 }: TenantFeatureFlagsEditorProps) {
-  const { m } = useSaasI18n();
+  const { feedback, m } = useSaasI18n();
   const headingId = useId();
   const [values, setValues] = useState(initialValues);
   const [submitting, setSubmitting] = useState(false);
@@ -56,7 +56,7 @@ export function TenantFeatureFlagsEditor({
 
       if (!result.ok) {
         setError(result.error);
-        toast.error(result.error);
+        toast.error(feedback(result.error));
         return;
       }
 
@@ -69,7 +69,7 @@ export function TenantFeatureFlagsEditor({
         m.tenants.settings.flagsSaveFailed,
       );
       setError(message);
-      toast.error(message);
+      toast.error(feedback(message));
     } finally {
       setSubmitting(false);
     }
@@ -98,7 +98,7 @@ export function TenantFeatureFlagsEditor({
 
         {error ? (
           <p className="text-sm text-destructive" role="alert">
-            {error}
+            {feedback(error)}
           </p>
         ) : null}
 

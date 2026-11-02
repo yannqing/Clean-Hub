@@ -36,21 +36,6 @@ function isActivePath(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function getRoleLabel(authContext: AuthContext | null): string {
-  if (!authContext) {
-    return "Admin User";
-  }
-
-  return authContext.role
-    .split("_")
-    .map((part: string) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function getDisplayName(authContext: AuthContext | null): string {
-  return authContext?.displayName.trim() || getRoleLabel(authContext);
-}
-
 export function TenantDashboardShell({
   children,
   initialAuthContext = null,
@@ -141,7 +126,7 @@ export function TenantDashboardShell({
     pathname,
     webAdminRoutes.tenant.customerAccounts,
   );
-  const displayName = useMemo(() => getDisplayName(authContext), [authContext]);
+  const displayName = authContext?.displayName.trim() || messages.shell.tenant.header.accountLabel;
 
   useEffect(() => {
     let active = true;
@@ -282,7 +267,7 @@ export function TenantDashboardShell({
           data-testid="tenant-sidebar"
         >
           <nav
-            aria-label="tenant sidebar"
+            aria-label={messages.shell.tenant.title}
             className="grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pb-5"
           >
             {sidebarItems.map((item) => {

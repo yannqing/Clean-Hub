@@ -2,6 +2,7 @@ import "server-only";
 
 import type { ApiRequestOptions } from "@cleanhub/api-client";
 import { headers } from "next/headers";
+import { getWebAdminLocaleFromCookies } from "@/i18n/locale.server";
 
 export async function getSaasServerApiRequestOptions(): Promise<
   Omit<ApiRequestOptions, "method" | "body">
@@ -11,7 +12,10 @@ export async function getSaasServerApiRequestOptions(): Promise<
 
   return {
     cache: "no-store",
-    headers: cookie ? { cookie } : undefined,
+    headers: {
+      ...(cookie ? { cookie } : {}),
+      "accept-language": await getWebAdminLocaleFromCookies(),
+    },
     skipAuthRefresh: true,
   };
 }

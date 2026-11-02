@@ -12,6 +12,8 @@
     "smoke:nav-visibility": "tsx src/config/feature-visibility.smoke.ts",
     "smoke:audit-events": "tsx src/features/audit/event-description.smoke.ts",
     "smoke:i18n-parity": "tsx src/i18n/parity.smoke.ts",
+    "smoke:i18n-feedback": "tsx src/i18n/saas-feedback.smoke.ts",
+    "smoke:tenant-i18n-feedback": "tsx src/i18n/tenant-feedback.smoke.ts",
     "smoke:tax-rate-percent": "tsx src/features/tenant/tax-rates/percent.smoke.ts",
     "smoke:proxy": "tsx src/proxy.smoke.ts",
     "smoke:product-import": "tsx src/features/tenant/products/product-import.smoke.ts"

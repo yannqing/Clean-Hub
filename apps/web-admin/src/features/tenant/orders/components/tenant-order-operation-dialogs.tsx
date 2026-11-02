@@ -1,5 +1,7 @@
 "use client";
 
+import { LocalizedDialogContent as DialogContent } from "@/components/i18n/localized-overlay-content";
+
 import type {
   ServiceSummary,
   TenantOrderDetail,
@@ -9,7 +11,6 @@ import type {
 import {
   Button,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -59,7 +60,7 @@ export function TenantOrderItemEditorDialog({
   order,
   services,
 }: ItemEditorProps) {
-  const { locale, m } = useTenantI18n();
+  const { feedback, locale, m } = useTenantI18n();
   const router = useRouter();
   const initialService = item
     ? services.find((service) => service.id === item.serviceId)
@@ -160,7 +161,7 @@ export function TenantOrderItemEditorDialog({
           });
 
       if (!result.ok) {
-        toast.error(result.message || m.orders.detail.itemEditor.saveError);
+        toast.error(feedback(result.message || m.orders.detail.itemEditor.saveError));
         return;
       }
       toast.success(
@@ -171,7 +172,7 @@ export function TenantOrderItemEditorDialog({
       onOpenChange(false);
       router.refresh();
     } catch {
-      toast.error(m.orders.detail.itemEditor.saveError);
+      toast.error(feedback(m.orders.detail.itemEditor.saveError));
     } finally {
       setSubmitting(false);
     }
@@ -446,7 +447,7 @@ export function TenantOrderItemDeleteDialog({
   onOpenChange: (open: boolean) => void;
   orderId: string;
 }) {
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const router = useRouter();
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -461,14 +462,14 @@ export function TenantOrderItemDeleteDialog({
         reason.trim(),
       );
       if (!result.ok) {
-        toast.error(result.message || m.orders.detail.itemEditor.deleteError);
+        toast.error(feedback(result.message || m.orders.detail.itemEditor.deleteError));
         return;
       }
       toast.success(m.orders.detail.itemEditor.deleteSuccess);
       onOpenChange(false);
       router.refresh();
     } catch {
-      toast.error(m.orders.detail.itemEditor.deleteError);
+      toast.error(feedback(m.orders.detail.itemEditor.deleteError));
     } finally {
       setSubmitting(false);
     }
@@ -548,7 +549,7 @@ export function TenantOrderPaymentAdjustmentDialog({
   order: TenantOrderDetail;
   target: PaymentAdjustmentTarget | null;
 }) {
-  const { locale, m } = useTenantI18n();
+  const { feedback, locale, m } = useTenantI18n();
   const router = useRouter();
   const [direction, setDirection] = useState<"debit" | "credit">("debit");
   const [amount, setAmount] = useState("");
@@ -605,7 +606,7 @@ export function TenantOrderPaymentAdjustmentDialog({
             });
       if (!result.ok) {
         toast.error(
-          result.message || m.orders.detail.paymentAdjustments.saveError,
+          feedback(result.message || m.orders.detail.paymentAdjustments.saveError),
         );
         return;
       }
@@ -617,7 +618,7 @@ export function TenantOrderPaymentAdjustmentDialog({
       onOpenChange(false);
       router.refresh();
     } catch {
-      toast.error(m.orders.detail.paymentAdjustments.saveError);
+      toast.error(feedback(m.orders.detail.paymentAdjustments.saveError));
     } finally {
       setSubmitting(false);
     }

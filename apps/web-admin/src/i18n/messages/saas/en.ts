@@ -1,3 +1,4 @@
+import { countrySetupEn } from "./country-setup";
 import type { SaasMessages } from "./types";
 
 export const saasMessagesEn: SaasMessages = {
@@ -15,6 +16,7 @@ export const saasMessagesEn: SaasMessages = {
     allPriorities: "All priorities",
     tryAgain: "Try again",
     cancel: "Cancel",
+    close: "Close",
     saving: "Saving...",
     creating: "Creating...",
     submitting: "Submitting...",
@@ -279,6 +281,7 @@ export const saasMessagesEn: SaasMessages = {
       flagsUpdated: "Feature flags updated",
     },
     form: {
+      countrySetup: countrySetupEn,
       profileSection: "Tenant Profile",
       defaultsSection: "Defaults",
       ownerSection: "Initial Owner",

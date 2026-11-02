@@ -33,7 +33,7 @@ export function FeedbackTicketStatusControl({
   status,
   onUpdated,
 }: FeedbackTicketStatusControlProps) {
-  const { m } = useSaasI18n();
+  const { feedback, m } = useSaasI18n();
   const [value, setValue] = useState<FeedbackTicketStatus>(status);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -53,14 +53,14 @@ export function FeedbackTicketStatusControl({
       setReason("");
       onUpdated(result.data);
     } else {
-      toast.error(result.error);
+      toast.error(feedback(result.error));
     }
 
     setSubmitting(false);
   }
 
   return (
-    <form className="grid gap-3" onSubmit={handleSubmit}>
+    <form className="grid gap-3" noValidate onSubmit={handleSubmit}>
       <div className="grid gap-2">
         <Label htmlFor={`feedback-status-${ticketId}`}>{m.feedbackTickets.status.label}</Label>
         <Select

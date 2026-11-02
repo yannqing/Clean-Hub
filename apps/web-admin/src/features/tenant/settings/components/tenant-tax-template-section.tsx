@@ -100,7 +100,7 @@ export function TenantTaxTemplateSection({
   taxEnabled?: boolean;
   taxRegistrationNumber?: string | null;
 }) {
-  const { locale } = useTenantI18n();
+  const { feedback, locale } = useTenantI18n();
   const text = copy[locale];
   const router = useRouter();
   const [templates, setTemplates] = useState<PlatformTaxTemplate[]>([]);
@@ -139,13 +139,13 @@ export function TenantTaxTemplateSection({
         }
       })
       .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : text.loadError);
+        if (active) setError(cause instanceof Error ? feedback(cause.message) : text.loadError);
       })
       .finally(() => {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [tenantCountry, text.loadError]);
+  }, [tenantCountry, text.loadError, feedback]);
 
   async function apply() {
     if (!selected || currentVersion === undefined) return;
@@ -163,7 +163,7 @@ export function TenantTaxTemplateSection({
       toast.success(text.applied);
       router.refresh();
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : text.loadError;
+      const message = cause instanceof Error ? feedback(cause.message) : text.loadError;
       setError(message);
       toast.error(message);
     } finally {

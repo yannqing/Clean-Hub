@@ -106,7 +106,7 @@ function toListItem(backupJob: BackupJobListItem): BackupJobListItem {
 }
 
 export function BackupJobListView() {
-  const { m, formatDateTime } = useSaasI18n();
+  const { feedback, m, formatDateTime } = useSaasI18n();
   const [backupJobs, setBackupJobs] = useState<BackupJobListItem[]>([]);
   const [restoreRequests, setRestoreRequests] = useState<RestoreRequest[]>([]);
   const [backupOffset, setBackupOffset] = useState(0);
@@ -375,7 +375,7 @@ export function BackupJobListView() {
             </div>
           ) : error ? (
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-              {error}
+              {feedback(error)}
             </div>
           ) : backupJobs.length === 0 ? (
             <div className="rounded-md border border-dashed p-8 text-center">
@@ -560,7 +560,7 @@ export function BackupJobListView() {
               </div>
             ) : restoreRequestsError ? (
               <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-                {restoreRequestsError}
+                {feedback(restoreRequestsError)}
               </div>
             ) : restoreRequests.length === 0 ? (
               <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">

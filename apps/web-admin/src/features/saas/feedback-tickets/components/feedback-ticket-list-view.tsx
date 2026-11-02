@@ -96,7 +96,7 @@ function priorityLabel(
 }
 
 export function FeedbackTicketListView() {
-  const { m, formatDateTime } = useSaasI18n();
+  const { feedback, m, formatDateTime } = useSaasI18n();
   const router = useRouter();
   const [tickets, setTickets] = useState<FeedbackTicketListItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -383,7 +383,7 @@ export function FeedbackTicketListView() {
         ) : error ? (
           <div className="p-5">
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-              {error}
+              {feedback(error)}
             </div>
           </div>
         ) : tickets.length === 0 ? (

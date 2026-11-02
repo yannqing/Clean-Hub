@@ -16,7 +16,7 @@ import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import { TenantForm } from "./tenant-form";
 
 export function NewTenantView() {
-  const { m } = useSaasI18n();
+  const { feedback, m } = useSaasI18n();
   const router = useRouter();
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -70,7 +70,7 @@ export function NewTenantView() {
       {!authLoading && (authError || !canManageTenantCreation) ? (
         <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
           {authError
-            ? `${m.tenants.new.sessionError} ${authError}`
+            ? `${m.tenants.new.sessionError} ${feedback(authError)}`
             : m.tenants.new.permissionHint}
         </div>
       ) : null}

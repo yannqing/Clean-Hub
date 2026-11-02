@@ -1,10 +1,11 @@
 "use client";
 
+import { LocalizedDialogContent as DialogContent } from "@/components/i18n/localized-overlay-content";
+
 import {
   Button,
   Checkbox,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,

@@ -1,10 +1,11 @@
 "use client";
 
+import { LocalizedDialogContent as DialogContent } from "@/components/i18n/localized-overlay-content";
+
 import {
   Badge,
   Button,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
@@ -329,7 +330,7 @@ export function TenantUserListView({
   initialSearchQuery = "",
   initialUsers,
 }: TenantUserListViewProps) {
-  const { locale, formatDateTime, m } = useTenantI18n();
+  const { feedback, locale, formatDateTime, m } = useTenantI18n();
   const copy = COPY[locale];
   const firstLoad = useRef(true);
   const [users, setUsers] = useState(initialUsers);
@@ -448,7 +449,7 @@ export function TenantUserListView({
     const result = await createTenantUserAction(input);
     setSaving(false);
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(feedback(result.error));
       return;
     }
     toast.success(copy.created);
@@ -498,7 +499,7 @@ export function TenantUserListView({
     });
     setSaving(false);
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(feedback(result.error));
       return;
     }
     toast.success(copy.updated);
@@ -518,7 +519,7 @@ export function TenantUserListView({
     });
     setSaving(false);
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(feedback(result.error));
       return;
     }
     toast.success(copy.statusUpdated);
@@ -538,7 +539,7 @@ export function TenantUserListView({
     });
     setSaving(false);
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(feedback(result.error));
       return;
     }
     toast.success(copy.deleted);
@@ -574,7 +575,7 @@ export function TenantUserListView({
           });
     setSaving(false);
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(feedback(result.error));
       return;
     }
     toast.success(copy.credentialUpdated);
@@ -605,7 +606,7 @@ export function TenantUserListView({
 
       {error ? (
         <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          {error}
+          {feedback(error)}
         </p>
       ) : null}
 
@@ -992,9 +993,9 @@ export function TenantUserListView({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="fr">Français</SelectItem>
-                  <SelectItem value="zh-CN">简体中文</SelectItem>
+                    <SelectItem value="en">{m.common.languageLabels.en}</SelectItem>
+                    <SelectItem value="fr">{m.common.languageLabels.fr}</SelectItem>
+                    <SelectItem value="zh-CN">{m.common.languageLabels["zh-CN"]}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

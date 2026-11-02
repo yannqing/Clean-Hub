@@ -13,7 +13,7 @@ import type { SecuritySettings } from "../types";
 import { SecuritySettingsForm } from "./security-settings-form";
 
 export function SecurityPolicySettingsView() {
-  const { m } = useSaasI18n();
+  const { feedback, m } = useSaasI18n();
   const [settings, setSettings] = useState<SecuritySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +97,7 @@ export function SecurityPolicySettingsView() {
         </div>
       ) : error ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {error}
+          {feedback(error)}
         </div>
       ) : (
         <SecuritySettingsForm

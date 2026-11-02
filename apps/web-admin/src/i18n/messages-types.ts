@@ -341,6 +341,11 @@ type AuthCopy = {
 };
 
 export type WebAdminMessages = {
+  utilityPages: Record<"home" | "apiHealth", {
+    title: string;
+    description: string;
+    items: string[];
+  }>;
   shell: {
     saas: SaasShellCopy;
     tenant: TenantShellCopy;
@@ -350,6 +355,7 @@ export type WebAdminMessages = {
     tenant: SidebarSection[];
   };
   common: {
+    close: string;
     personalCenter: string;
     language: string;
     languageLabels: {

@@ -1,5 +1,7 @@
 "use client";
 
+import { LocalizedDialogContent as DialogContent } from "@/components/i18n/localized-overlay-content";
+
 import { useItemTypeNames } from "../hooks/use-item-type-names";
 
 import {
@@ -7,7 +9,6 @@ import {
   Button,
   Checkbox,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
@@ -187,9 +188,10 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 function FieldError({ message }: { message?: string }) {
+  const { feedback } = useTenantI18n();
   return message ? (
     <p className="text-xs text-destructive" role="alert">
-      {message}
+      {feedback(message)}
     </p>
   ) : null;
 }
@@ -290,7 +292,7 @@ export function ServiceCatalogView({
   initialSearchQuery?: string;
 }) {
   const router = useRouter();
-  const { formatDateTime, locale, m } = useTenantI18n();
+  const { feedback, formatDateTime, locale, m } = useTenantI18n();
   const itemTypeName = useItemTypeNames(locale);
   const [serviceDataset, setServiceDataset] = useState<ServiceSummary[]>([]);
   const [serviceImageSources, setServiceImageSources] = useState<
@@ -852,7 +854,7 @@ export function ServiceCatalogView({
         setFormError(nextMessage);
 
         if (conflict) {
-          toast.error(nextMessage);
+          toast.error(feedback(nextMessage));
         }
         return;
       }
@@ -879,7 +881,7 @@ export function ServiceCatalogView({
         const nextMessage = isVersionConflict(result)
           ? m.services.versionConflict
           : (result.message ?? m.services.requestFailed);
-        toast.error(nextMessage);
+        toast.error(feedback(nextMessage));
         return;
       }
 
@@ -906,9 +908,9 @@ export function ServiceCatalogView({
 
       if (!result.ok) {
         toast.error(
-          isVersionConflict(result)
+          feedback(isVersionConflict(result)
             ? m.services.versionConflict
-            : (result.message ?? m.services.requestFailed),
+            : (result.message ?? m.services.requestFailed)),
         );
         return;
       }
@@ -1224,7 +1226,7 @@ export function ServiceCatalogView({
         ) : error ? (
           <div className="p-4">
             <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
-              <span>{error}</span>
+              <span>{feedback(error)}</span>
               <Button
                 onClick={() => void loadServices()}
                 size="sm"
@@ -1871,7 +1873,7 @@ export function ServiceCatalogView({
           </div>
 
           {formError ? (
-            <p className="text-sm text-destructive">{formError}</p>
+            <p className="text-sm text-destructive">{feedback(formError)}</p>
           ) : null}
 
           <div className="flex justify-end gap-2">

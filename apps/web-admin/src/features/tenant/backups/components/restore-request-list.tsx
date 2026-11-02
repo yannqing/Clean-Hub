@@ -46,7 +46,7 @@ function getStatusVariant(
  * renders the localized empty state in the meantime.
  */
 export function RestoreRequestList({ refreshKey }: RestoreRequestListProps) {
-  const { m, formatDateTime } = useTenantI18n();
+  const { feedback, m, formatDateTime } = useTenantI18n();
   const [items, setItems] = useState<RestoreRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +110,7 @@ export function RestoreRequestList({ refreshKey }: RestoreRequestListProps) {
 
       {error ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          {error}
+          {feedback(error)}
         </div>
       ) : null}
 

@@ -64,7 +64,7 @@ export function PlatformSettingsView({
 }: {
   section?: "defaults" | "maintenance";
 }) {
-  const { m, formatDateTime } = useSaasI18n();
+  const { feedback, m, formatDateTime } = useSaasI18n();
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -184,11 +184,12 @@ export function PlatformSettingsView({
         </div>
       ) : loadError ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {loadError}
+          {feedback(loadError)}
         </div>
       ) : (
         <form
           className="grid gap-5 rounded-xl border bg-background px-5 py-6 shadow-sm"
+          noValidate
           onSubmit={handleSubmit}
         >
           {section === "defaults" ? (
@@ -305,7 +306,7 @@ export function PlatformSettingsView({
           ) : null}
           {formError ? (
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              {formError}
+              {feedback(formError)}
             </div>
           ) : null}
           <div className="flex justify-end">

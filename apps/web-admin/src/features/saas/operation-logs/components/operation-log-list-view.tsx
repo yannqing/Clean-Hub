@@ -72,7 +72,7 @@ function getLevelVariant(
 
 export function OperationLogListView() {
   const router = useRouter();
-  const { locale, m, formatDateTime } = useSaasI18n();
+  const { feedback, locale, m, formatDateTime } = useSaasI18n();
   const [logs, setLogs] = useState<OperationLogListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -276,7 +276,7 @@ export function OperationLogListView() {
         ) : error ? (
           <div className="p-4">
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-              {error}
+              {feedback(error)}
             </div>
           </div>
         ) : logs.length === 0 ? (
@@ -363,7 +363,9 @@ export function OperationLogListView() {
             formatCountLabel={({ from, to, total: itemTotal }) =>
               locale === "zh-CN"
                 ? `${from}–${to} / 共 ${itemTotal} 条`
-                : `${from}–${to} of ${itemTotal}`
+                : locale === "fr"
+                  ? `${from}–${to} sur ${itemTotal}`
+                  : `${from}–${to} of ${itemTotal}`
             }
             nextLabel={m.common.nextPage}
             offset={offset}

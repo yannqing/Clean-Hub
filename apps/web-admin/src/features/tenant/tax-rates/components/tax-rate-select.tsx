@@ -41,7 +41,7 @@ export function TaxRateSelect({
   disabled?: boolean;
   error?: string;
 }) {
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const text = m.taxRates.field;
   const offered = options.rates.filter((rate) => !rate.archived || rate.id === value);
   const defaultLabel = options.defaultRate
@@ -71,7 +71,7 @@ export function TaxRateSelect({
       </Select>
       {error ? (
         <p className="text-xs text-destructive" role="alert">
-          {error}
+          {feedback(error)}
         </p>
       ) : null}
       <p className="text-xs leading-5 text-muted-foreground">

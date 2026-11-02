@@ -77,7 +77,7 @@ export function CategoryMetafieldsEditor({
   onRetry,
   values,
 }: CategoryMetafieldsEditorProps) {
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const [announcement, setAnnouncement] = useState("");
   const fieldsetRef = useRef<HTMLFieldSetElement>(null);
   const definitionById = useMemo(
@@ -489,7 +489,7 @@ export function CategoryMetafieldsEditor({
           id="category-attributes-error"
           role="alert"
         >
-          {error}
+          {feedback(error)}
         </p>
       ) : null}
 

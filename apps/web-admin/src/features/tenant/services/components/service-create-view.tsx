@@ -240,9 +240,10 @@ function RequiredMark() {
 }
 
 function FieldError({ message }: { message?: string }) {
+  const { feedback } = useTenantI18n();
   return message ? (
     <p className="text-xs text-destructive" role="alert">
-      {message}
+      {feedback(message)}
     </p>
   ) : null;
 }
@@ -258,7 +259,7 @@ export function ServiceCreateView({
   taxRateOptions,
 }: ServiceCreateViewProps) {
   const router = useRouter();
-  const { m, locale } = useTenantI18n();
+  const { feedback, m, locale } = useTenantI18n();
   const itemTypeName = useItemTypeNames(locale);
   const isEditMode = initialService !== undefined;
   const effectiveCurrency = initialService?.currency ?? defaultCurrency;
@@ -468,10 +469,10 @@ export function ServiceCreateView({
     });
 
     if (invalidType) {
-      toast.error(m.services.create.mediaTypeInvalid);
+      toast.error(feedback(m.services.create.mediaTypeInvalid));
     }
     if (oversized) {
-      toast.error(m.services.create.mediaTooLarge);
+      toast.error(feedback(m.services.create.mediaTooLarge));
     }
 
     const existingFiles = new Set(
@@ -491,7 +492,7 @@ export function ServiceCreateView({
     );
 
     if (uniqueFiles.length < newFiles.length) {
-      toast.error(m.services.create.mediaLimitReached);
+      toast.error(feedback(m.services.create.mediaLimitReached));
     }
 
     if (uniqueFiles.length > 0) {
@@ -550,11 +551,11 @@ export function ServiceCreateView({
       });
       if (!result.ok) {
         toast.error(
-          result.reason === "type"
+          feedback(result.reason === "type"
             ? m.services.create.mediaTypeInvalid
             : result.reason === "size"
               ? m.services.create.mediaTooLarge
-              : m.services.create.mediaUploadFailed,
+              : m.services.create.mediaUploadFailed),
         );
         return null;
       }
@@ -567,11 +568,11 @@ export function ServiceCreateView({
           body: image.file,
         });
       } catch {
-        toast.error(m.services.create.mediaUploadFailed);
+        toast.error(feedback(m.services.create.mediaUploadFailed));
         return null;
       }
       if (!uploadResponse.ok) {
-        toast.error(m.services.create.mediaUploadFailed);
+        toast.error(feedback(m.services.create.mediaUploadFailed));
         return null;
       }
 
@@ -710,18 +711,18 @@ export function ServiceCreateView({
                   },
             ),
           );
-          toast.error(m.services.create.mediaSaveConflict);
+          toast.error(feedback(m.services.create.mediaSaveConflict));
         }
         if (result.code === "SERVICE_NAME_DUPLICATE") {
           setErrors({ name: m.services.create.nameConflict });
           setFormError(m.services.create.nameConflict);
-          toast.error(m.services.create.nameConflict);
+          toast.error(feedback(m.services.create.nameConflict));
           return;
         }
 
         if (isVersionConflict(result)) {
           setFormError(m.services.versionConflict);
-          toast.error(m.services.versionConflict);
+          toast.error(feedback(m.services.versionConflict));
           return;
         }
 
@@ -729,13 +730,13 @@ export function ServiceCreateView({
 
         if (Object.keys(result.errors).length > 0) {
           setFormError(m.services.create.checkForm);
-          toast.error(m.services.create.checkForm);
+          toast.error(feedback(m.services.create.checkForm));
         } else {
           const message = isEditMode
             ? (result.message ?? m.services.requestFailed)
             : m.services.create.createFailed;
           setFormError(message);
-          toast.error(message);
+          toast.error(feedback(message));
         }
         return;
       }
@@ -753,7 +754,7 @@ export function ServiceCreateView({
         ? m.services.requestFailed
         : m.services.create.createFailed;
       setFormError(message);
-      toast.error(message);
+      toast.error(feedback(message));
     } finally {
       setSaving(false);
     }
@@ -1601,7 +1602,7 @@ export function ServiceCreateView({
               className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
               role="alert"
             >
-              {formError}
+              {feedback(formError)}
             </p>
           ) : null}
 

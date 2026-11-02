@@ -4,6 +4,10 @@ import { formatWebAdminDate, formatWebAdminDateTime } from "./format";
 import { useWebAdminLocale } from "./locale-provider";
 import type { TenantMessages } from "./messages/tenant";
 import { useTenantTimeZone } from "./tenant-timezone-provider";
+import {
+  getWebAdminFeedbackTranslator,
+  type FeedbackTranslator,
+} from "./feedback";
 
 /**
  * 租户域（/tenant/**）的 i18n hook，镜像 use-saas-i18n()。
@@ -19,7 +23,9 @@ export function useTenantI18n() {
     locale,
     timeZone,
     m: messages.tenant,
-    formatDate: (value: string) => formatWebAdminDate(locale, value, undefined, timeZone),
+    feedback: getWebAdminFeedbackTranslator(locale, messages, "tenant"),
+    formatDate: (value: string) =>
+      formatWebAdminDate(locale, value, undefined, timeZone),
     formatDateTime: (value: string) =>
       formatWebAdminDateTime(locale, value, timeZone),
   };
@@ -29,6 +35,7 @@ export type TenantI18n = {
   locale: ReturnType<typeof useWebAdminLocale>["locale"];
   timeZone: string;
   m: TenantMessages;
+  feedback: FeedbackTranslator;
   formatDate: (value: string) => string;
   formatDateTime: (value: string) => string;
 };

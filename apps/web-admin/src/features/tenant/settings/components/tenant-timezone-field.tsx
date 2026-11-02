@@ -28,7 +28,7 @@ export function TenantTimezoneField({
   onChange,
   value,
 }: TenantTimezoneFieldProps) {
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const timezoneOptions = Array.from(
     new Set([value, ...tenantSettingsTimezoneOptions]),
   ).filter(Boolean);
@@ -55,7 +55,7 @@ export function TenantTimezoneField({
       <p className="text-xs leading-5 text-slate-500">
         {m.settings.general.timezoneHint}
       </p>
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {error ? <p className="text-xs text-destructive">{feedback(error)}</p> : null}
     </div>
   );
 }

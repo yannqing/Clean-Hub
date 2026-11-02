@@ -46,7 +46,7 @@ function getErrorMessage(error: unknown): string {
 
 export function SaasAuditLogListView() {
   const router = useRouter();
-  const { locale, m, formatDateTime } = useSaasI18n();
+  const { feedback, locale, m, formatDateTime } = useSaasI18n();
   // Shared with the tenant console: both render the same audit feed.
   const { messages } = useWebAdminLocale();
   const auditCopy = messages.common.auditEvents;
@@ -321,7 +321,7 @@ export function SaasAuditLogListView() {
         ) : error ? (
           <div className="p-4">
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-              {error}
+              {feedback(error)}
             </div>
           </div>
         ) : logs.length === 0 ? (
@@ -406,7 +406,9 @@ export function SaasAuditLogListView() {
             formatCountLabel={({ from, to, total: itemTotal }) =>
               locale === "zh-CN"
                 ? `${from}–${to} / 共 ${itemTotal} 条`
-                : `${from}–${to} of ${itemTotal}`
+                : locale === "fr"
+                  ? `${from}–${to} sur ${itemTotal}`
+                  : `${from}–${to} of ${itemTotal}`
             }
             nextLabel={m.common.nextPage}
             offset={offset}

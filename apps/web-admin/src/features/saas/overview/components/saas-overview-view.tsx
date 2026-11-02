@@ -49,7 +49,7 @@ import { getSaasOverviewQuery } from "../queries";
 import type { SaasOverview } from "../types";
 
 export function SaasOverviewView() {
-  const { m, locale } = useSaasI18n();
+  const { feedback, m, locale } = useSaasI18n();
   const [overview, setOverview] = useState<SaasOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -391,7 +391,7 @@ export function SaasOverviewView() {
                     className="col-span-full text-sm text-destructive"
                     role="alert"
                   >
-                    {searchError}
+                    {feedback(searchError)}
                   </p>
                 ) : searchResult ? (
                   searchResult.tenants.length + searchResult.users.length ===
@@ -519,7 +519,7 @@ export function SaasOverviewView() {
 
       {error ? (
         <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          {error}
+          {feedback(error)}
         </div>
       ) : null}
     </section>

@@ -84,7 +84,7 @@ export function BranchManagementView({
 }: BranchManagementViewProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
-  const { m, formatDateTime } = useTenantI18n();
+  const { feedback, m, formatDateTime } = useTenantI18n();
   const [status, setStatus] = useState<StatusFilter>(
     initialFilters?.status ?? "all",
   );
@@ -167,7 +167,7 @@ export function BranchManagementView({
       );
 
       if (!result.ok) {
-        toast.error(result.message);
+        toast.error(feedback(result.message));
         return;
       }
 
@@ -175,7 +175,7 @@ export function BranchManagementView({
       await refetch();
     } catch (statusError) {
       const message = getErrorMessage(statusError, m.common.requestFailed);
-      toast.error(message);
+      toast.error(feedback(message));
     } finally {
       setSaving(false);
     }

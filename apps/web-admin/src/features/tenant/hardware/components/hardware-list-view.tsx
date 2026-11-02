@@ -1,10 +1,11 @@
 "use client";
 
+import { LocalizedDialogContent as DialogContent } from "@/components/i18n/localized-overlay-content";
+
 import {
   Badge,
   Button,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
@@ -65,7 +66,7 @@ export function HardwareListView({
 }: HardwareListViewProps = {}) {
   const isCurrent = useRef(true);
   const router = useRouter();
-  const { m, formatDateTime } = useTenantI18n();
+  const { feedback, m, formatDateTime } = useTenantI18n();
   const [devices, setDevices] = useState<HardwareConfigSummary[]>([]);
   const [offset, setOffset] = useState(0);
   const [isPending, startTransition] = useTransition();
@@ -205,7 +206,7 @@ export function HardwareListView({
 
       {error ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          {error}
+          {feedback(error)}
         </div>
       ) : null}
 

@@ -12,6 +12,8 @@ import {
   type AuthRedirectReason,
 } from "@/config/auth-routing";
 import { getOrCreateWebAdminDeviceId } from "@/features/auth/utils";
+import { getWebAdminClientLocale } from "@/i18n/locale";
+import { isErrorMessageTranslation } from "@cleanhub/i18n/error-messages";
 
 const DEFAULT_API_BASE_URL = "http://localhost:4000";
 let refreshRequest: Promise<unknown> | null = null;
@@ -59,7 +61,7 @@ function isTenantAccessDeniedError(error: unknown): boolean {
     isApiHttpError(error) &&
     error.status === 403 &&
     error.code === "FORBIDDEN" &&
-    error.message === TENANT_ACCESS_DENIED_MESSAGE
+    isErrorMessageTranslation(error.message, TENANT_ACCESS_DENIED_MESSAGE)
   );
 }
 
@@ -69,7 +71,7 @@ export const webAdminApi = createCleanHubApiClient({
   defaultHeaders: (): Record<string, string> =>
     typeof window === "undefined"
       ? {}
-      : { "x-device-id": getOrCreateWebAdminDeviceId() },
+      : { "x-device-id": getOrCreateWebAdminDeviceId(), "accept-language": getWebAdminClientLocale() },
   timeoutMs: 30_000,
   retry: {
     retries: 1,

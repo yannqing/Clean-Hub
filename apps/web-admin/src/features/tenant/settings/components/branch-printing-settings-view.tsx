@@ -316,7 +316,7 @@ export function BranchPrintingSettingsView({
   initialBranches?: BranchSummary[];
   initialError?: string;
 }) {
-  const { locale } = useTenantI18n();
+  const { feedback, locale } = useTenantI18n();
   const text = copy[locale];
   const { authLoaded, canUpdateSettings } = useTenantSettingsWorkspace();
   const [branches, setBranches] = useState(initialBranches ?? []);
@@ -371,7 +371,7 @@ export function BranchPrintingSettingsView({
       });
 
       if (!result.ok) {
-        toast.error(result.message);
+        toast.error(feedback(result.message));
         return;
       }
 
@@ -418,7 +418,7 @@ export function BranchPrintingSettingsView({
 
       {initialError ? (
         <div className="border-b border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive sm:px-5">
-          {initialError}
+          {feedback(initialError)}
         </div>
       ) : null}
 

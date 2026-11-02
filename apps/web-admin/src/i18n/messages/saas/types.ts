@@ -13,6 +13,7 @@ export type SaasMessages = {
     allPriorities: string;
     tryAgain: string;
     cancel: string;
+    close: string;
     saving: string;
     creating: string;
     submitting: string;
@@ -270,6 +271,17 @@ export type SaasMessages = {
       flagsUpdated: string;
     };
     form: {
+      countrySetup: {
+        required: string;
+        pending: string;
+        selected: string;
+        unavailable: string;
+        empty: string;
+        missing: string;
+        configure: string;
+        currency: string;
+        change: string;
+      };
       profileSection: string;
       defaultsSection: string;
       ownerSection: string;

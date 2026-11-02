@@ -12,7 +12,7 @@ import {
 import { useTenantSettingsWorkspace } from "./tenant-settings-workspace";
 
 export function TenantPosBrandingSection() {
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const copy = m.settings.branding;
   const { settings, authLoaded, canUpdateSettings, updateSettings } =
     useTenantSettingsWorkspace();
@@ -96,7 +96,7 @@ export function TenantPosBrandingSection() {
       setImageFailed(false);
       toast.success(copy.saved);
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : copy.saveFailed;
+      const message = cause instanceof Error ? feedback(cause.message) : copy.saveFailed;
       setError(message);
       toast.error(message);
     } finally {

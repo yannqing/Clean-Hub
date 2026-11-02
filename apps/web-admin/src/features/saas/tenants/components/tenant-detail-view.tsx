@@ -111,7 +111,7 @@ export function TenantDetailView({
   onTenantUpdated,
 }: TenantDetailViewProps) {
   const isDialog = presentation === "dialog";
-  const { locale, m, formatDate } = useSaasI18n();
+  const { feedback, locale, m, formatDate } = useSaasI18n();
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [tenant, setTenant] = useState<TenantDetail | null>(null);
@@ -158,7 +158,7 @@ export function TenantDetailView({
       setTimeout(() => URL.revokeObjectURL(url), 0);
       toast.success(m.tenants.detail.exportSucceeded);
     } catch {
-      toast.error(m.tenants.detail.exportFailed);
+      toast.error(feedback(m.tenants.detail.exportFailed));
     }
 
     setExporting(false);
@@ -182,7 +182,7 @@ export function TenantDetailView({
         result.message ??
         m.tenants.detail.offboardFailed;
       setOffboardError(message);
-      toast.error(message);
+      toast.error(feedback(message));
       setOffboardSubmitting(false);
       return;
     }
@@ -212,7 +212,7 @@ export function TenantDetailView({
         result.message ??
         m.tenants.detail.restoreFailed;
       setOffboardError(message);
-      toast.error(message);
+      toast.error(feedback(message));
       setRestoreSubmitting(false);
       return;
     }
@@ -237,7 +237,7 @@ export function TenantDetailView({
     if (!canManageStatus) {
       const message = m.tenants.detail.statusPermissionError;
       setStatusError(message);
-      toast.error(message);
+      toast.error(feedback(message));
       return;
     }
 
@@ -255,7 +255,7 @@ export function TenantDetailView({
         result.message ??
         m.tenants.detail.statusUpdateFailed;
       setStatusError(message);
-      toast.error(message);
+      toast.error(feedback(message));
       setStatusSubmitting(null);
       return;
     }
@@ -380,14 +380,14 @@ export function TenantDetailView({
         </div>
       ) : error ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {error}
+          {feedback(error)}
         </div>
       ) : tenant ? (
         <div className="grid gap-3">
           {authError || !canManageTenant ? (
             <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
               {authError
-                ? `${m.tenants.detail.sessionError} ${authError}`
+                ? `${m.tenants.detail.sessionError} ${feedback(authError)}`
                 : m.tenants.detail.readOnlyHint}
             </div>
           ) : null}
@@ -588,7 +588,7 @@ export function TenantDetailView({
 
                     {statusError ? (
                       <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
-                        {statusError}
+                        {feedback(statusError)}
                       </div>
                     ) : null}
 
@@ -671,7 +671,7 @@ export function TenantDetailView({
 
                     {offboardError ? (
                       <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
-                        {offboardError}
+                        {feedback(offboardError)}
                       </div>
                     ) : null}
 

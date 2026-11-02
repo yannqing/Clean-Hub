@@ -28,7 +28,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export function TodoCenterView() {
-  const { m, formatDateTime } = useSaasI18n();
+  const { feedback, m, formatDateTime } = useSaasI18n();
   const copy = m.todoCenter;
   const [result, setResult] = useState<TodoCenterResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -111,7 +111,7 @@ export function TodoCenterView() {
         </div>
       ) : error ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {error}
+          {feedback(error)}
         </div>
       ) : total === 0 ? (
         <div className="border-y border-dashed bg-background px-5 py-14 text-center">

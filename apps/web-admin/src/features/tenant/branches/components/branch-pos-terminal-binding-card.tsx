@@ -1,12 +1,13 @@
 "use client";
 
+import { LocalizedDialogContent as DialogContent } from "@/components/i18n/localized-overlay-content";
+
 import {
   Badge,
   Button,
   Card,
   CardContent,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
@@ -41,7 +42,7 @@ function terminalName(terminal: PointOfSaleDevice): string {
 export function BranchPosTerminalBindingCard({
   branch,
 }: BranchPosTerminalBindingCardProps) {
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const [terminals, setTerminals] = useState<PointOfSaleDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -93,7 +94,7 @@ export function BranchPosTerminalBindingCard({
       setSelectedTerminalId("");
       await loadTerminals();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : m.common.requestFailed);
+      toast.error(feedback(error instanceof Error ? error.message : m.common.requestFailed));
     } finally {
       setBinding(false);
     }

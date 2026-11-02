@@ -1,10 +1,11 @@
 "use client";
 
+import { LocalizedDialogContent as DialogContent } from "@/components/i18n/localized-overlay-content";
+
 import {
   Badge,
   Button,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -201,7 +202,7 @@ export function TenantProfileView({
   initialSessions,
 }: TenantProfileViewProps) {
   const router = useRouter();
-  const { m, formatDate, formatDateTime } = useTenantI18n();
+  const { feedback, m, formatDate, formatDateTime } = useTenantI18n();
   const copy = m.profile;
   const [profile, setProfile] = useState(initialProfile);
   const [profileForm, setProfileForm] = useState<TenantProfileFormValues | null>(
@@ -360,7 +361,7 @@ export function TenantProfileView({
 
     if (!validation.ok) {
       setProfileErrors(validation.errors);
-      toast.error(copy.feedback.checkForm);
+      toast.error(feedback(copy.feedback.checkForm));
       return;
     }
 
@@ -376,7 +377,7 @@ export function TenantProfileView({
 
       if (!result.ok) {
         setProfileErrors(result.errors);
-        toast.error(getActionErrorMessage(result.code));
+        toast.error(feedback(getActionErrorMessage(result.code)));
         return;
       }
 
@@ -386,7 +387,7 @@ export function TenantProfileView({
       dispatchTenantProfileUpdated({ displayName: result.data.displayName });
       toast.success(copy.feedback.profileSaved);
     } catch {
-      toast.error(copy.feedback.requestFailed);
+      toast.error(feedback(copy.feedback.requestFailed));
     } finally {
       setSavingProfile(false);
     }
@@ -402,7 +403,7 @@ export function TenantProfileView({
 
     if (!validation.ok) {
       setPasswordErrors(validation.errors);
-      toast.error(copy.feedback.checkPassword);
+      toast.error(feedback(copy.feedback.checkPassword));
       return;
     }
 
@@ -412,7 +413,7 @@ export function TenantProfileView({
       const result = await changeTenantProfilePasswordAction(validation.data);
 
       if (!result.ok) {
-        toast.error(getActionErrorMessage(result.code));
+        toast.error(feedback(getActionErrorMessage(result.code)));
         return;
       }
 
@@ -423,7 +424,7 @@ export function TenantProfileView({
       router.replace(webAdminRoutes.login);
       router.refresh();
     } catch {
-      toast.error(copy.feedback.requestFailed);
+      toast.error(feedback(copy.feedback.requestFailed));
     } finally {
       setSavingPassword(false);
     }
@@ -432,15 +433,15 @@ export function TenantProfileView({
   async function handlePinSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!/^\d{6}$/.test(pinForm.currentPin) || !/^\d{6}$/.test(pinForm.newPin)) {
-      toast.error(copy.security.pinFormatError);
+      toast.error(feedback(copy.security.pinFormatError));
       return;
     }
     if (pinForm.newPin !== pinForm.confirmPin) {
-      toast.error(copy.security.pinConfirmationError);
+      toast.error(feedback(copy.security.pinConfirmationError));
       return;
     }
     if (pinForm.newPin === pinForm.currentPin) {
-      toast.error(copy.security.pinUnchanged);
+      toast.error(feedback(copy.security.pinUnchanged));
       return;
     }
 
@@ -458,7 +459,7 @@ export function TenantProfileView({
             : result.code === "NEW_PIN_CONFLICT"
               ? copy.security.pinConflict
               : copy.security.pinChangeFailed;
-        toast.error(message);
+        toast.error(feedback(message));
         return;
       }
       setPinForm({ currentPin: "", newPin: "", confirmPin: "" });
@@ -467,7 +468,7 @@ export function TenantProfileView({
       router.replace(webAdminRoutes.login);
       router.refresh();
     } catch {
-      toast.error(copy.security.pinChangeFailed);
+      toast.error(feedback(copy.security.pinChangeFailed));
     } finally {
       setSavingPin(false);
     }
@@ -490,16 +491,16 @@ export function TenantProfileView({
             current,
           );
           setSessionToRevoke(null);
-          toast.error(copy.devices.sessionNotFound);
+          toast.error(feedback(copy.devices.sessionNotFound));
           return;
         }
 
         if (result.code === "TENANT_CURRENT_SESSION_REVOKE_FORBIDDEN") {
-          toast.error(copy.devices.currentSessionForbidden);
+          toast.error(feedback(copy.devices.currentSessionForbidden));
           return;
         }
 
-        toast.error(copy.devices.revokeFailed);
+        toast.error(feedback(copy.devices.revokeFailed));
         return;
       }
 
@@ -510,7 +511,7 @@ export function TenantProfileView({
       setSessionToRevoke(null);
       toast.success(copy.devices.revokeSuccess);
     } catch {
-      toast.error(copy.devices.revokeFailed);
+      toast.error(feedback(copy.devices.revokeFailed));
     } finally {
       setRevokingSessionId(null);
     }

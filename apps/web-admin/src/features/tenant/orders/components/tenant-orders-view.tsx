@@ -1,12 +1,13 @@
 "use client";
 
+import { LocalizedDialogContent as DialogContent } from "@/components/i18n/localized-overlay-content";
+
 import { formatPosOrderCode } from "@cleanhub/domain/order-codes";
 import {
   Badge,
   Button,
   Checkbox,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -152,7 +153,7 @@ export function TenantOrdersView({
   initialSearchQuery?: string;
 }) {
   const router = useRouter();
-  const { formatDateTime, locale, m, timeZone } = useTenantI18n();
+  const { feedback, formatDateTime, locale, m, timeZone } = useTenantI18n();
   const [orders, setOrders] = useState<TenantOrderSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [overview, setOverview] = useState<TenantOrderOverview | null>(null);
@@ -552,7 +553,7 @@ export function TenantOrdersView({
       const result = await importTenantOrdersAction(importParseResult.data);
       if (!result.ok) {
         setImportFileError(result.message || m.orders.transfer.importFailed);
-        toast.error(m.orders.transfer.importFailed);
+        toast.error(feedback(m.orders.transfer.importFailed));
         return;
       }
 
@@ -568,10 +569,10 @@ export function TenantOrdersView({
 
       if (result.data.failed > 0) {
         toast.error(
-          interpolate(m.orders.transfer.importPartial, {
+          feedback(interpolate(m.orders.transfer.importPartial, {
             failed: String(result.data.failed),
             imported: String(result.data.imported),
-          }),
+          })),
         );
       } else {
         toast.success(
@@ -584,7 +585,7 @@ export function TenantOrdersView({
       }
     } catch {
       setImportFileError(m.orders.transfer.importFailed);
-      toast.error(m.orders.transfer.importFailed);
+      toast.error(feedback(m.orders.transfer.importFailed));
     } finally {
       setImporting(false);
     }
@@ -603,7 +604,7 @@ export function TenantOrdersView({
       });
 
       if (exportOrders.length === 0) {
-        toast.error(m.orders.transfer.exportEmpty);
+        toast.error(feedback(m.orders.transfer.exportEmpty));
         return;
       }
 
@@ -637,7 +638,7 @@ export function TenantOrdersView({
         guestCustomer: m.orders.guestCustomer,
       });
     } catch {
-      toast.error(m.orders.transfer.exportFailed);
+      toast.error(feedback(m.orders.transfer.exportFailed));
     } finally {
       setExporting(false);
     }
@@ -705,7 +706,7 @@ export function TenantOrdersView({
 
       {overviewError ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          {overviewError}
+          {feedback(overviewError)}
         </div>
       ) : null}
 
@@ -904,7 +905,7 @@ export function TenantOrdersView({
         ) : listError ? (
           <div className="p-4">
             <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
-              <span>{listError}</span>
+              <span>{feedback(listError)}</span>
               <Button
                 onClick={refresh}
                 size="sm"
@@ -1139,7 +1140,7 @@ export function TenantOrdersView({
                 className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
                 role="alert"
               >
-                {importFileError}
+                {feedback(importFileError)}
               </div>
             ) : null}
 
@@ -1166,7 +1167,7 @@ export function TenantOrdersView({
                   {importFailures.map((failure) => (
                     <li key={failure.importKey}>
                       <span className="font-medium">{failure.importKey}:</span>{" "}
-                      {failure.message}
+                      {feedback(failure.message)}
                     </li>
                   ))}
                 </ul>

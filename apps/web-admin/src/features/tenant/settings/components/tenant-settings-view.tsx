@@ -146,7 +146,7 @@ function SettingsSection({
 }
 
 export function TenantSettingsView() {
-  const { locale, m, formatDateTime } = useTenantI18n();
+  const { feedback, locale, m, formatDateTime } = useTenantI18n();
   const { authError, authLoaded, canUpdateSettings, settings, updateSettings } =
     useTenantSettingsWorkspace();
   const [form, setForm] = useState<TenantSettingsFormValues>(() =>
@@ -206,7 +206,7 @@ export function TenantSettingsView() {
 
     if (!canUpdateSettings) {
       setSaveError(m.settings.onlyOwners);
-      toast.error(m.settings.onlyOwners);
+      toast.error(feedback(m.settings.onlyOwners));
       return;
     }
 
@@ -246,13 +246,13 @@ export function TenantSettingsView() {
       } else {
         setErrors(result.errors);
         setSaveError(result.message);
-        toast.error(result.message);
+        toast.error(feedback(result.message));
       }
     } catch (error) {
       const message = getErrorMessage(error, m.settings.requestFailed);
       setErrors({});
       setSaveError(message);
-      toast.error(message);
+      toast.error(feedback(message));
     } finally {
       setSaving(false);
     }
@@ -263,7 +263,7 @@ export function TenantSettingsView() {
 
     if (!canUpdateSettings) {
       setProfileSaveError(m.settings.onlyOwners);
-      toast.error(m.settings.onlyOwners);
+      toast.error(feedback(m.settings.onlyOwners));
       return;
     }
 
@@ -291,13 +291,13 @@ export function TenantSettingsView() {
       } else {
         setProfileErrors(result.errors);
         setProfileSaveError(result.message);
-        toast.error(result.message);
+        toast.error(feedback(result.message));
       }
     } catch (error) {
       const message = getErrorMessage(error, m.settings.requestFailed);
       setProfileErrors({});
       setProfileSaveError(message);
-      toast.error(message);
+      toast.error(feedback(message));
     } finally {
       setSavingProfile(false);
     }
@@ -343,7 +343,7 @@ export function TenantSettingsView() {
                 />
                 {profileErrors.tenantName ? (
                   <p className="text-xs text-destructive">
-                    {profileErrors.tenantName}
+                    {feedback(profileErrors.tenantName)}
                   </p>
                 ) : null}
               </div>
@@ -389,7 +389,7 @@ export function TenantSettingsView() {
                 </p>
                 {profileErrors.country ? (
                   <p className="text-xs text-destructive">
-                    {profileErrors.country}
+                    {feedback(profileErrors.country)}
                   </p>
                 ) : null}
               </div>
@@ -408,7 +408,7 @@ export function TenantSettingsView() {
                 />
                 {profileErrors.city ? (
                   <p className="text-xs text-destructive">
-                    {profileErrors.city}
+                    {feedback(profileErrors.city)}
                   </p>
                 ) : null}
               </div>
@@ -429,7 +429,7 @@ export function TenantSettingsView() {
                 />
                 {profileErrors.contactName ? (
                   <p className="text-xs text-destructive">
-                    {profileErrors.contactName}
+                    {feedback(profileErrors.contactName)}
                   </p>
                 ) : null}
               </div>
@@ -451,7 +451,7 @@ export function TenantSettingsView() {
                 />
                 {profileErrors.contactPhone ? (
                   <p className="text-xs text-destructive">
-                    {profileErrors.contactPhone}
+                    {feedback(profileErrors.contactPhone)}
                   </p>
                 ) : null}
               </div>
@@ -474,7 +474,7 @@ export function TenantSettingsView() {
                 />
                 {profileErrors.contactEmail ? (
                   <p className="text-xs text-destructive">
-                    {profileErrors.contactEmail}
+                    {feedback(profileErrors.contactEmail)}
                   </p>
                 ) : null}
               </div>
@@ -486,7 +486,7 @@ export function TenantSettingsView() {
 
             {profileSaveError ? (
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                {profileSaveError}
+                {feedback(profileSaveError)}
               </div>
             ) : null}
           </div>
@@ -516,7 +516,7 @@ export function TenantSettingsView() {
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <p className="font-medium">{m.settings.general.readOnlyTitle}</p>
           <p className="mt-1 text-xs leading-5 text-amber-800">
-            {authError ?? m.settings.onlyOwnersReadonly}
+            {feedback(authError ?? m.settings.onlyOwnersReadonly)}
           </p>
         </div>
       ) : null}
@@ -562,14 +562,14 @@ export function TenantSettingsView() {
                 </p>
                 {errors.defaultLanguage ? (
                   <p className="text-xs text-destructive">
-                    {errors.defaultLanguage}
+                    {feedback(errors.defaultLanguage)}
                   </p>
                 ) : null}
               </div>
 
               <TenantTimezoneField
                 disabled={formDisabled}
-                error={errors.timezone}
+                error={feedback(errors.timezone)}
                 id="tenant-timezone"
                 onChange={(value) => updateForm("timezone", value)}
                 value={form.timezone}
@@ -578,7 +578,7 @@ export function TenantSettingsView() {
 
             {saveError ? (
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                {saveError}
+                {feedback(saveError)}
               </div>
             ) : null}
           </div>

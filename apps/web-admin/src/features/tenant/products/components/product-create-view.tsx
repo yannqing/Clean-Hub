@@ -171,9 +171,10 @@ function RequiredMark() {
 }
 
 function FieldError({ message }: { message?: string }) {
+  const { feedback } = useTenantI18n();
   return message ? (
     <p className="text-xs text-destructive" role="alert">
-      {message}
+      {feedback(message)}
     </p>
   ) : null;
 }
@@ -204,7 +205,7 @@ export function ProductCreateView({
   taxRateOptions,
 }: ProductCreateViewProps) {
   const router = useRouter();
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const isEditMode = mode === "edit";
   const initialPublishedBranchSettings =
     initialProduct?.branchSettings.filter((setting) => setting.isAvailable) ??
@@ -671,10 +672,10 @@ export function ProductCreateView({
     });
 
     if (invalidType) {
-      toast.error(m.products.create.mediaTypeInvalid);
+      toast.error(feedback(m.products.create.mediaTypeInvalid));
     }
     if (oversized) {
-      toast.error(m.products.create.mediaTooLarge);
+      toast.error(feedback(m.products.create.mediaTooLarge));
     }
 
     const existingFiles = new Set(
@@ -692,7 +693,7 @@ export function ProductCreateView({
     const uniqueFiles = newFiles.slice(0, availableSlots);
 
     if (uniqueFiles.length < newFiles.length) {
-      toast.error(m.products.create.mediaLimitReached);
+      toast.error(feedback(m.products.create.mediaLimitReached));
     }
 
     if (uniqueFiles.length > 0) {
@@ -759,11 +760,11 @@ export function ProductCreateView({
           return null;
         }
         toast.error(
-          result.reason === "type"
+          feedback(result.reason === "type"
             ? m.products.create.mediaTypeInvalid
             : result.reason === "size"
               ? m.products.create.mediaTooLarge
-              : m.products.create.mediaUploadFailed,
+              : m.products.create.mediaUploadFailed),
         );
         return null;
       }
@@ -777,12 +778,12 @@ export function ProductCreateView({
           body: image.file,
         });
       } catch {
-        toast.error(m.products.create.mediaUploadFailed);
+        toast.error(feedback(m.products.create.mediaUploadFailed));
         return null;
       }
 
       if (!uploadResponse.ok) {
-        toast.error(m.products.create.mediaUploadFailed);
+        toast.error(feedback(m.products.create.mediaUploadFailed));
         return null;
       }
 
@@ -811,7 +812,7 @@ export function ProductCreateView({
     }
 
     if (categoryId && categoryMetafieldsLoadState !== "loaded") {
-      toast.error(m.products.create.categoryMetafields.loadFailed);
+      toast.error(feedback(m.products.create.categoryMetafields.loadFailed));
       return;
     }
 
@@ -861,7 +862,7 @@ export function ProductCreateView({
       setInvalidCategoryAttributeDefinitionIds(
         new Set(clientValidation.invalidCategoryAttributeDefinitionIds),
       );
-      toast.error(m.products.create.checkForm);
+      toast.error(feedback(m.products.create.checkForm));
       return;
     }
 
@@ -928,7 +929,7 @@ export function ProductCreateView({
           new Set(result.invalidCategoryAttributeDefinitionIds ?? []),
         );
         toast.error(
-          isMediaError
+          feedback(isMediaError
             ? m.products.create.mediaCreateConflict
             : result.code === "PRODUCT_VERSION_CONFLICT" ||
                 result.code === "PRODUCT_SKU_VERSION_CONFLICT"
@@ -942,7 +943,7 @@ export function ProductCreateView({
                     ? m.products.create.productConflict
                     : isEditMode
                       ? m.products.edit.updateFailed
-                      : m.products.create.createFailed,
+                      : m.products.create.createFailed),
         );
         return;
       }
@@ -955,9 +956,9 @@ export function ProductCreateView({
       router.refresh();
     } catch {
       toast.error(
-        isEditMode
+        feedback(isEditMode
           ? m.products.edit.updateFailed
-          : m.products.create.createFailed,
+          : m.products.create.createFailed),
       );
     } finally {
       setSaving(false);

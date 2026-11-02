@@ -50,7 +50,7 @@ export function FeedbackTicketBatchToolbar({
   selectedIds,
   onOutcome,
 }: FeedbackTicketBatchToolbarProps) {
-  const { m } = useSaasI18n();
+  const { feedback, m } = useSaasI18n();
   const copy = m.feedbackTickets.batch;
 
   const [statusValue, setStatusValue] = useState<FeedbackTicketStatus>("open");
@@ -83,7 +83,7 @@ export function FeedbackTicketBatchToolbar({
     } else if (outcome === "partial") {
       toast.warning(partial);
     } else {
-      toast.error(failed);
+      toast.error(feedback(failed));
     }
   }
 

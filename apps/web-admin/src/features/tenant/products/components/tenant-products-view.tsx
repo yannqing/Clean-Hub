@@ -193,7 +193,7 @@ export function TenantProductsView({
   canEditProducts,
 }: TenantProductsViewProps) {
   const router = useRouter();
-  const { formatDateTime, locale, m, timeZone } = useTenantI18n();
+  const { feedback, formatDateTime, locale, m, timeZone } = useTenantI18n();
   const [productDataset, setProductDataset] = useState<TenantProductSummary[]>(
     [],
   );
@@ -723,7 +723,7 @@ export function TenantProductsView({
 
           {overviewError ? (
             <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-              {overviewError}
+              {feedback(overviewError)}
             </div>
           ) : null}
 
@@ -892,7 +892,7 @@ export function TenantProductsView({
             ) : listError ? (
               <div className="p-4">
                 <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
-                  <span>{listError}</span>
+                  <span>{feedback(listError)}</span>
                   <Button
                     onClick={refresh}
                     size="sm"

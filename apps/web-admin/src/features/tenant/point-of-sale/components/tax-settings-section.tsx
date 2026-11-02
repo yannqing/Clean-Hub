@@ -113,7 +113,7 @@ export function TaxSettingsSection({
   initialSettings?: PointOfSaleSettings;
   initialError?: string;
 }) {
-  const { locale } = useTenantI18n();
+  const { feedback, locale } = useTenantI18n();
   const router = useRouter();
   const text = copy[locale];
   const [settings, setSettings] = useState(initialSettings);
@@ -133,7 +133,7 @@ export function TaxSettingsSection({
       });
 
       if (!result.ok) {
-        toast.error(result.message);
+        toast.error(feedback(result.message));
         return;
       }
 
@@ -181,7 +181,7 @@ export function TaxSettingsSection({
 
       {initialError ? (
         <p className="mt-4 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-          {initialError}
+          {feedback(initialError)}
         </p>
       ) : null}
 

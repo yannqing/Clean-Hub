@@ -14,6 +14,18 @@ import type { WebAdminMessages } from "../messages-types";
  * keeping the default (en) bundle small.
  */
 export const zhCNMessages: WebAdminMessages = {
+  utilityPages: {
+    home: {
+      title: "CleanHub 管理后台",
+      description: "CleanHub 管理入口。平台管理请前往 /saas，租户运营管理请前往 /tenant。",
+      items: ["SaaS 管理", "租户管理", "身份验证", "API 健康状态"],
+    },
+    apiHealth: {
+      title: "API 健康状态",
+      description: "用于检查 API 连接及后端服务健康状态的预留页面。",
+      items: ["API 状态", "数据库状态", "同步队列状态", "Webhook 状态"],
+    },
+  },
   shell: {
     saas: {
       eyebrow: "SaaS 管理",
@@ -246,6 +258,7 @@ export const zhCNMessages: WebAdminMessages = {
     ],
   },
   common: {
+    close: "关闭",
     personalCenter: "个人中心",
     language: "语言",
     languageLabels: {

@@ -69,9 +69,10 @@ type HardwareFormViewProps = {
 };
 
 function FieldError({ message }: { message?: string }) {
+  const { feedback } = useTenantI18n();
   return message ? (
     <p className="text-xs text-destructive" role="alert">
-      {message}
+      {feedback(message)}
     </p>
   ) : null;
 }
@@ -127,7 +128,7 @@ export function HardwareFormView({
   mode = "create",
 }: HardwareFormViewProps) {
   const router = useRouter();
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const isEditMode = mode === "edit";
   const isBuiltIn = initialDevice?.provisioningMode === "built_in";
   const [name, setName] = useState(initialDevice?.name ?? "");
@@ -187,7 +188,7 @@ export function HardwareFormView({
 
     if (!validation.ok) {
       setErrors(validation.errors);
-      toast.error(m.common.requestFailed);
+      toast.error(feedback(m.common.requestFailed));
       return;
     }
 
@@ -206,7 +207,7 @@ export function HardwareFormView({
             );
 
       if (!result.ok) {
-        toast.error(result.error);
+        toast.error(feedback(result.error));
         return;
       }
 
@@ -217,7 +218,7 @@ export function HardwareFormView({
       router.refresh();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : m.hardware.requestFailed,
+        feedback(error instanceof Error ? error.message : m.hardware.requestFailed),
       );
     } finally {
       setSaving(false);
@@ -300,7 +301,7 @@ export function HardwareFormView({
                       required
                       value={name}
                     />
-                    <FieldError message={errors.name} />
+                    <FieldError message={feedback(errors.name)} />
                   </div>
 
                   <div className="grid gap-2">
@@ -326,7 +327,7 @@ export function HardwareFormView({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FieldError message={errors.deviceType} />
+                    <FieldError message={feedback(errors.deviceType)} />
                   </div>
 
                   <div className="grid gap-2">
@@ -351,7 +352,7 @@ export function HardwareFormView({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FieldError message={errors.connectionType} />
+                    <FieldError message={feedback(errors.connectionType)} />
                   </div>
 
                   {deviceType === "printer" ? (
@@ -378,7 +379,7 @@ export function HardwareFormView({
                           </SelectItem>
                         </SelectContent>
                       </Select>
-                      <FieldError message={errors.printerPurpose} />
+                      <FieldError message={feedback(errors.printerPurpose)} />
                       <p className="text-xs text-muted-foreground">
                         {m.hardware.create.printerPurposeHint}
                       </p>
@@ -405,7 +406,7 @@ export function HardwareFormView({
                       }}
                       selected={terminalId}
                     />
-                    <FieldError message={errors.terminalId} />
+                    <FieldError message={feedback(errors.terminalId)} />
                   </div>
 
                   {isEditMode ? (
@@ -432,7 +433,7 @@ export function HardwareFormView({
                           ))}
                         </SelectContent>
                       </Select>
-                      <FieldError message={errors.status} />
+                      <FieldError message={feedback(errors.status)} />
                     </div>
                   ) : null}
 

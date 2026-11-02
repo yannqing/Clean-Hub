@@ -1487,6 +1487,7 @@ export const tenantMessagesFr: TenantMessages = {
     },
   },
   branches: {
+    unavailable: { badge: "Succursale indisponible", title: "Impossible de charger la succursale", description: "Cette succursale est indisponible ou dépasse vos accès.", back: "Retour aux succursales" },
     eyebrow: "Succursales du locataire",
     title: "Succursales",
     listDescription:
@@ -2752,6 +2753,10 @@ export const tenantMessagesFr: TenantMessages = {
       syncHint: "Les terminaux seront mis à jour à la prochaine synchronisation en ligne. Le logo reste disponible hors ligne. Le nom du locataire et l’en-tête du reçu restent inchangés.",
     },
     paymentIntegrations: {
+      waveApiKey: "Clé API Wave",
+      clientId: "Identifiant client",
+      clientSecret: "Secret client",
+      merchantKey: "Clé marchand Orange Money",
       unbind: "Déconnecter",
       savedAndVerified: "{provider} validé et enregistré.",
       unbound: "{provider} déconnecté.",

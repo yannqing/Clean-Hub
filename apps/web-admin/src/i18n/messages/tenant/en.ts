@@ -1463,6 +1463,7 @@ export const tenantMessagesEn: TenantMessages = {
   },
 
   branches: {
+    unavailable: { badge: "Branch unavailable", title: "Branch could not be loaded", description: "This branch is unavailable or outside your access scope.", back: "Back to branches" },
     eyebrow: "Tenant branches",
     title: "Branches",
     listDescription:
@@ -2700,6 +2701,10 @@ export const tenantMessagesEn: TenantMessages = {
       syncHint: "Terminals update on their next online sync. Synced logos remain available offline. This does not change the tenant name or receipt heading.",
     },
     paymentIntegrations: {
+      waveApiKey: "Wave API key",
+      clientId: "Client ID",
+      clientSecret: "Client secret",
+      merchantKey: "Orange Money merchant key",
       unbind: "Disconnect",
       savedAndVerified: "{provider} verified and saved.",
       unbound: "{provider} disconnected.",

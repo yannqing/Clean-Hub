@@ -1,4 +1,5 @@
 "use client";
+import { localizeSystemNotification } from "@cleanhub/i18n/system-notifications";
 
 import type { TenantNotificationInboxItem } from "@cleanhub/api-client";
 import {
@@ -293,7 +294,8 @@ export function TenantHeaderMessages({
 
           {loadState === "success" && items.length > 0 ? (
             <div className="divide-y">
-              {items.map((notification) => {
+              {items.map((storedNotification) => {
+                const notification = localizeSystemNotification(storedNotification, locale);
                 const unread = notification.readStatus === "unread";
                 const sentAt = formatSentAt(
                   notification.sentAt ?? notification.createdAt,

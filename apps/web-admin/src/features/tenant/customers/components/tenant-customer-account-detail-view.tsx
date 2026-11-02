@@ -79,7 +79,7 @@ export function TenantCustomerAccountDetailView({
   initialEditing?: boolean;
 }) {
   const router = useRouter();
-  const { formatDateTime, locale, m } = useTenantI18n();
+  const { feedback, formatDateTime, locale, m } = useTenantI18n();
   const copy = m.customers.accounts.detail;
   const [account, setAccount] = useState(initialAccount);
   const [customersResult, setCustomersResult] = useState(initialCustomers);
@@ -216,9 +216,9 @@ export function TenantCustomerAccountDetailView({
 
     if (!result.ok) {
       toast.error(
-        result.code === "ACCOUNT_DISABLED"
+        feedback(result.code === "ACCOUNT_DISABLED"
           ? copy.appPasswordDisabled
-          : result.message || copy.appPasswordError,
+          : result.message || copy.appPasswordError),
       );
       return;
     }
@@ -392,7 +392,7 @@ export function TenantCustomerAccountDetailView({
                       className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
                       role="alert"
                     >
-                      {formError}
+                      {feedback(formError)}
                     </p>
                   ) : null}
                 </div>
@@ -454,7 +454,7 @@ export function TenantCustomerAccountDetailView({
                 </div>
               ) : customersError ? (
                 <p className="border-t px-5 py-8 text-center text-sm text-destructive">
-                  {customersError}
+                  {feedback(customersError)}
                 </p>
               ) : customersResult.data.length === 0 ? (
                 <p className="border-t px-5 py-10 text-center text-sm text-muted-foreground">

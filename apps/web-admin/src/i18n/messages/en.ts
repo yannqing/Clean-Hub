@@ -15,6 +15,18 @@ import type { WebAdminMessages } from "../messages-types";
  * catalogs don't bloat the initial bundle.
  */
 export const enMessages: WebAdminMessages = {
+  utilityPages: {
+    home: {
+      title: "CleanHub Web Admin",
+      description: "Entry point for CleanHub administration. Use /saas for platform administration and /tenant for tenant back-office operations.",
+      items: ["SaaS Admin", "Tenant Admin", "Authentication", "API Health"],
+    },
+    apiHealth: {
+      title: "API Health",
+      description: "Operational placeholder for checking API connectivity and backend service health.",
+      items: ["API status", "Database status", "Sync queue status", "Webhook status"],
+    },
+  },
   shell: {
     saas: {
       eyebrow: "SaaS Admin",
@@ -272,6 +284,7 @@ export const enMessages: WebAdminMessages = {
     ],
   },
   common: {
+    close: "Close",
     personalCenter: "Personal Center",
     language: "Language",
     languageLabels: {

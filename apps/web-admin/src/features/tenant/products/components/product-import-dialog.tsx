@@ -1,12 +1,13 @@
 "use client";
 
+import { LocalizedDialogContent as DialogContent } from "@/components/i18n/localized-overlay-content";
+
 import type { ImportTenantProductsResponse } from "@cleanhub/api-client";
 import { createId } from "@cleanhub/id";
 import {
   Button,
   Checkbox,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -50,7 +51,7 @@ export function ProductImportDialog({
   onImported: () => void;
   onFeatureDisabled: () => void;
 }) {
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const copy = m.products.importing;
   const [options, setOptions] = useState<Options | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -349,7 +350,7 @@ export function ProductImportDialog({
                     {failure.row
                       ? `${interpolate(copy.row, { row: String(failure.row) })} · `
                       : ""}
-                    {failureReason}
+                    {feedback(failureReason)}
                   </p>
                 ) : null}
               </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { LocalizedDialogContent as DialogContent } from "@/components/i18n/localized-overlay-content";
+
 import type { TenantUserSummary } from "@cleanhub/api-client";
 import {
   addCalendarDays,
@@ -11,7 +13,6 @@ import {
   Card,
   CardContent,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -637,7 +638,7 @@ export function TenantTimeline({
     sizeBytes: number;
   }) => Promise<TimelineUploadResult>;
 }) {
-  const { formatDate, formatDateTime, locale, timeZone } = useTenantI18n();
+  const { feedback, formatDate, formatDateTime, locale, timeZone } = useTenantI18n();
   const [items, setItems] = useState(initialTimeline.data);
   const [nextCursor, setNextCursor] = useState(initialTimeline.nextCursor);
   const [comment, setComment] = useState("");
@@ -691,8 +692,8 @@ export function TenantTimeline({
       }
       return true;
     });
-    if (invalidType) toast.error(messages.attachmentTypeInvalid);
-    if (tooLarge) toast.error(messages.attachmentTooLarge);
+    if (invalidType) toast.error(feedback(messages.attachmentTypeInvalid));
+    if (tooLarge) toast.error(feedback(messages.attachmentTooLarge));
 
     const existing = new Set(
       pendingAttachments.map(
@@ -704,7 +705,7 @@ export function TenantTimeline({
       (file) => !existing.has(`${file.name}:${file.size}:${file.lastModified}`),
     );
     const available = MAX_ATTACHMENTS - pendingAttachments.length;
-    if (unique.length > available) toast.error(messages.attachmentLimit);
+    if (unique.length > available) toast.error(feedback(messages.attachmentLimit));
     setPendingAttachments((current) => [
       ...current,
       ...unique.slice(0, available).map((file) => ({
@@ -749,11 +750,11 @@ export function TenantTimeline({
       });
       if (!result.ok) {
         toast.error(
-          result.reason === "type"
+          feedback(result.reason === "type"
             ? messages.attachmentTypeInvalid
             : result.reason === "size"
               ? messages.attachmentTooLarge
-              : messages.attachmentUploadFailed,
+              : messages.attachmentUploadFailed),
         );
         return null;
       }
@@ -766,11 +767,11 @@ export function TenantTimeline({
           body: attachment.file,
         });
       } catch {
-        toast.error(messages.attachmentUploadFailed);
+        toast.error(feedback(messages.attachmentUploadFailed));
         return null;
       }
       if (!response.ok) {
-        toast.error(messages.attachmentUploadFailed);
+        toast.error(feedback(messages.attachmentUploadFailed));
         return null;
       }
 
@@ -808,7 +809,7 @@ export function TenantTimeline({
         attachments,
       });
       if (!result.ok) {
-        toast.error(result.message || messages.postError);
+        toast.error(feedback(result.message || messages.postError));
         return;
       }
       setItems((current) => [
@@ -819,7 +820,7 @@ export function TenantTimeline({
       setMentionedUserIds([]);
       setPendingAttachments([]);
     } catch {
-      toast.error(messages.postError);
+      toast.error(feedback(messages.postError));
     } finally {
       setPosting(false);
     }
@@ -848,7 +849,7 @@ export function TenantTimeline({
         mentionedUserIds: editingMentionIds,
       });
       if (!result.ok) {
-        toast.error(result.message || messages.editError);
+        toast.error(feedback(result.message || messages.editError));
         return;
       }
       setItems((current) =>
@@ -858,7 +859,7 @@ export function TenantTimeline({
       );
       cancelEdit();
     } catch {
-      toast.error(messages.editError);
+      toast.error(feedback(messages.editError));
     } finally {
       setSavingId(null);
     }
@@ -870,7 +871,7 @@ export function TenantTimeline({
     try {
       const result = await deleteComment(deleteTarget.id, deleteTarget.version);
       if (!result.ok) {
-        toast.error(result.message || messages.deleteError);
+        toast.error(feedback(result.message || messages.deleteError));
         return;
       }
       setItems((current) =>
@@ -878,7 +879,7 @@ export function TenantTimeline({
       );
       setDeleteTarget(null);
     } catch {
-      toast.error(messages.deleteError);
+      toast.error(feedback(messages.deleteError));
     } finally {
       setDeleting(false);
     }
@@ -898,7 +899,7 @@ export function TenantTimeline({
       });
       setNextCursor(result.nextCursor);
     } catch {
-      toast.error(messages.loadError);
+      toast.error(feedback(messages.loadError));
     } finally {
       setLoadingMore(false);
     }

@@ -101,7 +101,7 @@ function getStatusVariant(success: boolean): "default" | "destructive" {
 }
 
 export function TenantAuditLogView() {
-  const { m, formatDateTime, timeZone } = useTenantI18n();
+  const { feedback, m, formatDateTime, timeZone } = useTenantI18n();
   // Audit copy is shared between both consoles, so it lives in the top-level
   // `common` namespace rather than either feature catalogue.
   const { messages } = useWebAdminLocale();
@@ -230,7 +230,7 @@ export function TenantAuditLogView() {
 
       {error ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          {error}
+          {feedback(error)}
         </div>
       ) : null}
 

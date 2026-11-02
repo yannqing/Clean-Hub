@@ -1,5 +1,7 @@
 "use client";
 
+import { LocalizedDialogContent as DialogContent } from "@/components/i18n/localized-overlay-content";
+
 import { formatPosOrderCode } from "@cleanhub/domain/order-codes";
 import type {
   ServiceSummary,
@@ -13,7 +15,6 @@ import {
   Card,
   CardContent,
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -133,7 +134,7 @@ export function TenantOrderDetailView({
   services: ServiceSummary[];
   staffMembers: TenantUserSummary[];
 }) {
-  const { formatDateTime, locale, m } = useTenantI18n();
+  const { feedback, formatDateTime, locale, m } = useTenantI18n();
   const router = useRouter();
   const orderCode = formatPosOrderCode(order.id);
   const displayBranchName = branchName ?? order.branchId;
@@ -179,7 +180,7 @@ export function TenantOrderDetailView({
             : {}),
       });
       if (!result.ok) {
-        toast.error(result.message || m.orders.detail.actions.statusError);
+        toast.error(feedback(result.message || m.orders.detail.actions.statusError));
         return;
       }
       toast.success(m.orders.detail.actions.statusSuccess);
@@ -187,7 +188,7 @@ export function TenantOrderDetailView({
       setStatusNote("");
       router.refresh();
     } catch {
-      toast.error(m.orders.detail.actions.statusError);
+      toast.error(feedback(m.orders.detail.actions.statusError));
     } finally {
       setSubmittingAction(false);
     }
@@ -213,14 +214,14 @@ export function TenantOrderDetailView({
         idempotencyKey: crypto.randomUUID(),
       });
       if (!result.ok) {
-        toast.error(result.message || m.orders.detail.actions.paymentError);
+        toast.error(feedback(result.message || m.orders.detail.actions.paymentError));
         return;
       }
       toast.success(m.orders.detail.actions.paymentSuccess);
       setPaymentDialogOpen(false);
       router.refresh();
     } catch {
-      toast.error(m.orders.detail.actions.paymentError);
+      toast.error(feedback(m.orders.detail.actions.paymentError));
     } finally {
       setSubmittingAction(false);
     }

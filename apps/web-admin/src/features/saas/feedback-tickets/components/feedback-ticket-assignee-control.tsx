@@ -18,7 +18,7 @@ export function FeedbackTicketAssigneeControl({
   ticketId,
   onUpdated,
 }: FeedbackTicketAssigneeControlProps) {
-  const { m } = useSaasI18n();
+  const { feedback, m } = useSaasI18n();
   const [value, setValue] = useState(assigneeUserId ?? "");
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,14 +35,14 @@ export function FeedbackTicketAssigneeControl({
       setValue(result.data.assigneeUserId ?? "");
       onUpdated(result.data);
     } else {
-      toast.error(result.error);
+      toast.error(feedback(result.error));
     }
 
     setSubmitting(false);
   }
 
   return (
-    <form className="grid gap-3" onSubmit={handleSubmit}>
+    <form className="grid gap-3" noValidate onSubmit={handleSubmit}>
       <div className="grid gap-2">
         <Label htmlFor={`feedback-assignee-${ticketId}`}>
           {m.feedbackTickets.assignee.label}

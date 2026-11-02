@@ -68,9 +68,10 @@ function toFormValues(branch: BranchSummary): BranchFormValues {
 }
 
 function FieldError({ message }: { message?: string }) {
+  const { feedback } = useTenantI18n();
   return message ? (
     <p className="text-xs text-destructive" role="alert">
-      {message}
+      {feedback(message)}
     </p>
   ) : null;
 }
@@ -85,7 +86,7 @@ export function BranchDetailView({
   basePath = webAdminRoutes.tenant.branches,
   initialBranch,
 }: BranchDetailViewProps) {
-  const { m, formatDateTime } = useTenantI18n();
+  const { feedback, m, formatDateTime } = useTenantI18n();
   const queryClient = useQueryClient();
   const { data: branch = initialBranch } = useBranchDetailQuery(
     initialBranch.id,
@@ -168,7 +169,7 @@ export function BranchDetailView({
                 ? m.branches.create.logoTooLarge
                 : m.branches.create.logoUploadFailed;
           setMessage(uploadMessage);
-          toast.error(uploadMessage);
+          toast.error(feedback(uploadMessage));
           return;
         }
 
@@ -189,7 +190,7 @@ export function BranchDetailView({
           : result.message;
         setErrors(result.errors);
         setMessage(nextMessage);
-        toast.error(nextMessage);
+        toast.error(feedback(nextMessage));
         return;
       }
 
@@ -199,7 +200,7 @@ export function BranchDetailView({
       const nextMessage =
         saveError instanceof Error ? saveError.message : m.common.requestFailed;
       setMessage(nextMessage);
-      toast.error(nextMessage);
+      toast.error(feedback(nextMessage));
     } finally {
       setSaving(false);
     }
@@ -247,7 +248,7 @@ export function BranchDetailView({
           : result.message;
         setErrors(result.errors);
         setMessage(nextMessage);
-        toast.error(nextMessage);
+        toast.error(feedback(nextMessage));
         return;
       }
 
@@ -259,7 +260,7 @@ export function BranchDetailView({
           ? statusError.message
           : m.common.requestFailed;
       setMessage(nextMessage);
-      toast.error(nextMessage);
+      toast.error(feedback(nextMessage));
     } finally {
       setSaving(false);
     }
@@ -320,7 +321,7 @@ export function BranchDetailView({
                       }
                       value={formValues.name}
                     />
-                    <FieldError message={errors.name} />
+                    <FieldError message={feedback(errors.name)} />
                   </div>
 
                   <div className="grid gap-2">
@@ -335,12 +336,12 @@ export function BranchDetailView({
                       }
                       value={formValues.phone}
                     />
-                    <FieldError message={errors.phone} />
+                    <FieldError message={feedback(errors.phone)} />
                   </div>
 
                   <BranchLogoField
                     disabled={saving}
-                    error={errors.logoObjectKey}
+                    error={feedback(errors.logoObjectKey)}
                     onRemove={handleLogoRemove}
                     onSelect={handleLogoSelect}
                     previewUrl={logoPreviewUrl}
@@ -364,12 +365,12 @@ export function BranchDetailView({
                       }
                       value={formValues.address}
                     />
-                    <FieldError message={errors.address} />
+                    <FieldError message={feedback(errors.address)} />
                   </div>
 
                   <BranchBusinessHoursEditor
                     disabled={saving}
-                    error={errors.businessHours}
+                    error={feedback(errors.businessHours)}
                     onChange={(value) => updateForm("businessHours", value)}
                     value={formValues.businessHours}
                   />
@@ -427,7 +428,7 @@ export function BranchDetailView({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FieldError message={errors.defaultLanguage} />
+                    <FieldError message={feedback(errors.defaultLanguage)} />
                   </div>
 
                   <div className="grid gap-2">
@@ -494,7 +495,7 @@ export function BranchDetailView({
               className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
               role="alert"
             >
-              {message}
+              {feedback(message)}
             </p>
           ) : null}
 

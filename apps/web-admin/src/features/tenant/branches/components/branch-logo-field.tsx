@@ -25,7 +25,7 @@ export function BranchLogoField({
   onSelect,
   previewUrl,
 }: BranchLogoFieldProps) {
-  const { m } = useTenantI18n();
+  const { feedback, m } = useTenantI18n();
   const inputRef = useRef<HTMLInputElement>(null);
 
   function handleSelection(event: ChangeEvent<HTMLInputElement>) {
@@ -37,12 +37,12 @@ export function BranchLogoField({
     }
 
     if (!BRANCH_LOGO_TYPES.has(file.type)) {
-      toast.error(m.branches.create.logoTypeInvalid);
+      toast.error(feedback(m.branches.create.logoTypeInvalid));
       return;
     }
 
     if (file.size > MAX_BRANCH_LOGO_SIZE_BYTES) {
-      toast.error(m.branches.create.logoTooLarge);
+      toast.error(feedback(m.branches.create.logoTooLarge));
       return;
     }
 
@@ -125,7 +125,7 @@ export function BranchLogoField({
 
       {error ? (
         <p className="text-xs text-destructive" role="alert">
-          {error}
+          {feedback(error)}
         </p>
       ) : null}
     </div>

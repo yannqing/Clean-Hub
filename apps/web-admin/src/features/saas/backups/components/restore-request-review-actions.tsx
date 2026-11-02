@@ -62,7 +62,7 @@ export function RestoreRequestReviewActions({
   onReviewed,
   canReview,
 }: RestoreRequestReviewActionsProps) {
-  const { m } = useSaasI18n();
+  const { feedback, m } = useSaasI18n();
   const [note, setNote] = useState("");
   const [pendingAction, setPendingAction] = useState<ReviewAction | null>(null);
 
@@ -81,7 +81,7 @@ export function RestoreRequestReviewActions({
     setPendingAction(null);
 
     if (!result.ok) {
-      toast.error(result.error || m.backups.reviewToasts.failed);
+      toast.error(feedback(result.error || m.backups.reviewToasts.failed));
       return;
     }
 

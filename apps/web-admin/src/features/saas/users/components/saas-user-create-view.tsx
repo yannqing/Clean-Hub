@@ -54,7 +54,7 @@ export function SaasUserCreateView({
   roleLoadFailed,
   roles,
 }: SaasUserCreateViewProps) {
-  const { m } = useSaasI18n();
+  const { feedback, m } = useSaasI18n();
   const router = useRouter();
   const [values, setValues] = useState<InviteSaasUserFormInput>(initialValues);
   const [errors, setErrors] = useState<InviteSaasUserFormErrors>({});
@@ -109,7 +109,7 @@ export function SaasUserCreateView({
     } catch (error) {
       const message = getErrorMessage(error) || m.users.invite.failed;
       setFormError(message);
-      toast.error(message);
+      toast.error(feedback(message));
     } finally {
       setSubmitting(false);
     }
@@ -158,7 +158,7 @@ export function SaasUserCreateView({
                   />
                   {errors.displayName ? (
                     <p className="text-xs text-destructive">
-                      {errors.displayName}
+                      {feedback(errors.displayName)}
                     </p>
                   ) : null}
                 </div>
@@ -181,7 +181,7 @@ export function SaasUserCreateView({
                     value={values.email}
                   />
                   {errors.email ? (
-                    <p className="text-xs text-destructive">{errors.email}</p>
+                    <p className="text-xs text-destructive">{feedback(errors.email)}</p>
                   ) : null}
                 </div>
 
@@ -201,7 +201,7 @@ export function SaasUserCreateView({
                     value={values.phone}
                   />
                   {errors.phone ? (
-                    <p className="text-xs text-destructive">{errors.phone}</p>
+                    <p className="text-xs text-destructive">{feedback(errors.phone)}</p>
                   ) : null}
                 </div>
 
@@ -223,7 +223,7 @@ export function SaasUserCreateView({
                   />
                   {errors.password ? (
                     <p className="text-xs text-destructive">
-                      {errors.password}
+                      {feedback(errors.password)}
                     </p>
                   ) : null}
                 </div>
@@ -267,7 +267,7 @@ export function SaasUserCreateView({
                   </Select>
                   {errors.roleCode ? (
                     <p className="text-xs text-destructive">
-                      {errors.roleCode}
+                      {feedback(errors.roleCode)}
                     </p>
                   ) : null}
                   {roleLoadFailed ? (
@@ -308,7 +308,7 @@ export function SaasUserCreateView({
                   </Select>
                   {errors.language ? (
                     <p className="text-xs text-destructive">
-                      {errors.language}
+                      {feedback(errors.language)}
                     </p>
                   ) : null}
                 </div>
@@ -319,7 +319,7 @@ export function SaasUserCreateView({
 
         {formError ? (
           <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-            {formError}
+            {feedback(formError)}
           </div>
         ) : null}
 

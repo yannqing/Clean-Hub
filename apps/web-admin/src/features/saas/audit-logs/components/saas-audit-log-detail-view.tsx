@@ -39,7 +39,16 @@ export function SaasAuditLogDetailView({
           notCaptured: "未记录",
           userAgent: "用户代理",
         }
-      : {
+      : locale === "fr"
+        ? {
+            branch: "Succursale",
+            changeData: "Modifications des données",
+            metadata: "Métadonnées",
+            noData: "Aucune donnée",
+            notCaptured: "Non enregistré",
+            userAgent: "Agent utilisateur",
+          }
+        : {
           branch: "Branch",
           changeData: "Data changes",
           metadata: "Metadata",

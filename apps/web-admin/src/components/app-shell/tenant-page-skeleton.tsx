@@ -1,8 +1,13 @@
+"use client";
+
+import { useTenantI18n } from "@/i18n";
+
 export function TenantListPageSkeleton() {
+  const { m } = useTenantI18n();
   return (
     <section
       aria-busy="true"
-      aria-label="Loading"
+      aria-label={m.common.loading}
       className="space-y-7 pb-8"
     >
       <header className="flex items-center justify-between gap-3">
@@ -32,10 +37,11 @@ export function TenantListPageSkeleton() {
 }
 
 export function TenantFormPageSkeleton() {
+  const { m } = useTenantI18n();
   return (
     <section
       aria-busy="true"
-      aria-label="Loading"
+      aria-label={m.common.loading}
       className="mx-auto w-full max-w-[960px] space-y-3 pb-20"
     >
       <div className="h-8 w-44 animate-pulse rounded-md bg-muted" />
