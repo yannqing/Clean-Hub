@@ -8,7 +8,11 @@
   "exports": {
     ".": "./src/index.ts",
     "./react": "./src/react.tsx",
-    "./locales": "./src/locales.ts"
+    "./locales": "./src/locales.ts",
+    "./error-messages": "./src/error-messages.ts",
+    "./tenant-error-messages": "./src/tenant-error-messages.ts",
+    "./schema-error-messages": "./src/schema-error-messages.ts",
+    "./system-notifications": "./src/system-notifications.ts"
   },
   "scripts": {
     "test": "tsx src/i18n.test.ts",

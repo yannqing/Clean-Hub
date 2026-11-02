@@ -3,8 +3,12 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, relative } from "node:path";
 
 import { supportedLocales } from "@cleanhub/i18n/locales";
+import ts from "typescript";
 
-import { listLocalizedErrorMessages, localizeErrorMessage } from "./error-messages.js";
+import {
+  listLocalizedErrorMessages,
+  localizeErrorMessage,
+} from "./error-messages.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const apiSrc = join(here, "..");
@@ -15,8 +19,8 @@ const repoRoot = join(apiSrc, "..", "..", "..");
  *
  * The catalogue is keyed by the English text, so editing a message at its
  * throw site silently orphans its translation -- the lookup misses and the
- * cashier is back to English. This walks the POS and auth modules for thrown
- * messages and reports any the catalogue does not cover.
+ * cashier is back to English. This walks POS, auth and tenant modules for
+ * thrown messages and custom schema guidance the catalogue must cover.
  */
 function walkTypeScript(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -35,6 +39,7 @@ function collectThrownMessages(): Map<string, string[]> {
     join(apiSrc, "modules", "pos"),
     join(apiSrc, "modules", "auth"),
     join(apiSrc, "modules", "tax"),
+    join(apiSrc, "modules", "tenant"),
     join(apiSrc, "http"),
   ];
   const files = roots
@@ -62,6 +67,65 @@ function collectThrownMessages(): Map<string, string[]> {
         found.set(message, where);
       }
     }
+    // Follow conditional branches and interpolated business names, without
+    // treating diagnostic strings or arbitrary stored content as UI copy.
+    const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+    function collectMessage(node: ts.Node): void {
+      let message: string | undefined;
+      if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
+        message = node.text;
+      else if (ts.isTemplateExpression(node))
+        message =
+          node.head.text +
+          node.templateSpans
+            .map((span) => `{name}${span.literal.text}`)
+            .join("");
+      else if (ts.isConditionalExpression(node)) {
+        collectMessage(node.whenTrue);
+        collectMessage(node.whenFalse);
+      }
+      if (message)
+        found.set(message, [
+          ...(found.get(message) ?? []),
+          relative(repoRoot, file),
+        ]);
+    }
+    function visit(node: ts.Node): void {
+      if (
+        ts.isNewExpression(node) &&
+        /Error$/.test(node.expression.getText(ast)) &&
+        node.arguments?.[0] &&
+        ts.isStringLiteral(node.arguments[0]) &&
+        /^[A-Z_]+$/.test(node.arguments[0].text) &&
+        node.arguments[1] &&
+        file.includes(`${join("modules", "tenant")}`)
+      )
+        collectMessage(node.arguments[1]);
+      if (
+        file.endsWith("password-policy.helper.ts") &&
+        ts.isReturnStatement(node) &&
+        node.expression
+      )
+        collectMessage(node.expression);
+      if (file.endsWith(".validation.ts")) {
+        if (
+          ts.isPropertyAssignment(node) &&
+          node.name.getText(ast) === "message"
+        )
+          collectMessage(node.initializer);
+        if (
+          ts.isCallExpression(node) &&
+          ts.isPropertyAccessExpression(node.expression) &&
+          /^(regex|refine|min|max|length)$/.test(node.expression.name.text)
+        ) {
+          const last = node.arguments.at(-1);
+          if (last && node.arguments.length > 1 && ts.isStringLiteral(last))
+            collectMessage(last);
+        }
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(ast);
   }
 
   return found;
@@ -91,11 +155,16 @@ for (const [message, files] of thrown) {
 for (const message of translated) {
   if (thrown.has(message)) continue;
   // The central handler raises these two itself rather than from a module.
-  if (message === "Internal server error." || message === "Request validation failed.") {
+  if (
+    message === "Internal server error." ||
+    message === "Request validation failed."
+  ) {
     continue;
   }
 
-  console.error(`ORPHANED: ${JSON.stringify(message)} is translated but never thrown`);
+  console.error(
+    `ORPHANED: ${JSON.stringify(message)} is translated but never thrown`,
+  );
   failures += 1;
 }
 
@@ -106,7 +175,9 @@ for (const message of translated) {
     const localized = localizeErrorMessage(message, locale);
 
     if (!localized.trim()) {
-      console.error(`EMPTY: ${locale} translation of ${JSON.stringify(message)}`);
+      console.error(
+        `EMPTY: ${locale} translation of ${JSON.stringify(message)}`,
+      );
       failures += 1;
       continue;
     }
@@ -120,19 +191,28 @@ for (const message of translated) {
   }
 }
 
-// An unknown message must fall back to itself rather than throwing or
-// returning undefined: a missing translation during a sale must not become a
-// blank error.
+// Unknown French errors must remain readable without exposing untranslated text.
 const unknown = "A message that is deliberately not in the catalogue.";
 for (const locale of supportedLocales) {
-  if (localizeErrorMessage(unknown, locale) !== unknown) {
-    console.error(`FALLBACK: ${locale} did not fall back to the original message`);
+  if (locale !== "fr" && localizeErrorMessage(unknown, locale) !== unknown) {
+    console.error(
+      `FALLBACK: ${locale} did not fall back to the original message`,
+    );
     failures += 1;
   }
 }
+if (!localizeErrorMessage(unknown, "fr").startsWith("Une erreur"))
+  failures += 1;
+if (
+  localizeErrorMessage('Category attribute "Taille" is required.', "fr") !==
+  "L’attribut de catégorie « Taille » est obligatoire."
+)
+  failures += 1;
 
 if (failures > 0) {
-  console.error(`\nAPI error message check failed with ${failures} problem(s).`);
+  console.error(
+    `\nAPI error message check failed with ${failures} problem(s).`,
+  );
   process.exit(1);
 }
 

@@ -75,12 +75,14 @@ export type MarkPosNotificationReadInput = {
   authContext: AuthContext;
   requestMeta?: AuthRequestMeta;
   deliveryId: string;
+  locale?: string;
 };
 
 export type ArchivePosNotificationInput = {
   authContext: AuthContext;
   requestMeta?: AuthRequestMeta;
   deliveryId: string;
+  locale?: string;
 };
 
 export type MarkAllPosNotificationsReadInput = {

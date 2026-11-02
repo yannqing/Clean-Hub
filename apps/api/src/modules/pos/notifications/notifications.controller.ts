@@ -34,6 +34,7 @@ export async function listPosNotificationsController(c: Context<AppBindings>) {
   const query = posNotificationListQuerySchema.parse(c.req.query());
   const result = await listPosNotifications({
     authContext: c.get("authContext"),
+    locale: c.req.header("accept-language") ? c.get("locale") : undefined,
     query,
   });
   return c.json(result);
@@ -54,6 +55,7 @@ export async function markPosNotificationReadController(c: Context<AppBindings>)
       authContext: c.get("authContext"),
       requestMeta: getRequestMeta(c),
       deliveryId: params.deliveryId,
+      locale: c.req.header("accept-language") ? c.get("locale") : undefined,
     });
     return c.json(notification);
   } catch (error) {
@@ -89,6 +91,7 @@ export async function archivePosNotificationController(c: Context<AppBindings>) 
       authContext: c.get("authContext"),
       requestMeta: getRequestMeta(c),
       deliveryId: params.deliveryId,
+      locale: c.req.header("accept-language") ? c.get("locale") : undefined,
     });
     return c.json(notification);
   } catch (error) {

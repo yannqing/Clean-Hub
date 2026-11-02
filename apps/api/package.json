@@ -29,6 +29,7 @@
     "smoke:cors-origin": "tsx src/http/cors-origin.smoke.ts",
     "smoke:locale": "tsx src/http/locale.smoke.ts",
     "smoke:error-messages": "tsx src/http/error-messages.smoke.ts",
+    "smoke:public-error-locale": "tsx src/http/public-error-locale.smoke.ts",
     "smoke:cron-schedule": "tsx src/cron/schedule.smoke.ts",
     "smoke:payment": "tsx src/modules/mobile/payment/payment.smoke.ts",
     "smoke:payment-config": "tsx src/modules/mobile/payment/payment.config.smoke.ts",

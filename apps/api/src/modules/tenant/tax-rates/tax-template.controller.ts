@@ -1,3 +1,4 @@
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 import type { Context } from "hono";
 import { z } from "zod";
 
@@ -31,7 +32,7 @@ export async function applyTaxTemplateController(c: Context<AppBindings>) {
     if (error instanceof ApplyTaxTemplateError) {
       return c.json({
         code: error.code,
-        message: error.message,
+        message: localizeErrorMessage(error.message, c.get("locale")),
         requestId: c.get("requestId"),
       }, error.status);
     }

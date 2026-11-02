@@ -1,3 +1,4 @@
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 import type { Context } from "hono";
 
 import type { AppBindings } from "../../../http/types.js";
@@ -41,7 +42,7 @@ function createTenantProductsErrorResponse(
 ) {
   return c.json(
     {
-      message: error.message,
+      message: localizeErrorMessage(error.message, c.get("locale")),
       code: error.code,
       ...(error.row ? { row: error.row } : {}),
       requestId: c.get("requestId"),

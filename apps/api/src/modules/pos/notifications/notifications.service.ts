@@ -1,3 +1,4 @@
+import { localizeSystemNotification } from "../../notifications/system-notification-copy.js";
 import { getDb, type Database } from "@cleanhub/db";
 
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
@@ -34,7 +35,7 @@ function requirePosTenantId(authContext: AuthContext): string {
 }
 
 export async function listPosNotifications(
-  input: { authContext: AuthContext; query: PosNotificationListQuery },
+  input: { authContext: AuthContext; query: PosNotificationListQuery; locale?: string },
   db: Database = getDb(),
 ): Promise<PosNotificationListResponse> {
   const tenantId = requirePosTenantId(input.authContext);
@@ -55,7 +56,7 @@ export async function listPosNotifications(
     countPosNotificationInbox(db, listInput),
   ]);
 
-  return { data, total };
+  return { data: data.map((item) => localizeSystemNotification(item, input.locale ?? input.authContext.language ?? "en")), total };
 }
 
 export async function getPosNotificationsOverview(
@@ -117,7 +118,7 @@ export async function markPosNotificationRead(
       });
     }
 
-    return after;
+    return localizeSystemNotification(after, input.locale ?? input.authContext.language ?? "en");
   });
 }
 
@@ -159,7 +160,7 @@ export async function archivePosNotification(
       });
     }
 
-    return after;
+    return localizeSystemNotification(after, input.locale ?? input.authContext.language ?? "en");
   });
 }
 

@@ -1,3 +1,4 @@
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 import type { Context } from "hono";
 
 import { getRequestMeta } from "../../../http/request-meta.js";
@@ -18,7 +19,7 @@ import {
 
 function createErrorResponse(c: Context<AppBindings>, error: TenantTaxRateError) {
   return c.json(
-    { message: error.message, code: error.code, requestId: c.get("requestId") },
+    { message: localizeErrorMessage(error.message, c.get("locale")), code: error.code, requestId: c.get("requestId") },
     error.status,
   );
 }

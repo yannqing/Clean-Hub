@@ -1,3 +1,4 @@
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 import type { Context } from "hono";
 
 import { getRequestMeta } from "../../../http/request-meta.js";
@@ -21,7 +22,7 @@ function createErrorResponse(
 ) {
   return c.json(
     {
-      message: error.message,
+      message: localizeErrorMessage(error.message, c.get("locale")),
       code: error.code,
       requestId: c.get("requestId"),
     },
@@ -35,6 +36,7 @@ export async function listTenantNotificationsController(
   const query = tenantNotificationListQuerySchema.parse(c.req.query());
   const result = await listTenantNotifications({
     authContext: c.get("authContext"),
+    locale: c.req.header("accept-language") ? c.get("locale") : undefined,
     query,
   });
   return c.json(result);
@@ -57,6 +59,7 @@ export async function markTenantNotificationReadController(
       authContext: c.get("authContext"),
       requestMeta: getRequestMeta(c),
       deliveryId: params.deliveryId,
+      locale: c.req.header("accept-language") ? c.get("locale") : undefined,
     });
     return c.json(notification);
   } catch (error) {
@@ -94,6 +97,7 @@ export async function archiveTenantNotificationController(
       authContext: c.get("authContext"),
       requestMeta: getRequestMeta(c),
       deliveryId: params.deliveryId,
+      locale: c.req.header("accept-language") ? c.get("locale") : undefined,
     });
     return c.json(notification);
   } catch (error) {

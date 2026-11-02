@@ -1,3 +1,4 @@
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 import type { Context } from "hono";
 
 import type { AppBindings } from "../../../http/types.js";
@@ -16,7 +17,7 @@ export async function getTenantFinanceSummaryController(
     if (error instanceof TenantFinanceError) {
       return c.json(
         {
-          message: error.message,
+          message: localizeErrorMessage(error.message, c.get("locale")),
           code: error.code,
           requestId: c.get("requestId"),
         },

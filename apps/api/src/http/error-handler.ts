@@ -2,6 +2,7 @@ import { ZodError } from "zod";
 
 import { AuthError } from "../modules/auth/auth.errors.js";
 import { localizeErrorMessage } from "./error-messages.js";
+import { localizeValidationMessage } from "./validation-messages.js";
 import type { AppBindings, ApiErrorResponse } from "./types.js";
 
 function getAuthErrorStatus(error: AuthError): 400 | 401 | 403 | 422 | 500 {
@@ -35,19 +36,25 @@ function getAuthErrorStatus(error: AuthError): 400 | 401 | 403 | 422 | 500 {
   }
 }
 
-export function handleApiError(error: Error, c: import("hono").Context<AppBindings>) {
+export function handleApiError(
+  error: Error,
+  c: import("hono").Context<AppBindings>,
+) {
   const requestId = c.get("requestId");
   const logger = c.get("logger");
 
   const locale = c.get("locale");
 
   if (error instanceof ZodError) {
+    const validation = error.flatten((issue) =>
+      localizeValidationMessage(issue, locale),
+    );
     return c.json<ApiErrorResponse>(
       {
         message: localizeErrorMessage("Request validation failed.", locale),
         code: "VALIDATION_ERROR",
         requestId,
-        validationErrors: error.flatten(),
+        validationErrors: validation,
       },
       422,
     );

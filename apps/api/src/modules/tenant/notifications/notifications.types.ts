@@ -61,12 +61,14 @@ export type MarkTenantNotificationReadInput = {
   authContext: AuthContext;
   requestMeta?: AuthRequestMeta;
   deliveryId: string;
+  locale?: string;
 };
 
 export type ArchiveTenantNotificationInput = {
   authContext: AuthContext;
   requestMeta?: AuthRequestMeta;
   deliveryId: string;
+  locale?: string;
 };
 
 export type MarkAllTenantNotificationsReadInput = {

@@ -1,3 +1,4 @@
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 import type { Context } from "hono";
 import { getCookie } from "hono/cookie";
 
@@ -41,7 +42,7 @@ function createErrorResponse(
 ) {
   return c.json(
     {
-      message: error.message,
+      message: localizeErrorMessage(error.message, c.get("locale")),
       code: error.code,
       requestId: c.get("requestId"),
     },
