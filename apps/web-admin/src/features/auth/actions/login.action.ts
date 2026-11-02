@@ -6,10 +6,11 @@ import { cookies, headers } from "next/headers";
 import { getWebAdminHomePath } from "@/config/auth-routing";
 import {
   isWebAdminLocale,
-  shouldApplyWebAdminDefaultLocale,
+  parseWebAdminLocale,
   webAdminLocaleCookieName,
   webAdminLocalePreferenceCookieName,
-} from "@/i18n";
+  type WebAdminLocale,
+} from "@/i18n/locale";
 import { webAdminApi } from "@/lib/api-client";
 
 import {
@@ -49,7 +50,7 @@ function getLoginErrorMessage(error: unknown): string {
  * redirecting based on role.
  */
 export async function loginAction(
-  input: LoginFormValues & { deviceId: string },
+  input: LoginFormValues & { deviceId: string; locale?: WebAdminLocale },
 ): Promise<LoginActionResult> {
   // Re-validate server-side; the client also validates, but never trust it
   // alone. `loginFormSchema` is the single source of truth for the rules.
@@ -65,8 +66,18 @@ export async function loginAction(
   }
 
   try {
+    const cookieStore = await cookies();
+    // The rendered login page is authoritative even on a first visit, when
+    // the user has never touched the language switcher. Older forms can omit
+    // locale; their cookie/default fallback matches the server's first paint.
+    const loginLocale =
+      typeof input.locale === "string" && isWebAdminLocale(input.locale)
+        ? input.locale
+        : parseWebAdminLocale(cookieStore.get(webAdminLocaleCookieName)?.value);
     const incomingHeaders = await headers();
-    const forwardedHeaders: Record<string, string> = {};
+    const forwardedHeaders: Record<string, string> = {
+      "accept-language": loginLocale,
+    };
     const userAgent = incomingHeaders.get("user-agent");
     const forwardedFor = incomingHeaders.get("x-forwarded-for");
 
@@ -120,23 +131,19 @@ export async function loginAction(
       );
     }
 
-    // Preserve the language chosen on the login page. Account or tenant
-    // defaults apply only when this browser has no explicit choice.
-    const cookieStore = await cookies();
-    if (
-      result.authContext.language &&
-      isWebAdminLocale(result.authContext.language) &&
-      shouldApplyWebAdminDefaultLocale(
-        cookieStore.get(webAdminLocaleCookieName)?.value,
-        cookieStore.get(webAdminLocalePreferenceCookieName)?.value,
-      )
-    ) {
-      cookieStore.set(webAdminLocaleCookieName, result.authContext.language, {
-        path: "/",
-        maxAge: 60 * 60 * 24 * 365,
-        sameSite: "lax",
-      });
-    }
+    // Persist before returning the authenticated response, so both SSR and
+    // dashboard session effects retain the login language without a flash.
+    const localeCookieOptions = {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: "lax",
+    } as const;
+    cookieStore.set(webAdminLocaleCookieName, loginLocale, localeCookieOptions);
+    cookieStore.set(
+      webAdminLocalePreferenceCookieName,
+      "1",
+      localeCookieOptions,
+    );
 
     return {
       ok: true,

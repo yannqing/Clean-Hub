@@ -135,6 +135,9 @@ jobs:
           pnpm --filter @cleanhub/pos-web typecheck
           pnpm --filter @cleanhub/desktop typecheck
 
+      - name: Verify web-admin login preserves the displayed language
+        run: pnpm --filter @cleanhub/web-admin smoke:login-locale
+
       - name: Run power-loss resilience smoke tests
         run: |
           sh -n deploy/postgres/backup-loop.sh deploy/postgres/cloud-backup-loop.sh deploy/postgres/cloud-object-storage-loop.sh deploy/postgres/restore-drill.sh

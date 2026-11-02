@@ -49,7 +49,7 @@ export function getWebAdminHtmlLang(locale: WebAdminLocale): string {
   return locale;
 }
 
-/** An explicit browser choice takes priority over account and tenant defaults. */
+/** A language accepted at login or chosen in the switcher outranks account/tenant defaults. */
 export function shouldApplyWebAdminDefaultLocale(
   localeCookie: string | null | undefined,
   preferenceCookie: string | null | undefined,

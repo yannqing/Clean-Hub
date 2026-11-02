@@ -16,6 +16,7 @@
     "smoke:tenant-i18n-feedback": "tsx src/i18n/tenant-feedback.smoke.ts",
     "smoke:tax-rate-percent": "tsx src/features/tenant/tax-rates/percent.smoke.ts",
     "smoke:proxy": "tsx src/proxy.smoke.ts",
+    "smoke:login-locale": "node ../../scripts/check-web-admin-login-locale.mjs",
     "smoke:product-import": "tsx src/features/tenant/products/product-import.smoke.ts"
   },
   "dependencies": {

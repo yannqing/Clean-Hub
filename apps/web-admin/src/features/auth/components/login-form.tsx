@@ -30,10 +30,7 @@ function isSafeInternalPath(path: string | null): path is string {
 }
 
 function isPathAllowedForHome(path: string, homePath: "/saas" | "/tenant") {
-  return (
-    path === homePath ||
-    path.startsWith(`${homePath}/`)
-  );
+  return path === homePath || path.startsWith(`${homePath}/`);
 }
 
 function resolvePostLoginPath(
@@ -63,7 +60,7 @@ function resolvePostLoginPath(
 
 export function LoginForm() {
   const router = useRouter();
-  const { messages } = useWebAdminLocale();
+  const { locale, messages } = useWebAdminLocale();
   const auth = messages.auth;
   const [errorCode, setErrorCode] = useState<
     "invalidForm" | "accessDenied" | "signInFailed" | null
@@ -99,6 +96,7 @@ export function LoginForm() {
     const result = await loginAction({
       ...values,
       deviceId: getOrCreateWebAdminDeviceId(),
+      locale,
     });
 
     if (!result.ok) {
@@ -195,9 +193,7 @@ export function LoginForm() {
             {...register("password")}
           />
           <Button
-            aria-label={
-              passwordVisible ? auth.passwordHide : auth.passwordShow
-            }
+            aria-label={passwordVisible ? auth.passwordHide : auth.passwordShow}
             className="absolute right-1 top-1/2 size-9 -translate-y-1/2 text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-50"
             onClick={() => setPasswordVisible((visible) => !visible)}
             size="icon-sm"
@@ -205,11 +201,7 @@ export function LoginForm() {
             type="button"
             variant="ghost"
           >
-            <Icon
-              aria-hidden
-              icon={passwordVisible ? EyeOff : Eye}
-              size={16}
-            />
+            <Icon aria-hidden icon={passwordVisible ? EyeOff : Eye} size={16} />
           </Button>
         </div>
         {errors.password ? (
@@ -231,7 +223,12 @@ export function LoginForm() {
         type="submit"
       >
         {isSubmitting ? (
-          <Icon aria-hidden className="animate-spin" icon={LoaderCircle} size={16} />
+          <Icon
+            aria-hidden
+            className="animate-spin"
+            icon={LoaderCircle}
+            size={16}
+          />
         ) : null}
         {isSubmitting ? auth.submitting : auth.submit}
       </Button>
