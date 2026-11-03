@@ -519,6 +519,13 @@
       "when": 1793672473378,
       "tag": "0073_brainy_blonde_phantom",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1793686457429,
+      "tag": "0074_repair_cancelled_delivery_appointments",
+      "breakpoints": true
     }
   ]
 }

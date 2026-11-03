@@ -121,14 +121,8 @@ export type DeliveryRepositoryLike = {
     capturedAt?: Date;
     createdBy: string;
   }): Promise<DeliveryProof>;
-  updateTaskStatus(input: {
-    taskId: string;
-    tenantId: string;
-    driverUserId: string;
-    fromStatus: DeliveryTaskStatus;
-    toStatus: DeliveryTaskStatus;
-    exceptionReason?: string;
-  }): Promise<boolean>;
+  transitionTask: DeliveryRepository["transitionTask"];
+  reconcileCancelledAppointment: DeliveryRepository["reconcileCancelledAppointment"];
   signTask(input: {
     tenantId: string;
     taskId: string;
@@ -405,13 +399,18 @@ export class DeliveryService {
 
     assertValidTransition(task.status, input.toStatus);
 
-    const updated = await this.repository.updateTaskStatus({
+    const updated = await this.repository.transitionTask({
       taskId: task.id,
       tenantId: driver.tenantId,
       driverUserId: driver.subjectId,
       fromStatus: task.status,
       toStatus: input.toStatus,
       exceptionReason: input.exceptionReason,
+      lat: input.lat,
+      lng: input.lng,
+      deviceId: input.deviceId,
+      idempotencyKey: input.idempotencyKey,
+      note: input.note,
     });
 
     if (!updated) {
@@ -430,19 +429,6 @@ export class DeliveryService {
       );
     }
 
-    const event = await this.repository.insertTaskEvent({
-      tenantId: driver.tenantId,
-      taskId: task.id,
-      fromStatus: task.status,
-      toStatus: input.toStatus,
-      lat: input.lat,
-      lng: input.lng,
-      deviceId: input.deviceId,
-      idempotencyKey: input.idempotencyKey,
-      note: input.note ?? input.exceptionReason,
-      createdBy: driver.subjectId,
-    });
-
     await this.publishDeliveryStatusChanged({
       task,
       fromStatus: task.status,
@@ -451,8 +437,8 @@ export class DeliveryService {
 
     return {
       task: await this.getTaskDetail(driver, task.id),
-      event,
-      idempotent: false,
+      event: updated.event,
+      idempotent: updated.idempotent,
     };
   }
 
@@ -836,6 +822,9 @@ export class DeliveryService {
     });
 
     if (existingEvent) {
+      await this.repository.reconcileCancelledAppointment({
+        tenantId: owner.tenantId, taskId: task.id, operatorUserId: owner.subjectId,
+      });
       return {
         task: await this.getTaskDetailForOperator(owner.tenantId, task.id),
         event: existingEvent,
@@ -863,15 +852,6 @@ export class DeliveryService {
 
     if (!cancelled) {
       await this.throwTaskChanged(owner.tenantId, task.id, task.status);
-    }
-
-    if (cancelled?.appointmentId) {
-      await this.appointmentOperations?.markDeliveryCancelled({
-        tenantId: owner.tenantId,
-        appointmentId: cancelled.appointmentId,
-        taskId: task.id,
-        operatorUserId: owner.subjectId,
-      });
     }
 
     await this.publishDeliveryStatusChanged({

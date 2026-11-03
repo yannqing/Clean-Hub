@@ -1,5 +1,5 @@
 import { PosOrderError } from "../../pos/orders/orders.errors.js";
-import { assertDeliveryBusinessLink, completeDeliveryBusinessRecords } from "./delivery-business.service.js";
+import { assertDeliveryBusinessLink, completeDeliveryBusinessRecords, reopenCancelledDeliveryAppointment } from "./delivery-business.service.js";
 import { createId } from "@cleanhub/id";
 import {
   and,
@@ -482,39 +482,92 @@ export class DeliveryRepository {
     return existing;
   }
 
-  async updateTaskStatus(input: {
+  /** Commit status and its idempotency event together, serialized by task. */
+  async transitionTask(input: {
     taskId: string;
     tenantId: string;
     driverUserId: string;
     fromStatus: DeliveryTaskStatus;
     toStatus: DeliveryTaskStatus;
     exceptionReason?: string;
-  }): Promise<boolean> {
-    const now = new Date();
-    const rows = await this.db
-      .update(deliveryTasks)
-      .set({
-        status: input.toStatus,
-        exceptionReason:
-          input.toStatus === "exception" ? input.exceptionReason : undefined,
-        cancellationReason: undefined,
-        updatedAt: now,
-        updatedBy: input.driverUserId,
-        version: sql`${deliveryTasks.version} + 1`,
-        ...getStatusTimestamps(input.toStatus, now),
-      })
-      .where(
-        and(
-          eq(deliveryTasks.id, input.taskId),
-          eq(deliveryTasks.tenantId, input.tenantId),
-          eq(deliveryTasks.assigneeUserId, input.driverUserId),
-          eq(deliveryTasks.status, input.fromStatus),
-          isNull(deliveryTasks.deletedAt),
-        ),
-      )
-      .returning({ id: deliveryTasks.id });
+    lat?: string;
+    lng?: string;
+    deviceId?: string;
+    idempotencyKey: string;
+    note?: string;
+  }): Promise<{ event: DeliveryTaskEvent; idempotent: boolean } | null> {
+    return this.db.transaction(async (tx) => {
+      const [task] = await tx
+        .select()
+        .from(deliveryTasks)
+        .where(
+          and(
+            eq(deliveryTasks.id, input.taskId),
+            eq(deliveryTasks.tenantId, input.tenantId),
+            eq(deliveryTasks.assigneeUserId, input.driverUserId),
+            isNull(deliveryTasks.deletedAt),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (!task) return null;
+      const repository = new DeliveryRepository(tx);
+      const existing = await repository.findTaskEventByIdempotencyKey(input);
+      if (existing) return { event: existing, idempotent: true };
+      if (task.status !== input.fromStatus) return null;
+      const now = new Date();
+      await tx
+        .update(deliveryTasks)
+        .set({
+          status: input.toStatus,
+          exceptionReason:
+            input.toStatus === "exception" ? input.exceptionReason : null,
+          updatedAt: now,
+          updatedBy: input.driverUserId,
+          version: sql`${deliveryTasks.version} + 1`,
+          ...getStatusTimestamps(input.toStatus, now),
+        })
+        .where(
+          and(
+            eq(deliveryTasks.id, task.id),
+            eq(deliveryTasks.tenantId, input.tenantId),
+          ),
+        );
+      const event = await repository.insertTaskEvent({
+        ...input,
+        note: input.note ?? input.exceptionReason,
+        createdBy: input.driverUserId,
+      });
+      return { event, idempotent: false };
+    });
+  }
 
-    return Boolean(rows[0]);
+  /** Also repairs a previously committed cancellation on an idempotent replay. */
+  async reconcileCancelledAppointment(input: {
+    tenantId: string;
+    taskId: string;
+    operatorUserId: string;
+  }): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const [task] = await tx
+        .select()
+        .from(deliveryTasks)
+        .where(
+          and(
+            eq(deliveryTasks.tenantId, input.tenantId),
+            eq(deliveryTasks.id, input.taskId),
+            eq(deliveryTasks.status, "cancelled"),
+            isNull(deliveryTasks.deletedAt),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (task?.appointmentId)
+        await reopenCancelledDeliveryAppointment(tx, {
+          ...input,
+          appointmentId: task.appointmentId,
+        });
+    });
   }
 
   async signTask(input: {
@@ -537,12 +590,24 @@ export class DeliveryRepository {
     return this.db.transaction(async (tx) => {
       const repository = new DeliveryRepository(tx);
       const now = new Date();
-      const [task] = await tx.select().from(deliveryTasks).where(and(
-        eq(deliveryTasks.tenantId, input.tenantId), eq(deliveryTasks.id, input.taskId),
-        eq(deliveryTasks.assigneeUserId, input.driverUserId), isNull(deliveryTasks.deletedAt),
-      )).for("update").limit(1);
+      const [task] = await tx
+        .select()
+        .from(deliveryTasks)
+        .where(
+          and(
+            eq(deliveryTasks.tenantId, input.tenantId),
+            eq(deliveryTasks.id, input.taskId),
+            eq(deliveryTasks.assigneeUserId, input.driverUserId),
+            isNull(deliveryTasks.deletedAt),
+          ),
+        )
+        .for("update")
+        .limit(1);
       if (!task || task.status !== input.fromStatus) return null;
-      await completeDeliveryBusinessRecords(tx, { ...task, driverUserId: input.driverUserId });
+      await completeDeliveryBusinessRecords(tx, {
+        ...task,
+        driverUserId: input.driverUserId,
+      });
       const updatedRows = await tx
         .update(deliveryTasks)
         .set({
@@ -596,9 +661,24 @@ export class DeliveryRepository {
       });
 
       if (task.appointmentId) {
-        await tx.update(appointments).set({ status: "done", doneAt: now, doneBy: input.driverUserId,
-          updatedAt: now, updatedBy: input.driverUserId, version: sql`${appointments.version} + 1`,
-        }).where(and(eq(appointments.tenantId, input.tenantId), eq(appointments.id, task.appointmentId), eq(appointments.deliveryTaskId, task.id), eq(appointments.status, "accepted")));
+        await tx
+          .update(appointments)
+          .set({
+            status: "done",
+            doneAt: now,
+            doneBy: input.driverUserId,
+            updatedAt: now,
+            updatedBy: input.driverUserId,
+            version: sql`${appointments.version} + 1`,
+          })
+          .where(
+            and(
+              eq(appointments.tenantId, input.tenantId),
+              eq(appointments.id, task.appointmentId),
+              eq(appointments.deliveryTaskId, task.id),
+              eq(appointments.status, "accepted"),
+            ),
+          );
       }
       return { event, proof, appointmentId: updatedRows[0].appointmentId };
     });
@@ -620,13 +700,36 @@ export class DeliveryRepository {
     notes?: string;
     appointmentId?: string;
   }): Promise<string> {
-    const [customer] = await this.db.select({ id: customers.id }).from(customers).where(and(
-      eq(customers.tenantId, input.tenantId), eq(customers.id, input.customerId), eq(customers.status, "active"), isNull(customers.deletedAt),
-    )).limit(1);
-    const [branch] = await this.db.select({ id: branches.id }).from(branches).where(and(
-      eq(branches.tenantId, input.tenantId), eq(branches.id, input.branchId), eq(branches.status, "active"), isNull(branches.deletedAt),
-    )).limit(1);
-    if (!customer || !branch) throw new PosOrderError("VALIDATION_ERROR", "The delivery customer or store is unavailable.", 422);
+    const [customer] = await this.db
+      .select({ id: customers.id })
+      .from(customers)
+      .where(
+        and(
+          eq(customers.tenantId, input.tenantId),
+          eq(customers.id, input.customerId),
+          eq(customers.status, "active"),
+          isNull(customers.deletedAt),
+        ),
+      )
+      .limit(1);
+    const [branch] = await this.db
+      .select({ id: branches.id })
+      .from(branches)
+      .where(
+        and(
+          eq(branches.tenantId, input.tenantId),
+          eq(branches.id, input.branchId),
+          eq(branches.status, "active"),
+          isNull(branches.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (!customer || !branch)
+      throw new PosOrderError(
+        "VALIDATION_ERROR",
+        "The delivery customer or store is unavailable.",
+        422,
+      );
     await assertDeliveryBusinessLink(this.db, input);
     const rows = await this.db
       .insert(deliveryTasks)
@@ -881,6 +984,12 @@ export class DeliveryRepository {
         createdBy: input.operatorUserId,
       });
 
+      if (updatedRows[0].appointmentId) {
+        await reopenCancelledDeliveryAppointment(tx, {
+          ...input,
+          appointmentId: updatedRows[0].appointmentId,
+        });
+      }
       return {
         event,
         appointmentId: updatedRows[0].appointmentId,

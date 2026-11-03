@@ -227,8 +227,8 @@ function createRepository(options?: {
     async isTenantDriver({ tenantId, userId }) {
       return tenantId === "tenant_1" && tenantDriverIds.has(userId);
     },
-    async findTaskEventByIdempotencyKey() {
-      return options?.existingEvent ?? null;
+    async findTaskEventByIdempotencyKey({ idempotencyKey }) {
+      return options?.existingEvent ?? events.find(event => event.idempotencyKey === idempotencyKey) ?? null;
     },
     async findProofByIdempotencyKey() {
       return options?.existingProof ?? null;
@@ -249,14 +249,16 @@ function createRepository(options?: {
       proofs.push(proof);
       return proof;
     },
-    async updateTaskStatus(input) {
-      if (options?.updateSucceeds === false || input.fromStatus !== status) {
-        return false;
-      }
-
+    async transitionTask(input) {
+      const existing = events.find(event => event.idempotencyKey === input.idempotencyKey);
+      if (existing) return { event: existing, idempotent: true };
+      if (options?.updateSucceeds === false || input.fromStatus !== status) return null;
+      const event = makeEvent(input.toStatus, input.idempotencyKey);
       status = input.toStatus;
-      return true;
+      events.push(event);
+      return { event, idempotent: false };
     },
+    async reconcileCancelledAppointment() {},
     async signTask(input) {
       if (options?.updateSucceeds === false || input.fromStatus !== status) {
         return null;
@@ -629,7 +631,6 @@ export async function runDeliverySmokeChecks(): Promise<void> {
     "reassign should replace assignee",
   );
 
-  let cancelledAppointmentId: string | null = null;
   const cancelled = await new DeliveryService({
     repository: createRepository({
       status: "en_route",
@@ -640,7 +641,7 @@ export async function runDeliverySmokeChecks(): Promise<void> {
     appointmentOperations: {
       async markDeliveryDone() {},
       async markDeliveryCancelled({ appointmentId }) {
-        cancelledAppointmentId = appointmentId;
+        throw new Error(`Cancellation must update appointment ${appointmentId} inside its repository transaction`);
       },
     },
   }).cancelTask({
@@ -650,10 +651,8 @@ export async function runDeliverySmokeChecks(): Promise<void> {
     reason: "Customer unavailable",
   });
   assert(cancelled.task.status === "cancelled", "cancel should terminalize task");
-  assert(
-    cancelledAppointmentId === "appointment_1",
-    "cancel should call appointment linkage",
-  );
+  // Appointment consistency and rollback are tested against PostgreSQL in
+  // mobile-readiness.integration; no separate post-commit callback is allowed.
 
   const ownerCreated = await new DeliveryService({
     repository: createRepository({ assigneeUserId: null }),

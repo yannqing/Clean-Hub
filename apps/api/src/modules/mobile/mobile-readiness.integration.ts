@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import "../../config/env.js";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   appointments,
   branches,
@@ -10,6 +11,7 @@ import {
   customerCredentials,
   customers,
   deliveryTasks,
+  deliveryTaskEvents,
   getDb,
   orderItems,
   orders,
@@ -115,6 +117,66 @@ try {
           permissions: [],
           accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
         };
+        // Exercise the historical repair SQL as well as the new runtime flow.
+        const strandedAppointmentId = createId(),
+          oldCancelledTaskId = createId();
+        await tx.insert(appointments).values({
+          id: strandedAppointmentId,
+          tenantId,
+          branchId,
+          customerId,
+          type: "pickup",
+          status: "accepted",
+          expectedAt: new Date(),
+          address: "Repair fixture",
+        });
+        await tx.insert(deliveryTasks).values({
+          id: oldCancelledTaskId,
+          tenantId,
+          branchId,
+          customerId,
+          appointmentId: strandedAppointmentId,
+          type: "pickup",
+          status: "cancelled",
+          customerName: "Repair fixture",
+          address: "Repair fixture",
+        });
+        const repairSql = await readFile(
+          new URL(
+            "../../../../../packages/db/drizzle/0074_repair_cancelled_delivery_appointments.sql",
+            import.meta.url,
+          ),
+          "utf8",
+        );
+        await tx.execute(sql.raw(repairSql));
+        const repaired = (
+          await tx
+            .select()
+            .from(appointments)
+            .where(eq(appointments.id, strandedAppointmentId))
+        )[0]!;
+        assert.equal(
+          repaired.status,
+          "pending",
+          "historical cancelled orphan is reopened",
+        );
+        await tx.execute(sql.raw(repairSql));
+        assert.equal(
+          (
+            await tx
+              .select()
+              .from(appointments)
+              .where(eq(appointments.id, strandedAppointmentId))
+          )[0]?.version,
+          repaired.version,
+          "repair migration is idempotent",
+        );
+        await tx
+          .delete(deliveryTasks)
+          .where(eq(deliveryTasks.id, oldCancelledTaskId));
+        await tx
+          .delete(appointments)
+          .where(eq(appointments.id, strandedAppointmentId));
         const customer: MobileAuthContext = {
           subjectId: accountId,
           tenantId,
@@ -434,7 +496,7 @@ try {
           () => customerRepo.createAppointment({ ...input, id: createId() }),
           "duplicate active return delivery is rejected",
         );
-        const accepted = await new OwnerRepository(
+        let accepted = await new OwnerRepository(
           tx,
         ).acceptAppointmentAndCreateTask({
           tenantId,
@@ -444,6 +506,170 @@ try {
         });
         assert.ok(accepted);
         const deliveryRepo = new DeliveryRepository(tx);
+        const statusInput = {
+          tenantId,
+          taskId: accepted.taskId,
+          driverUserId: userId,
+          fromStatus: "pending_dispatch" as const,
+          toStatus: "en_route" as const,
+          idempotencyKey: "status-fault-retry",
+        };
+        // Real PostgreSQL fault injection: event failure must roll back status.
+        await tx.execute(sql`CREATE FUNCTION pg_temp.reject_delivery_audit_write() RETURNS trigger
+          LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'INJECTED_DELIVERY_WRITE_FAILURE'; END $$`);
+        await tx.execute(
+          sql.raw(`CREATE TRIGGER readiness_event_fault BEFORE INSERT ON delivery_task_events
+          FOR EACH ROW WHEN (NEW.task_id = '${accepted.taskId}')
+          EXECUTE FUNCTION pg_temp.reject_delivery_audit_write()`),
+        );
+        await assert.rejects(
+          () => deliveryRepo.transitionTask(statusInput),
+          (error: unknown) =>
+            error instanceof Error &&
+            error.cause instanceof Error &&
+            error.cause.message.includes("INJECTED_DELIVERY_WRITE_FAILURE"),
+        );
+        assert.equal(
+          (
+            await tx
+              .select()
+              .from(deliveryTasks)
+              .where(eq(deliveryTasks.id, accepted.taskId))
+          )[0]?.status,
+          "pending_dispatch",
+        );
+        assert.equal(
+          (
+            await tx
+              .select()
+              .from(deliveryTaskEvents)
+              .where(
+                and(
+                  eq(deliveryTaskEvents.taskId, accepted.taskId),
+                  eq(
+                    deliveryTaskEvents.idempotencyKey,
+                    statusInput.idempotencyKey,
+                  ),
+                ),
+              )
+          ).length,
+          0,
+        );
+        await tx.execute(
+          sql`DROP TRIGGER readiness_event_fault ON delivery_task_events`,
+        );
+        assert.equal(
+          (await deliveryRepo.transitionTask(statusInput))?.idempotent,
+          false,
+        );
+        assert.equal(
+          (await deliveryRepo.transitionTask(statusInput))?.idempotent,
+          true,
+        );
+        const cancelInput = {
+          tenantId,
+          taskId: accepted.taskId,
+          operatorUserId: userId,
+          taskVersion: (
+            await tx
+              .select()
+              .from(deliveryTasks)
+              .where(eq(deliveryTasks.id, accepted.taskId))
+          )[0]!.version,
+          fromStatus: "en_route" as const,
+          idempotencyKey: "cancel-fault-retry",
+          reason: "Retry test",
+        };
+        await tx.execute(
+          sql.raw(`CREATE TRIGGER readiness_appointment_fault BEFORE UPDATE ON appointments
+          FOR EACH ROW WHEN (OLD.id = '${appointmentId}' AND NEW.status = 'pending')
+          EXECUTE FUNCTION pg_temp.reject_delivery_audit_write()`),
+        );
+        await assert.rejects(
+          () => deliveryRepo.cancelTask(cancelInput),
+          (error: unknown) =>
+            error instanceof Error &&
+            error.cause instanceof Error &&
+            error.cause.message.includes("INJECTED_DELIVERY_WRITE_FAILURE"),
+        );
+        assert.equal(
+          (
+            await tx
+              .select()
+              .from(deliveryTasks)
+              .where(eq(deliveryTasks.id, accepted.taskId))
+          )[0]?.status,
+          "en_route",
+        );
+        assert.equal(
+          (
+            await tx
+              .select()
+              .from(appointments)
+              .where(eq(appointments.id, appointmentId))
+          )[0]?.status,
+          "accepted",
+        );
+        assert.equal(
+          (
+            await tx
+              .select()
+              .from(deliveryTaskEvents)
+              .where(
+                and(
+                  eq(deliveryTaskEvents.taskId, accepted.taskId),
+                  eq(
+                    deliveryTaskEvents.idempotencyKey,
+                    cancelInput.idempotencyKey,
+                  ),
+                ),
+              )
+          ).length,
+          0,
+        );
+        await tx.execute(
+          sql`DROP TRIGGER readiness_appointment_fault ON appointments`,
+        );
+        assert.ok(await deliveryRepo.cancelTask(cancelInput));
+        assert.equal(
+          (
+            await tx
+              .select()
+              .from(appointments)
+              .where(eq(appointments.id, appointmentId))
+          )[0]?.status,
+          "pending",
+        );
+        const cancelledTaskId = accepted.taskId;
+        accepted = await new OwnerRepository(tx).acceptAppointmentAndCreateTask(
+          {
+            tenantId,
+            appointmentId,
+            operatorUserId: userId,
+            assigneeUserId: userId,
+          },
+        );
+        assert.ok(accepted);
+        assert.notEqual(
+          accepted.taskId,
+          cancelledTaskId,
+          "cancelled appointment can be assigned to a new task",
+        );
+        await deliveryRepo.reconcileCancelledAppointment({
+          tenantId,
+          taskId: cancelledTaskId,
+          operatorUserId: userId,
+        });
+        assert.equal(
+          (
+            await tx
+              .select()
+              .from(appointments)
+              .where(eq(appointments.id, appointmentId))
+          )[0]?.deliveryTaskId,
+          accepted.taskId,
+          "replaying old cancellation preserves replacement task",
+        );
         await tx
           .update(deliveryTasks)
           .set({ status: "delivering" })
@@ -598,15 +824,13 @@ try {
         const beforeAccess = await findPosAccountById(tx, tenantId, accountId);
         assert.equal(beforeAccess?.appAccess?.passwordEnabled, false);
         assert.equal(beforeAccess?.appAccess?.tenantCode, `TEST-${tenantId}`);
-        await tx
-          .insert(customerCredentials)
-          .values({
-            id: createId(),
-            tenantId,
-            customerAccountId: accountId,
-            passwordHash: "test-only",
-            mustChangePassword: true,
-          });
+        await tx.insert(customerCredentials).values({
+          id: createId(),
+          tenantId,
+          customerAccountId: accountId,
+          passwordHash: "test-only",
+          mustChangePassword: true,
+        });
         const issuedAccess = await findPosAccountById(tx, tenantId, accountId);
         assert.equal(issuedAccess?.appAccess?.passwordEnabled, true);
         assert.equal(issuedAccess?.appAccess?.mustChangePassword, true);

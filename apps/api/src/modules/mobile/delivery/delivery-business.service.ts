@@ -1,10 +1,11 @@
 import {
+  appointments,
   orderTicketReferences,
   orders,
   serviceTickets,
   type Database,
 } from "@cleanhub/db";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { AuthError } from "../../auth/auth.errors.js";
 import type { AuthContext } from "../../auth/auth.types.js";
 import { PosOrderError } from "../../pos/orders/orders.errors.js";
@@ -221,4 +222,28 @@ export async function completeDeliveryBusinessRecords(
     completed.push(order.id);
   }
   return completed;
+}
+
+/** Only reopen the appointment still linked to this cancelled task. A replay
+ * cannot detach a replacement task, nor reopen a completed appointment. */
+export async function reopenCancelledDeliveryAppointment(db: Database, input: {
+  tenantId: string; appointmentId: string; taskId: string; operatorUserId: string;
+}): Promise<void> {
+  await db.update(appointments).set({
+    status: "pending",
+    deliveryTaskId: null,
+    acceptedAt: null,
+    acceptedBy: null,
+    doneAt: null,
+    doneBy: null,
+    updatedAt: new Date(),
+    updatedBy: input.operatorUserId,
+    version: sql`${appointments.version} + 1`,
+  }).where(and(
+    eq(appointments.tenantId, input.tenantId),
+    eq(appointments.id, input.appointmentId),
+    eq(appointments.deliveryTaskId, input.taskId),
+    eq(appointments.status, "accepted"),
+    isNull(appointments.deletedAt),
+  ));
 }

@@ -1,3 +1,4 @@
+import { reopenCancelledDeliveryAppointment } from "../delivery/delivery-business.service.js";
 import { assertDeliveryBusinessLink } from "../delivery/delivery-business.service.js";
 import {
   and,
@@ -660,26 +661,6 @@ export class OwnerRepository {
     taskId: string;
     operatorUserId: string;
   }): Promise<void> {
-    const now = new Date();
-
-    await this.db
-      .update(appointments)
-      .set({
-        status: "accepted",
-        deliveryTaskId: null,
-        doneAt: null,
-        doneBy: null,
-        updatedAt: now,
-        updatedBy: input.operatorUserId,
-        version: sql`${appointments.version} + 1`,
-      })
-      .where(
-        and(
-          eq(appointments.id, input.appointmentId),
-          eq(appointments.tenantId, input.tenantId),
-          eq(appointments.deliveryTaskId, input.taskId),
-          isNull(appointments.deletedAt),
-        ),
-      );
+    await reopenCancelledDeliveryAppointment(this.db, input);
   }
 }

@@ -270,7 +270,7 @@ function createRepository(options?: {
       return appointment;
     },
     async markAppointmentDoneFromDelivery({ appointmentId, taskId }) {
-      if (appointment.id !== appointmentId || appointment.deliveryTaskId !== taskId) {
+      if (appointment.id !== appointmentId || appointment.deliveryTaskId !== taskId || appointment.status !== "accepted") {
         return;
       }
 
@@ -282,13 +282,13 @@ function createRepository(options?: {
       };
     },
     async reopenAppointmentFromCancelledDelivery({ appointmentId, taskId }) {
-      if (appointment.id !== appointmentId || appointment.deliveryTaskId !== taskId) {
+      if (appointment.id !== appointmentId || appointment.deliveryTaskId !== taskId || appointment.status !== "accepted") {
         return;
       }
 
       appointment = {
         ...appointment,
-        status: "accepted",
+        status: "pending",
         deliveryTaskId: null,
       };
     },
@@ -563,21 +563,20 @@ export async function runOwnerSmokeChecks(): Promise<void> {
     "signed delivery should mark appointment done",
   );
 
-  await linkageService.markDeliveryCancelled({
-    tenantId: "tenant_1",
-    appointmentId: "appointment_1",
-    taskId: "task_1",
-    operatorUserId: "owner_1",
+  const cancellableService = new OwnerService({
+    repository: createRepository({ appointmentStatus: "accepted", deliveryTaskId: "task_1" }),
+    deliveryRepository: createDeliveryRepository(),
   });
-  const reopenedAppointment = await linkageService.listAppointments({
-    authContext: ownerContext,
-    branchId: "branch_1",
+  await cancellableService.markDeliveryCancelled({
+    tenantId: "tenant_1", appointmentId: "appointment_1", taskId: "task_1", operatorUserId: "owner_1",
   });
-  assert(
-    reopenedAppointment[0]?.status === "accepted" &&
-      reopenedAppointment[0].deliveryTaskId === null,
-    "cancelled delivery should reopen appointment for redispatch",
-  );
+  const reopenedAppointment = await cancellableService.listAppointments({ authContext: ownerContext, branchId: "branch_1" });
+  assert(reopenedAppointment[0]?.status === "pending" && reopenedAppointment[0].deliveryTaskId === null,
+    "cancelled delivery should reopen appointment for redispatch");
+  const redispatched = await cancellableService.acceptAppointment({
+    authContext: ownerContext, appointmentId: "appointment_1", idempotencyKey: "redispatch",
+  });
+  assert(redispatched.appointment.status === "accepted", "reopened appointment can be accepted again");
 
   await assertRejectsOwner(
     () => service.getTodaySummary(driverContext),
