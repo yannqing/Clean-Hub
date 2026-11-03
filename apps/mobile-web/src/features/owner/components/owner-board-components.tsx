@@ -43,6 +43,7 @@ import {
   XCircle,
 } from "lucide-react";
 
+import { getPaymentStatusLabel } from "@/features/customer/lib/format";
 import { formatTenantMoney } from "@/lib/currency";
 import { MobileOptionSheet } from "@/components/mobile-option-sheet";
 
@@ -565,7 +566,6 @@ export function RefundRequestItem({
 }
 
 export function RefundOrderDetailSheet({
-  currency,
   error,
   isLoading,
   onApprove,
@@ -575,7 +575,6 @@ export function RefundOrderDetailSheet({
   order,
   refundRequest,
 }: {
-  currency: string;
   error: string | null;
   isLoading: boolean;
   onApprove: (request: MobileRefundRequest) => void;
@@ -613,7 +612,7 @@ export function RefundOrderDetailSheet({
                 <p className="mt-0.5 text-xs text-slate-500">{formatDateTime(refundRequest.createdAt, intlLocale, "-")}</p>
               </div>
             </div>
-            <p className="text-xl font-bold tabular-nums text-slate-950">{formatTenantMoney(refundRequest.amount, intlLocale, currency)}</p>
+            <p className="text-xl font-bold tabular-nums text-slate-950">{formatTenantMoney(refundRequest.amount, intlLocale, refundRequest.currency)}</p>
           </div>
         ) : null}
         {refundRequest ? (
@@ -636,18 +635,18 @@ export function RefundOrderDetailSheet({
               <div>
                 <dt className="text-slate-500">{t("customer.detail.total")}</dt>
                 <dd className="mt-1 font-semibold">
-                  {formatTenantMoney(order.totalAmount, intlLocale, currency)}
+                  {formatTenantMoney(order.totalAmount, intlLocale, order.currency)}
                 </dd>
               </div>
               <div>
                 <dt className="text-slate-500">{t("customer.detail.paid")}</dt>
                 <dd className="mt-1 font-semibold">
-                  {formatTenantMoney(order.paidAmount, intlLocale, currency)}
+                  {formatTenantMoney(order.paidAmount, intlLocale, order.currency)}
                 </dd>
               </div>
               <div>
                 <dt className="text-slate-500">{t("customer.detail.payment")}</dt>
-                <dd className="mt-1 font-semibold">{order.paymentStatus}</dd>
+                <dd className="mt-1 font-semibold">{getPaymentStatusLabel(t, order.paymentStatus)}</dd>
               </div>
               <div>
                 <dt className="text-slate-500">{t("customer.detail.created")}</dt>
@@ -677,11 +676,11 @@ export function RefundOrderDetailSheet({
                           {item.itemName}
                         </p>
                         <p className="text-xs text-slate-500">
-                          {item.quantity} x {formatTenantMoney(item.unitAmount, intlLocale, currency)}
+                          {item.quantity} x {formatTenantMoney(item.unitAmount, intlLocale, order.currency)}
                         </p>
                       </div>
                       <span className="shrink-0 font-semibold tabular-nums">
-                        {formatTenantMoney(item.lineAmount, intlLocale, currency)}
+                        {formatTenantMoney(item.lineAmount, intlLocale, order.currency)}
                       </span>
                     </div>
                   ))

@@ -920,7 +920,6 @@ export function OwnerHome({
       />
 
       <RefundOrderDetailSheet
-        currency={tenantCurrency}
         error={refundOrderError}
         isLoading={refundOrderLoading}
         open={refundOrderOpen}

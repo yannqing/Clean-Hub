@@ -10,6 +10,8 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { PrintLocale } from "@cleanhub/hardware";
+import { App } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { Button, toast } from "@cleanhub/ui";
@@ -420,12 +422,16 @@ export function DeliveryHome({
     [proofPhoto],
   );
 
-  const replayQueue = useCallback(async () => {
+  const replayInFlight = useRef(false);
+  const initialReplayStarted = useRef(false);
+  const replayQueue = useCallback(async (silent = false) => {
+    if (replayInFlight.current) return;
     if (!isOnline()) {
-      setWarning(t("delivery.messages.networkUnavailable"));
+      if (!silent) setWarning(t("delivery.messages.networkUnavailable"));
       return;
     }
 
+    replayInFlight.current = true;
     setActiveAction("sync");
     setError(null);
     setWarning(null);
@@ -434,9 +440,7 @@ export function DeliveryHome({
       const result = await replayPendingDeliveryOperations();
       await refreshQueue();
 
-      if (selectedTaskId) {
-        await refreshTasks(selectedTaskId);
-      }
+      if (result.replayed.length || selectedTaskId) await refreshTasks(selectedTaskId);
 
       if (result.failed) {
         setWarning(
@@ -445,21 +449,41 @@ export function DeliveryHome({
         return;
       }
 
-      toast.success(t("delivery.messages.syncCount", { count: result.replayed.length }));
+      if (!silent || result.replayed.length)
+        toast.success(t("delivery.messages.syncCount", { count: result.replayed.length }));
     } catch (nextError) {
       setError(getErrorMessage(nextError, t("delivery.messages.genericAction"), t));
     } finally {
+      replayInFlight.current = false;
       setActiveAction(null);
     }
   }, [refreshQueue, refreshTasks, selectedTaskId, t]);
 
   useEffect(() => {
+    if (!isBooting && !initialReplayStarted.current) {
+      initialReplayStarted.current = true;
+      void replayQueue(true);
+    }
+  }, [isBooting, replayQueue]);
+
+  useEffect(() => {
     function handleOnline() {
-      void replayQueue();
+      void replayQueue(true);
+    }
+    function handleVisible() {
+      if (document.visibilityState === "visible") handleOnline();
     }
 
     window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
+    document.addEventListener("visibilitychange", handleVisible);
+    const listener = Capacitor.isNativePlatform()
+      ? App.addListener("appStateChange", ({ isActive }) => { if (isActive) handleOnline(); })
+      : null;
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      document.removeEventListener("visibilitychange", handleVisible);
+      void listener?.then(handle => handle.remove()).catch(() => undefined);
+    };
   }, [replayQueue]);
 
   function applyQueuedStatus(taskId: string, status: DeliveryTaskStatus) {

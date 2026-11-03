@@ -579,22 +579,20 @@ export function CustomerHome({
       setError(null);
 
       try {
-        const [detail, nextRefundRequests] = await Promise.all([
-          getCustomerActivityDetail(selection),
-          selection.kind === "order"
-            ? getCustomerRefundRequests()
-            : Promise.resolve(null),
-        ]);
-
-        if (nextRefundRequests) {
-          setRefundRequests(nextRefundRequests.data);
-        }
+        // Refund history has its own cache and availability. It must never
+        // prevent a cached order from opening when this terminal is offline.
+        const detail = await getCustomerActivityDetail(selection);
 
         setActivityDetail(
           selection.kind === "order"
             ? { kind: "order", data: detail as MobileCustomerOrderDetail }
             : { kind: "ticket", data: detail as MobileCustomerTicketDetail },
         );
+        if (selection.kind === "order") {
+          void getCustomerRefundRequests()
+            .then((requests) => setRefundRequests(requests.data))
+            .catch(() => undefined);
+        }
       } catch (nextError) {
         closeActivityDetail(false);
         writeMobileDetailUrlState(null, "replace");

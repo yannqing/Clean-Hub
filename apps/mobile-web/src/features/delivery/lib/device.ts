@@ -20,6 +20,7 @@ type CameraModule = {
   getPhoto(options: {
     quality?: number;
     allowEditing?: boolean;
+    saveToGallery?: boolean;
     resultType: "base64";
     source: "CAMERA" | "PHOTOS";
   }): Promise<{
@@ -225,6 +226,7 @@ export async function captureDeliveryPhoto(
 
     const photo = await camera.getPhoto({
       quality: 72,
+      saveToGallery: false,
       allowEditing: false,
       resultType: "base64",
       source: source === "gallery" ? "PHOTOS" : "CAMERA",

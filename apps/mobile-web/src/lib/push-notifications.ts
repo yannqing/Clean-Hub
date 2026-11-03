@@ -45,7 +45,7 @@ type FirebaseMessagingPlugin = {
   ): Promise<PluginListenerHandle>;
   addListener(
     eventName: "notificationReceived",
-    listener: (notification: PushNotificationSchema) => void,
+    listener: (event: { notification: PushNotificationSchema }) => void,
   ): Promise<PluginListenerHandle>;
   addListener(
     eventName: "notificationActionPerformed",
@@ -315,7 +315,7 @@ async function attachListeners(
       }
     });
 
-    await plugin.addListener("notificationReceived", (notification) => {
+    await plugin.addListener("notificationReceived", ({ notification }) => {
       window.dispatchEvent(new Event("cleanhub:notification"));
       showForegroundToast(notification);
     });
