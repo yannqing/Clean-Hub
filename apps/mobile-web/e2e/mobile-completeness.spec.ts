@@ -28,13 +28,6 @@ type CustomerActivityResponse = {
   };
 };
 
-type CustomerOrderDetailResponse = {
-  id: string;
-  paymentStatus: string;
-  totalAmount: string;
-  paidAmount: string;
-};
-
 type CustomerProfileResponse = {
   account: { id: string };
   addresses: Array<{ customerId: string }>;
@@ -54,22 +47,6 @@ type DeliveryTaskDetailResponse = DeliveryTaskResponse & {
   status: string;
 };
 
-type PosOrderResponse = {
-  id: string;
-  paymentStatus: string;
-  totalAmount: string;
-  paidAmount: string;
-};
-
-type PaymentStatusResponse = {
-  transaction: {
-    id: string;
-    paymentStatus: string;
-  };
-};
-
-const SEEDED_PRODUCT_SOURCE_ID = "01SEED0100SVC0000000000008";
-const PAID_STATUS_PATTERN = /^paid$|^已付$/i;
 const PENDING_SYNC_PATTERN =
   /1 pending sync|1 to sync|1 个操作待同步|1 个待同步/i;
 
@@ -77,18 +54,6 @@ async function apiHealth(): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/health`);
 
   expect(response.status, `API health at ${API_BASE_URL}/health`).toBe(200);
-}
-
-function amountToCents(value: string): number {
-  const [whole, fraction = ""] = value.split(".");
-  return Number.parseInt(whole, 10) * 100 + Number.parseInt(fraction.padEnd(2, "0").slice(0, 2), 10);
-}
-
-function getPaymentIdFromUrl(url: string): string {
-  const paymentId = new URL(url).searchParams.get("paymentId");
-
-  expect(paymentId, `Payment URL should include paymentId: ${url}`).toBeTruthy();
-  return paymentId ?? "";
 }
 
 function workspaceReadyPattern(role: "customer" | "driver" | "owner"): RegExp {
@@ -156,14 +121,6 @@ async function loginByApi(
   });
 }
 
-async function loginPosOwnerByApi(api: APIRequestContext): Promise<void> {
-  await apiPost(api, "/auth/login", {
-    identifier: "tenant.admin1@cleanhub.local",
-    password: PASSWORD,
-    deviceId: `playwright-pos-owner-${Date.now()}`,
-  });
-}
-
 async function loginInBrowser(
   page: Page,
   role: "customer" | "driver" | "owner",
@@ -191,25 +148,6 @@ async function loginInBrowser(
   });
 }
 
-async function clickPayAndOpenMockPage(page: Page): Promise<{
-  paymentPage: Page;
-  openedInPopup: boolean;
-}> {
-  const popupPromise = page.waitForEvent("popup", { timeout: 5_000 }).catch(() => null);
-
-  await page.getByRole("button", { name: /^(支付|Pay)$/ }).click();
-
-  const popup = await popupPromise;
-  const paymentPage = popup ?? page;
-  await paymentPage.waitForLoadState("domcontentloaded");
-  await expect(paymentPage).toHaveURL(/\/payments\/mock\?/);
-
-  return {
-    paymentPage,
-    openedInPopup: Boolean(popup),
-  };
-}
-
 async function firstCustomerOrder(api: APIRequestContext): Promise<{
   token: TokenResponse;
   orderId: string;
@@ -227,54 +165,6 @@ async function firstCustomerOrder(api: APIRequestContext): Promise<{
 
   expect(order, "Seeded customer account must have at least one paid order").toBeTruthy();
   return { token, orderId: order.id, totalAmount: order.totalAmount };
-}
-
-async function createPayableCustomerOrder(api: APIRequestContext): Promise<{
-  customer: TokenResponse;
-  orderId: string;
-  totalAmount: string;
-}> {
-  const [owner, customer] = await Promise.all([
-    loginByApi(api, "owner"),
-    loginByApi(api, "customer"),
-  ]);
-  const [branches, profile] = await Promise.all([
-    apiGet<OwnerBranchesResponse>(api, "/mobile/owner/branches", owner.accessToken),
-    apiGet<CustomerProfileResponse>(api, "/mobile/customer/profile", customer.accessToken),
-  ]);
-  const branch = branches.data[0];
-  const customerId = profile.addresses[0]?.customerId;
-
-  expect(branch, "Owner branch list should not be empty").toBeTruthy();
-  expect(customerId, "Customer profile should include a linked customer").toBeTruthy();
-
-  await loginPosOwnerByApi(api);
-
-  const order = await apiPost<PosOrderResponse>(api, "/pos/orders", {
-    orderType: "manual",
-    branchId: branch.id,
-    customerId,
-    items: [
-      {
-        sourceType: "product",
-        sourceId: SEEDED_PRODUCT_SOURCE_ID,
-        itemName: `Playwright payment item ${Date.now().toString(36)}`,
-        quantity: "1",
-        unitAmount: "8.25",
-      },
-    ],
-    expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    notes: "Created by Playwright mobile payment E2E",
-  });
-
-  expect(order.paymentStatus).toBe("unpaid");
-  expect(amountToCents(order.totalAmount)).toBeGreaterThan(0);
-
-  return {
-    customer,
-    orderId: order.id,
-    totalAmount: order.totalAmount,
-  };
 }
 
 async function createDeliveryTask(api: APIRequestContext): Promise<DeliveryTaskResponse> {
@@ -357,46 +247,18 @@ test.describe("mobile web completeness", () => {
     await expect(page.getByText(/已付|Paid/).first()).toBeVisible();
   });
 
-  test("customer mock payment returns to a paid order detail", async ({ page }) => {
-    const order = await createPayableCustomerOrder(api);
-
+  test("customer order detail is read-only for payment and mock routes are absent", async ({ page }) => {
+    const { token, orderId } = await firstCustomerOrder(api);
     await loginInBrowser(page, "customer");
-    await page.goto(`/?view=order&id=${order.orderId}`);
-    await expect(page.getByText(new RegExp(order.orderId.slice(-6).toUpperCase()))).toBeVisible({
-      timeout: 20_000,
-    });
-    await expect(page.getByRole("button", { name: /^(支付|Pay)$/ })).toBeEnabled();
-
-    const { paymentPage, openedInPopup } = await clickPayAndOpenMockPage(page);
-    const paymentId = getPaymentIdFromUrl(paymentPage.url());
-
-    await paymentPage.getByRole("button", { name: /确认支付|Confirm payment/ }).click();
-    await expect(paymentPage.getByText(/支付已确认|Payment confirmed/)).toBeVisible();
-
-    if (openedInPopup) {
-      await paymentPage.close();
-      await page.bringToFront();
+    await page.goto(`/?view=order&id=${orderId}`);
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByRole("button", { name: /^(支付|Pay)$/ })).toHaveCount(0);
+    for (const path of [`/mobile/payment/orders/${orderId}/payments`, `/mobile/payment/payments/${orderId}/mock-callback`]) {
+      const response = await api.post(`${API_BASE_URL}${path}`, {
+        headers: { Authorization: `Bearer ${token.accessToken}`, "X-CleanHub-Auth-Client": "mobile" }, data: {},
+      });
+      expect(response.status()).toBe(404);
     }
-
-    await page.goto(`/?view=order&id=${order.orderId}`);
-    await page.reload();
-
-    const paidOrder = await apiGet<CustomerOrderDetailResponse>(
-      api,
-      `/mobile/customer/orders/${order.orderId}`,
-      order.customer.accessToken,
-    );
-    const paymentStatus = await apiGet<PaymentStatusResponse>(
-      api,
-      `/mobile/payment/payments/${paymentId}`,
-      order.customer.accessToken,
-    );
-
-    expect(paymentStatus.transaction.paymentStatus).toBe("paid");
-    expect(paidOrder.paymentStatus).toBe("paid");
-    expect(amountToCents(paidOrder.paidAmount)).toBe(amountToCents(order.totalAmount));
-    await expect(page.getByText(PAID_STATUS_PATTERN).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: /^(支付|Pay)$/ })).toBeDisabled();
   });
 
   test("delivery task detail survives direct URL and refresh", async ({ page }) => {

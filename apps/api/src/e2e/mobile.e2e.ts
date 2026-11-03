@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHmac } from "node:crypto";
 import {
   buildDeliveryLabelText,
   buildDeliveryReceiptText,
@@ -16,8 +15,6 @@ const API_BASE_URL =
 
 const TENANT_CODE = process.env.MOBILE_E2E_TENANT_CODE ?? "CLEAN-001";
 const PASSWORD = process.env.MOBILE_E2E_PASSWORD ?? "123456";
-const PAYMENT_MOCK_SECRET =
-  process.env.PAYMENT_MOCK_SECRET ?? "cleanhub-mock-payment-secret";
 const DEVICE_ID = `mobile-e2e-${Date.now()}`;
 
 const FIXTURES = {
@@ -60,29 +57,12 @@ type MediaUploadTicket = {
   expiresAt: string;
 };
 
-type PaymentInitiationResponse = {
-  transaction: {
-    id: string;
-    orderId: string;
-    amount: string;
-    paymentStatus: "pending" | "paid" | "refunded" | "failed";
-  };
-  gateway: {
-    gateway: "mock";
-    externalId: string;
-    paymentUrl: string;
-    paymentToken: string;
-    expiresAt: string;
-  };
-  idempotent: boolean;
-};
-
 type RefundRequestResponse = {
   id: string;
   amount: string;
   orderId: string;
   paymentTransactionId: string | null;
-  status: "pending" | "processing" | "rejected" | "refunded" | "failed";
+  status: "pending" | "approved" | "processing" | "rejected" | "refunded" | "failed";
   externalId: string | null;
 };
 
@@ -102,40 +82,6 @@ function normalizePrintableText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== "object") {
-    return JSON.stringify(value);
-  }
-
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
-  }
-
-  return `{${Object.entries(value as Record<string, unknown>)
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
-    .join(",")}}`;
-}
-
-function signMockPaymentPayload(payload: JsonObject): string {
-  return createHmac("sha256", PAYMENT_MOCK_SECRET)
-    .update(stableStringify(payload))
-    .digest("hex");
-}
-
-async function sendMockPaymentWebhook(
-  payload: JsonObject,
-  expectedStatus: number | number[] = 200,
-): Promise<void> {
-  await request("/mobile/payment/webhooks/mock", {
-    expectedStatus,
-    body: payload,
-    headers: {
-      "X-CleanHub-Mock-Signature": signMockPaymentPayload(payload),
-    },
-  });
-}
-
 async function request<T = JsonObject>(
   path: string,
   options: {
@@ -153,6 +99,7 @@ async function request<T = JsonObject>(
     method: options.method ?? (options.body ? "POST" : "GET"),
     headers: {
       Accept: "application/json",
+      "X-CleanHub-Auth-Client": "mobile",
       ...(options.body ? { "Content-Type": "application/json" } : {}),
       ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
       ...(options.headers ?? {}),
@@ -708,187 +655,33 @@ async function verifyPaymentFlow(input: {
   customer: MobileTokenResponse;
   owner: MobileTokenResponse;
 }): Promise<void> {
-  const startingOrder = await request<{
-    paymentStatus: string;
-    totalAmount: string;
-    paidAmount: string;
-  }>(`/mobile/customer/orders/${FIXTURES.orderId}`, {
-    token: input.customer.accessToken,
+  const activity = await request<{ data: { orders: Array<{ id: string; paidAmount: string; totalAmount: string; currency: string }> } }>("/mobile/customer/orders", { token: input.customer.accessToken });
+  const order = activity.body.data.orders.find(row => amountToCents(row.paidAmount) >= 100);
+  assert.ok(order, "refund checks require an order paid through POS fixtures");
+  // Customers cannot initiate or self-confirm payments.
+  for (const path of [`/mobile/payment/orders/${order.id}/payments`, `/mobile/payment/payments/${order.id}/mock-callback`]) {
+    await request(path, { expectedStatus: 404, token: input.customer.accessToken, body: {} });
+  }
+  const amount = centsToAmount(100);
+  const refund = await request<RefundRequestResponse>(`/mobile/payment/orders/${order.id}/refund-requests`, {
+    expectedStatus: 201, token: input.customer.accessToken, body: { amount, reason: "Mobile E2E approval does not settle money" },
   });
-  const startingPaidCents = amountToCents(startingOrder.body.paidAmount);
-  const balanceCents =
-    amountToCents(startingOrder.body.totalAmount) - startingPaidCents;
-  const paymentCents = Math.min(Math.max(balanceCents, 1), 1000);
-  const paymentAmount = centsToAmount(paymentCents);
-
-  assert.ok(balanceCents > 0, "payment flow requires a positive order balance");
-
-  await request(`/mobile/payment/orders/${FIXTURES.orderId}/payments`, {
-    expectedStatus: 422,
-    token: input.customer.accessToken,
-    body: {
-      amount: "999.00",
-      idempotencyKey: idempotencyKey("payment-over"),
-    },
-  });
-
-  const payment = await request<PaymentInitiationResponse>(
-    `/mobile/payment/orders/${FIXTURES.orderId}/payments`,
-    {
-      expectedStatus: 201,
-      token: input.customer.accessToken,
-      body: {
-        amount: paymentAmount,
-        idempotencyKey: idempotencyKey("payment-balance"),
-      },
-    },
-  );
-
-  assert.equal(payment.body.transaction.paymentStatus, "pending");
-  assert.equal(payment.body.gateway.gateway, "mock");
-  assert.match(payment.body.gateway.paymentUrl, /\/payments\/mock/);
-
-  const replay = await request<PaymentInitiationResponse>(
-    `/mobile/payment/orders/${FIXTURES.orderId}/payments`,
-    {
-      expectedStatus: 201,
-      token: input.customer.accessToken,
-      body: {
-        amount: paymentAmount,
-        idempotencyKey: idempotencyKey("payment-balance"),
-      },
-    },
-  );
-  assert.equal(replay.body.idempotent, true);
-  assert.equal(replay.body.transaction.id, payment.body.transaction.id);
-
-  await request(`/mobile/payment/payments/${payment.body.transaction.id}/mock-callback`, {
-    token: input.customer.accessToken,
-    body: {
-      status: "paid",
-    },
-  });
-
-  await sendMockPaymentWebhook({
-    gateway: "mock",
-    action: "pay",
-    tenantId: FIXTURES.tenantId,
-    externalId: payment.body.gateway.externalId,
-    event: `mock.payment.paid.${payment.body.transaction.id}`,
-    status: "paid",
-    amount: paymentAmount,
-    transactionId: payment.body.transaction.id,
-    occurredAt: new Date().toISOString(),
-  });
-
-  await request("/mobile/payment/webhooks/mock", {
-    expectedStatus: 200,
-    body: {
-      gateway: "mock",
-      action: "pay",
-      tenantId: FIXTURES.tenantId,
-      externalId: `${DEVICE_ID}.invalid`,
-      event: `${DEVICE_ID}.payment.invalid`,
-      status: "paid",
-      amount: "10.00",
-      transactionId: "missing",
-      occurredAt: new Date().toISOString(),
-    },
-    headers: {
-      "X-CleanHub-Mock-Signature": "bad",
-    },
-  });
-
-  const paidStatus = await request<{
-    transaction: { paymentStatus: string; amount: string };
-  }>(`/mobile/payment/payments/${payment.body.transaction.id}`, {
-    token: input.customer.accessToken,
-  });
-
-  assert.equal(paidStatus.body.transaction.paymentStatus, "paid");
-
-  const paidOrder = await request<{ paymentStatus: string; paidAmount: string }>(
-    `/mobile/customer/orders/${FIXTURES.orderId}`,
-    { token: input.customer.accessToken },
-  );
-  assert.ok(["paid", "partial"].includes(paidOrder.body.paymentStatus));
-  assert.equal(
-    paidOrder.body.paidAmount,
-    centsToAmount(startingPaidCents + paymentCents),
-  );
-
-  await request(`/mobile/payment/orders/${FIXTURES.orderId}/refund-requests`, {
-    expectedStatus: 422,
-    token: input.customer.accessToken,
-    body: {
-      amount: "999.00",
-      reason: "Too much",
-    },
-  });
-
-  const refundCents = Math.min(paymentCents, 1000);
-  const refundAmount = centsToAmount(refundCents);
-  const refund = await request<RefundRequestResponse>(
-    `/mobile/payment/orders/${FIXTURES.orderId}/refund-requests`,
-    {
-      expectedStatus: 201,
-      token: input.customer.accessToken,
-      body: {
-        amount: refundAmount,
-        reason: "Mobile E2E refund request",
-      },
-    },
-  );
   assert.equal(refund.body.status, "pending");
-
-  await request(`/mobile/payment/refund-requests/${refund.body.id}/approve`, {
-    method: "POST",
-    expectedStatus: 403,
-    token: input.customer.accessToken,
+  await request(`/mobile/payment/refund-requests/${refund.body.id}/approve`, { method: "POST", expectedStatus: 403, token: input.customer.accessToken });
+  const approved = await request<{ refundRequest: RefundRequestResponse; gateway?: unknown }>(`/mobile/payment/refund-requests/${refund.body.id}/approve`, { method: "POST", token: input.owner.accessToken });
+  assert.equal(approved.body.refundRequest.status, "approved");
+  assert.equal(approved.body.gateway, undefined);
+  const after = await request<{ paidAmount: string }>(`/mobile/customer/orders/${order.id}`, { token: input.customer.accessToken });
+  assert.equal(after.body.paidAmount, order.paidAmount, "approval must not pretend that cash or provider money was returned");
+  await request(`/mobile/payment/refund-requests/${refund.body.id}/settlement`, { expectedStatus: 403, token: input.customer.accessToken });
+  const plan = await request<{ canSettle: boolean }>(`/mobile/payment/refund-requests/${refund.body.id}/settlement`, { token: input.owner.accessToken });
+  assert.equal(plan.body.canSettle, true);
+  // No money is moved by this HTTP E2E. Mixed-tender settlement and ledger
+  // reconciliation are covered by the rollback-only readiness integration.
+  const rejected = await request<RefundRequestResponse>(`/mobile/payment/refund-requests/${refund.body.id}/reject`, {
+    token: input.owner.accessToken, body: { reason: "E2E record only; no actual refund" },
   });
-
-  const approved = await request<{
-    refundRequest: RefundRequestResponse;
-    gateway: { externalId: string };
-  }>(`/mobile/payment/refund-requests/${refund.body.id}/approve`, {
-    method: "POST",
-    token: input.owner.accessToken,
-  });
-
-  assert.equal(approved.body.refundRequest.status, "refunded");
-
-  await sendMockPaymentWebhook({
-    gateway: "mock",
-    action: "refund",
-    tenantId: FIXTURES.tenantId,
-    externalId: approved.body.gateway.externalId,
-    event: `${DEVICE_ID}.refund.succeeded`,
-    status: "refunded",
-    amount: refundAmount,
-    transactionId: payment.body.transaction.id,
-    refundRequestId: refund.body.id,
-    occurredAt: new Date().toISOString(),
-  });
-
-  const refundList = await request<{
-    data: Array<{ id: string; status: string }>;
-  }>("/mobile/payment/refund-requests", {
-    token: input.customer.accessToken,
-  });
-  assert.ok(
-    refundList.body.data.some(
-      (item) => item.id === refund.body.id && item.status === "refunded",
-    ),
-  );
-
-  const refundedOrder = await request<{ paidAmount: string }>(
-    `/mobile/customer/orders/${FIXTURES.orderId}`,
-    { token: input.customer.accessToken },
-  );
-  assert.equal(
-    refundedOrder.body.paidAmount,
-    centsToAmount(startingPaidCents + paymentCents - refundCents),
-  );
+  assert.equal(rejected.body.status, "rejected");
 }
 
 async function verifyAccessIsolation(input: {

@@ -38,6 +38,7 @@ function collectThrownMessages(): Map<string, string[]> {
   const roots = [
     join(apiSrc, "modules", "pos"),
     join(apiSrc, "modules", "auth"),
+    join(apiSrc, "modules", "mobile"),
     join(apiSrc, "modules", "tax"),
     join(apiSrc, "modules", "tenant"),
     join(apiSrc, "http"),
@@ -47,6 +48,8 @@ function collectThrownMessages(): Map<string, string[]> {
     .filter((file) => !file.includes(".test.") && !file.includes(".smoke."));
 
   const patterns = [
+    /(?:invalid|validationError|conflict|appointmentConflict)\(\s*"((?:[^"\\]|\\.)*)"/g,
+    /(?:\?|:)\s*"(Delivery task (?:is already terminal and cannot be overwritten|status transition is not allowed)\.)"/g,
     // new PosOrderError("CODE", "message"
     /new\s+\w*Error\(\s*\n?\s*"[A-Z_]+"\s*,\s*\n?\s*"((?:[^"\\]|\\.)*)"/g,
     // { code: "CODE", message: "message" }
