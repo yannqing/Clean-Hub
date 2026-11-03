@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { AppBindings } from "../../../http/types.js";
 import { createCustomerController } from "./customer.controller.js";
 import { CustomerService } from "./customer.service.js";
+import { customerTrackingController } from "./customer-tracking.controller.js";
 
 export type CreateCustomerRoutesOptions = {
   customerService?: CustomerService;
@@ -30,6 +31,7 @@ export function createCustomerRoutes({
   routes.get("/orders/:id", controller.getOrderDetail);
   routes.get("/tickets/:id", controller.getTicketDetail);
   routes.get("/appointments", controller.listAppointments);
+  routes.get("/appointments/:id", customerTrackingController);
   routes.post("/appointments", controller.createAppointment);
   routes.post("/appointments/:id/cancel", controller.cancelAppointment);
 

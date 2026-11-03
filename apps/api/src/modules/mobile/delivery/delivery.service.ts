@@ -7,7 +7,6 @@ import {
 
 import {
   deliveryStatusChangedEvent,
-  orderCompletedEvent,
   type NotificationPublisher,
 } from "../../notifications/index.js";
 import type { AppointmentOperationsServiceLike } from "../owner/owner.service.js";
@@ -587,14 +586,6 @@ export class DeliveryService {
       );
     }
 
-    if (signed.appointmentId) {
-      await this.appointmentOperations?.markDeliveryDone({
-        tenantId: driver.tenantId,
-        appointmentId: signed.appointmentId,
-        taskId: task.id,
-        operatorUserId: driver.subjectId,
-      });
-    }
 
     await this.publishDeliveryStatusChanged({
       task,
@@ -622,6 +613,7 @@ export class DeliveryService {
     }
 
     if (input.authContext.role === "driver") {
+      this.assertBranchAccess(input.authContext, input.branchId);
       if (input.assigneeUserId !== input.authContext.subjectId) {
         throw forbidden();
       }
@@ -1031,6 +1023,7 @@ export class DeliveryService {
     try {
       await this.notificationPublisher.publish(
         deliveryStatusChangedEvent({
+          appointmentId: input.task.appointmentId,
           tenantId: input.task.tenantId,
           branchId: input.task.branchId,
           customerId: input.task.customerId,
@@ -1045,21 +1038,7 @@ export class DeliveryService {
         }),
       );
 
-      if (
-        input.toStatus === "signed" &&
-        input.task.type === "dropoff" &&
-        input.task.orderId
-      ) {
-        await this.notificationPublisher.publish(
-          orderCompletedEvent({
-            tenantId: input.task.tenantId,
-            branchId: input.task.branchId,
-            customerId: input.task.customerId,
-            orderId: input.task.orderId,
-            orderNo: input.task.orderId,
-          }),
-        );
-      }
+
     } catch (error) {
       logger.error(
         {

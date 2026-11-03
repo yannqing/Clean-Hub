@@ -108,6 +108,8 @@ export type MobileCustomerTicketStatus =
   | "exception";
 
 export type MobileCustomerOrderListItem = {
+  currency: string;
+  orderCode: string;
   id: string;
   branchId: string;
   customerId: string;
@@ -131,12 +133,23 @@ export type MobileCustomerOrderItem = {
 };
 
 export type MobileCustomerOrderDetail = MobileCustomerOrderListItem & {
+  branchName?: string | null;
+  subtotalAmount?: string;
+  discountAmount?: string;
+  taxableAmount?: string;
+  taxAmount?: string;
+  taxRateSnapshot?: string;
+  taxLabelSnapshot?: string | null;
+  taxRegistrationNumberSnapshot?: string | null;
+  taxExemptionReason?: string | null;
+  taxComponentsSnapshot?: Array<{ name: string; rate: string; parentRate: string; taxableAmount: string; taxAmount: string }> | null;
   orderType: string;
   notes: string | null;
   items: MobileCustomerOrderItem[];
 };
 
 export type MobileCustomerTicketListItem = {
+  currency: string;
   id: string;
   branchId: string;
   customerId: string;
@@ -161,12 +174,15 @@ export type MobileCustomerTicketItem = {
 };
 
 export type MobileCustomerTicketDetail = MobileCustomerTicketListItem & {
+  branchName?: string | null;
+  orders?: MobileCustomerOrderListItem[];
   priority: string;
   remark: string | null;
   items: MobileCustomerTicketItem[];
 };
 
 export type MobileCustomerActivityList = {
+  nextOffset?: number | null;
   orders: MobileCustomerOrderListItem[];
   tickets: MobileCustomerTicketListItem[];
 };
@@ -184,6 +200,11 @@ export type MobileCustomerAppointmentStatus =
 export type MobileCustomerAppointmentType = "pickup" | "dropoff";
 
 export type MobileCustomerAppointment = {
+  ticketId?: string | null;
+  deliveryTaskId?: string | null;
+  deliveryStatus?: string | null;
+  deliveryUpdatedAt?: string | null;
+  cancellationReason?: string | null;
   id: string;
   tenantId: string;
   branchId: string;
@@ -201,6 +222,8 @@ export type MobileCustomerAppointment = {
 };
 
 export type MobileCreateCustomerAppointmentRequest = {
+  id?: string;
+  ticketId?: string;
   type: MobileCustomerAppointmentType;
   expectedAt: string;
   address: string;
@@ -209,6 +232,16 @@ export type MobileCreateCustomerAppointmentRequest = {
   notes?: string;
 };
 
+export type MobileCustomerTracking = {
+  id: string; type: "pickup" | "dropoff"; status: MobileCustomerAppointmentStatus;
+  expectedAt: string; address: string; notes: string | null;
+  acceptedAt: string | null; doneAt: string | null; cancelledAt: string | null;
+  cancellationReason: string | null; ticketId: string | null;
+  taskId: string | null; deliveryStatus: string | null; signedAt: string | null;
+  events: Array<{ status: string; occurredAt: string }>;
+};
+
 export type MobileCustomerListResponse<T> = {
+  nextOffset?: number | null;
   data: T[];
 };

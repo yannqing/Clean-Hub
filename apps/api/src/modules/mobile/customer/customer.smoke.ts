@@ -339,6 +339,7 @@ function createRepository(options?: {
       return orderId === "order_1"
         ? {
             id: "order_1",
+            currency: "XOF", orderCode: "OD-ORDER_1",
             branchId: "branch_1",
             customerId: "customer_1",
             status: "received",

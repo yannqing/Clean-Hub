@@ -70,6 +70,7 @@ export type MobileOwnerAppointmentStatus =
 export type MobileOwnerAppointmentType = "pickup" | "dropoff";
 
 export type MobileOwnerAppointment = {
+  ticketId?: string | null;
   id: string;
   tenantId: string;
   branchId: string;

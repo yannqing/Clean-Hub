@@ -7,6 +7,7 @@ import type {
   MobileCustomerAddress,
   MobileCustomerAddressInput,
   MobileCustomerAppointment,
+  MobileCustomerTracking,
   MobileCustomerBranchOption,
   MobileCustomerContact,
   MobileCustomerContactInput,
@@ -21,6 +22,7 @@ type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
 
 export function createMobileCustomerApi(client: ApiClient) {
   return {
+    getAppointment: (id: string, options?: RequestOptions) => client.get<MobileCustomerTracking>(`/mobile/customer/appointments/${encodeURIComponent(id)}`, options),
     getProfile: (options?: RequestOptions) =>
       client.get<MobileCustomerProfile>("/mobile/customer/profile", options),
     updateProfile: (
@@ -105,10 +107,10 @@ export function createMobileCustomerApi(client: ApiClient) {
         input,
         options,
       ),
-    listOrdersAndTickets: (options?: RequestOptions) =>
+    listOrdersAndTickets: (options?: RequestOptions, pagination?: { limit?: number; offset?: number }) =>
       client.get<MobileCustomerActivityResponse>(
         "/mobile/customer/orders",
-        options,
+        { ...options, query: pagination },
       ),
     getOrder: (orderId: string, options?: RequestOptions) =>
       client.get<MobileCustomerOrderDetail>(
@@ -120,10 +122,10 @@ export function createMobileCustomerApi(client: ApiClient) {
         `/mobile/customer/tickets/${encodeURIComponent(ticketId)}`,
         options,
       ),
-    listAppointments: (options?: RequestOptions) =>
+    listAppointments: (options?: RequestOptions, pagination?: { limit?: number; offset?: number }) =>
       client.get<MobileCustomerListResponse<MobileCustomerAppointment>>(
         "/mobile/customer/appointments",
-        options,
+        { ...options, query: pagination },
       ),
     createAppointment: (
       input: MobileCreateCustomerAppointmentRequest,

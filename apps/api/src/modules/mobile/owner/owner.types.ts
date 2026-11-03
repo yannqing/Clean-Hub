@@ -59,6 +59,7 @@ export type OwnerAppointmentStatus = "pending" | "accepted" | "cancelled" | "don
 export type OwnerAppointmentType = "pickup" | "dropoff";
 
 export type OwnerAppointment = {
+  ticketId?: string | null;
   id: string;
   tenantId: string;
   branchId: string;

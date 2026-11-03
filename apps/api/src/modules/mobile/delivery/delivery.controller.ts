@@ -1,3 +1,4 @@
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 import type { Context } from "hono";
 import { z } from "zod";
 
@@ -128,7 +129,7 @@ async function readBody(c: Context<AppBindings>): Promise<Record<string, unknown
 function errorResponse(c: Context<AppBindings>, error: DeliveryError) {
   return c.json(
     {
-      message: error.message,
+      message: localizeErrorMessage(error.message, c.get("locale")),
       code: error.code,
       requestId: c.get("requestId"),
       ...(error.details ? { details: error.details } : {}),

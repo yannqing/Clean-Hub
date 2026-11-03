@@ -1,3 +1,4 @@
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 import type { Context } from "hono";
 import { z } from "zod";
 
@@ -10,6 +11,8 @@ const idParamsSchema = z.object({
 });
 
 const createAppointmentBodySchema = z.object({
+  id: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/).optional(),
+  ticketId: z.string().length(26).optional(),
   type: z.enum(["pickup", "dropoff"]),
   expectedAt: z.string().datetime(),
   address: z.string().trim().min(1).max(2000),
@@ -96,7 +99,7 @@ async function readJson(c: Context<AppBindings>): Promise<unknown> {
 function errorResponse(c: Context<AppBindings>, error: CustomerError) {
   return c.json(
     {
-      message: error.message,
+      message: localizeErrorMessage(error.message, c.get("locale")),
       code: error.code,
       requestId: c.get("requestId"),
       ...(error.details ? { details: error.details } : {}),
@@ -318,6 +321,7 @@ export function createCustomerController({
         return c.json({
           data: await customerService.listOrdersAndTickets(
             c.get("mobileAuthContext"),
+            z.object({ limit: z.coerce.number().int().min(1).max(100).optional(), offset: z.coerce.number().int().min(0).max(1000000).optional() }).parse(c.req.query()),
           ),
         });
       } catch (error) {
@@ -367,6 +371,7 @@ export function createCustomerController({
       try {
         return c.json(
           await customerService.createAppointment({
+            id: body.id, ticketId: body.ticketId,
             authContext: c.get("mobileAuthContext"),
             type: body.type,
             expectedAt: new Date(body.expectedAt),
@@ -388,11 +393,9 @@ export function createCustomerController({
 
     listAppointments: async (c: Context<AppBindings>) => {
       try {
-        return c.json({
-          data: await customerService.listAppointments(
-            c.get("mobileAuthContext"),
-          ),
-        });
+        const { limit = 50, offset = 0 } = z.object({ limit: z.coerce.number().int().min(1).max(100).optional(), offset: z.coerce.number().int().min(0).max(1000000).optional() }).parse(c.req.query());
+        const rows = await customerService.listAppointments(c.get("mobileAuthContext"), { limit: limit + 1, offset });
+        return c.json({ data: rows.slice(0, limit), nextOffset: rows.length > limit ? offset + limit : null });
       } catch (error) {
         if (error instanceof CustomerError) {
           return errorResponse(c, error);

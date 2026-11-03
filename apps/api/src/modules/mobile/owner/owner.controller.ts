@@ -1,3 +1,4 @@
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 import type { Context } from "hono";
 import { z } from "zod";
 
@@ -35,7 +36,7 @@ export type OwnerControllerOptions = {
 function errorResponse(c: Context<AppBindings>, error: OwnerError) {
   return c.json(
     {
-      message: error.message,
+      message: localizeErrorMessage(error.message, c.get("locale")),
       code: error.code,
       requestId: c.get("requestId"),
       ...(error.details ? { details: error.details } : {}),

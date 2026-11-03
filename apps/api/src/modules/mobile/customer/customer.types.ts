@@ -111,6 +111,8 @@ export type CustomerTicketStatus =
   | "exception";
 
 export type CustomerOrderListItem = {
+  currency: string;
+  orderCode: string;
   id: string;
   branchId: string;
   customerId: string;
@@ -134,12 +136,23 @@ export type CustomerOrderItem = {
 };
 
 export type CustomerOrderDetail = CustomerOrderListItem & {
+  branchName?: string | null;
+  subtotalAmount?: string;
+  discountAmount?: string;
+  taxableAmount?: string;
+  taxAmount?: string;
+  taxRateSnapshot?: string;
+  taxLabelSnapshot?: string | null;
+  taxRegistrationNumberSnapshot?: string | null;
+  taxExemptionReason?: string | null;
+  taxComponentsSnapshot?: Array<{ name: string; rate: string; parentRate: string; taxableAmount: string; taxAmount: string }> | null;
   orderType: string;
   notes: string | null;
   items: CustomerOrderItem[];
 };
 
 export type CustomerTicketListItem = {
+  currency: string;
   id: string;
   branchId: string;
   customerId: string;
@@ -164,12 +177,15 @@ export type CustomerTicketItem = {
 };
 
 export type CustomerTicketDetail = CustomerTicketListItem & {
+  branchName?: string | null;
+  orders?: CustomerOrderListItem[];
   priority: string;
   remark: string | null;
   items: CustomerTicketItem[];
 };
 
 export type CustomerActivityList = {
+  nextOffset?: number | null;
   orders: CustomerOrderListItem[];
   tickets: CustomerTicketListItem[];
 };
@@ -183,6 +199,11 @@ export type CustomerAppointmentStatus =
 export type CustomerAppointmentType = "pickup" | "dropoff";
 
 export type CustomerAppointment = {
+  ticketId?: string | null;
+  deliveryTaskId?: string | null;
+  deliveryStatus?: string | null;
+  deliveryUpdatedAt?: string | null;
+  cancellationReason?: string | null;
   id: string;
   tenantId: string;
   branchId: string;
@@ -200,6 +221,8 @@ export type CustomerAppointment = {
 };
 
 export type CreateCustomerAppointmentInput = {
+  id?: string;
+  ticketId?: string;
   authContext: MobileAuthContext;
   type: CustomerAppointmentType;
   expectedAt: Date;

@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { AppBindings } from "../../../http/types.js";
 import { createOwnerController } from "./owner.controller.js";
 import { OwnerService } from "./owner.service.js";
+import { receiveAppointmentController } from "./appointment-reception.controller.js";
 
 export type CreateOwnerRoutesOptions = {
   ownerService?: OwnerService;
@@ -18,6 +19,7 @@ export function createOwnerRoutes({
   routes.get("/branches", controller.listBranches);
   routes.get("/drivers", controller.listDrivers);
   routes.get("/appointments", controller.listAppointments);
+  routes.post("/appointments/:appointmentId/receive", receiveAppointmentController);
   routes.post("/appointments/:appointmentId/accept", controller.acceptAppointment);
   routes.post("/appointments/:appointmentId/reject", controller.rejectAppointment);
 

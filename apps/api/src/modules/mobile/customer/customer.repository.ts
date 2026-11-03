@@ -1,3 +1,6 @@
+import { assertDeliveryBusinessLink } from "../delivery/delivery-business.service.js";
+import { CustomerError } from "./customer.types.js";
+import { formatPosOrderCode } from "@cleanhub/domain/order-codes";
 import { createId } from "@cleanhub/id";
 import {
   and,
@@ -14,12 +17,14 @@ import {
 import {
   appointments,
   branches,
+  deliveryTasks,
   customerAccounts,
   customerAddresses,
   customerAuthRefreshTokens,
   customerCredentials,
   customers,
   orderItems,
+  orderTicketReferences,
   orders,
   serviceTickets,
   ticketItems,
@@ -53,6 +58,7 @@ function toAppointment(
 ): CustomerAppointment {
   return {
     id: row.id,
+    ticketId: row.ticketId, deliveryTaskId: row.deliveryTaskId, cancellationReason: row.cancellationReason,
     tenantId: row.tenantId,
     branchId: row.branchId,
     customerId: row.customerId,
@@ -115,6 +121,8 @@ function toOrderListItem(
   }
   return {
     id: row.id,
+    currency: row.currency,
+    orderCode: formatPosOrderCode(row.id),
     branchId: row.branchId,
     customerId: row.customerId,
     status: row.status,
@@ -132,6 +140,7 @@ function toTicketListItem(
 ): CustomerTicketListItem {
   return {
     id: row.id,
+    currency: row.currency,
     branchId: row.branchId,
     customerId: row.customerId,
     ticketNo: row.ticketNo,
@@ -220,6 +229,7 @@ export class CustomerRepository {
           eq(customers.tenantId, tenantId),
           eq(customers.customerAccountId, customerAccountId),
           isNull(customers.deletedAt),
+          isNull(customers.appArchivedAt),
         ),
       )
       .orderBy(asc(customers.createdAt));
@@ -352,7 +362,7 @@ export class CustomerRepository {
     const rows = await this.db
       .update(customers)
       .set({
-        deletedAt: now,
+        appArchivedAt: now,
         updatedAt: now,
         version: sql`${customers.version} + 1`,
       })
@@ -362,6 +372,7 @@ export class CustomerRepository {
           eq(customers.tenantId, input.tenantId),
           eq(customers.customerAccountId, input.customerAccountId),
           isNull(customers.deletedAt),
+          isNull(customers.appArchivedAt),
         ),
       )
       .returning({ ...getTableColumns(customers) });
@@ -747,6 +758,7 @@ export class CustomerRepository {
           eq(customers.customerAccountId, customerAccountId),
           eq(customers.status, "active"),
           isNull(customers.deletedAt),
+          isNull(customers.appArchivedAt),
         ),
       )
       .orderBy(asc(customers.createdAt))
@@ -802,9 +814,11 @@ export class CustomerRepository {
   async listOrders({
     tenantId,
     customerAccountId,
+    limit = 51, offset = 0,
   }: {
     tenantId: string;
     customerAccountId: string;
+    limit?: number; offset?: number;
   }): Promise<CustomerOrderListItem[]> {
     const rows = await this.db
       .select({ ...getTableColumns(orders) })
@@ -819,7 +833,7 @@ export class CustomerRepository {
           isNull(customers.deletedAt),
         ),
       )
-      .orderBy(desc(orders.createdAt));
+      .orderBy(desc(orders.createdAt), desc(orders.id)).limit(limit).offset(offset);
 
     return rows.map(toOrderListItem);
   }
@@ -858,6 +872,7 @@ export class CustomerRepository {
       return null;
     }
 
+    const [branch] = await this.db.select({ name: branches.name }).from(branches).where(and(eq(branches.tenantId, tenantId), eq(branches.id, order.branchId))).limit(1);
     const itemRows = await this.db
       .select({ ...getTableColumns(orderItems) })
       .from(orderItems)
@@ -873,6 +888,12 @@ export class CustomerRepository {
 
     return {
       ...toOrderListItem(order),
+      branchName: branch?.name ?? null,
+      subtotalAmount: order.subtotalAmount, discountAmount: order.discountAmount,
+      taxableAmount: order.taxableAmount, taxAmount: order.taxAmount,
+      taxRateSnapshot: order.taxRateSnapshot, taxLabelSnapshot: order.taxLabelSnapshot,
+      taxRegistrationNumberSnapshot: order.taxRegistrationNumberSnapshot,
+      taxExemptionReason: order.taxExemptionReason, taxComponentsSnapshot: order.taxComponentsSnapshot,
       orderType: order.orderType,
       notes: order.notes,
       items: itemRows.map(toOrderItem),
@@ -882,9 +903,11 @@ export class CustomerRepository {
   async listTickets({
     tenantId,
     customerAccountId,
+    limit = 51, offset = 0,
   }: {
     tenantId: string;
     customerAccountId: string;
+    limit?: number; offset?: number;
   }): Promise<CustomerTicketListItem[]> {
     const rows = await this.db
       .select({ ...getTableColumns(serviceTickets) })
@@ -900,7 +923,7 @@ export class CustomerRepository {
           isNull(customers.deletedAt),
         ),
       )
-      .orderBy(desc(serviceTickets.createdAt));
+      .orderBy(desc(serviceTickets.createdAt), desc(serviceTickets.id)).limit(limit).offset(offset);
 
     return rows.map(toTicketListItem);
   }
@@ -937,6 +960,7 @@ export class CustomerRepository {
       return null;
     }
 
+    const [branch] = await this.db.select({ name: branches.name }).from(branches).where(and(eq(branches.tenantId, tenantId), eq(branches.id, ticket.branchId))).limit(1);
     const itemRows = await this.db
       .select({ ...getTableColumns(ticketItems) })
       .from(ticketItems)
@@ -949,8 +973,14 @@ export class CustomerRepository {
       )
       .orderBy(asc(ticketItems.sortOrder), asc(ticketItems.createdAt));
 
+    const linkedOrders = await this.db.select({ ...getTableColumns(orders) }).from(orders)
+      .innerJoin(orderTicketReferences, and(eq(orderTicketReferences.orderId, orders.id), eq(orderTicketReferences.tenantId, tenantId)))
+      .where(and(eq(orders.tenantId, tenantId), eq(orders.customerId, ticket.customerId),
+        eq(orderTicketReferences.ticketId, ticket.id), isNull(orders.deletedAt)))
+      .orderBy(desc(orders.createdAt));
     return {
-      ...toTicketListItem(ticket),
+      orders: linkedOrders.map(toOrderListItem),
+      ...toTicketListItem(ticket), branchName: branch?.name ?? null,
       priority: ticket.priority,
       remark: ticket.remark,
       items: itemRows.map(toTicketItem),
@@ -958,49 +988,51 @@ export class CustomerRepository {
   }
 
   async createAppointment(input: {
-    tenantId: string;
-    branchId: string;
-    customerId: string;
-    type: CustomerAppointmentType;
-    expectedAt: Date;
-    address: string;
-    notes?: string;
+    id?: string; ticketId?: string; tenantId: string; branchId: string; customerId: string;
+    type: CustomerAppointmentType; expectedAt: Date; address: string; notes?: string;
   }): Promise<CustomerAppointment> {
-    const rows = await this.db
-      .insert(appointments)
-      .values({
-        id: createId(),
-        tenantId: input.tenantId,
-        branchId: input.branchId,
-        customerId: input.customerId,
-        type: input.type,
-        status: "pending",
-        expectedAt: input.expectedAt,
-        address: input.address,
-        notes: input.notes,
-      })
-      .returning({ ...getTableColumns(appointments) });
-
-    const appointment = rows[0];
-
-    if (!appointment) {
-      throw new Error("Appointment insert failed.");
-    }
-
-    return toAppointment(appointment);
+    return this.db.transaction(async tx => {
+      const id = input.id ?? createId();
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`appointment:${input.tenantId}:${id}`}, 0))`);
+      const [existing] = await tx.select().from(appointments).where(and(eq(appointments.tenantId, input.tenantId), eq(appointments.id, id))).limit(1);
+      if (existing) {
+        if (existing.customerId !== input.customerId || existing.branchId !== input.branchId || existing.type !== input.type ||
+          existing.ticketId !== (input.ticketId ?? null) || existing.expectedAt.getTime() !== input.expectedAt.getTime() ||
+          existing.address !== input.address || (existing.notes ?? "") !== (input.notes ?? "") || existing.deletedAt) {
+          throw new CustomerError("CUSTOMER_APPOINTMENT_CONFLICT", "This appointment identifier is already used by another request.", 409);
+        }
+        return toAppointment(existing);
+      }
+      await assertDeliveryBusinessLink(tx, input);
+      if (input.type === "dropoff" && !input.ticketId) throw new CustomerError("CUSTOMER_VALIDATION_ERROR", "Select a work order for the return delivery.", 422);
+      if (input.type === "dropoff") {
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`dropoff:${input.tenantId}:${input.ticketId}`}, 0))`);
+        const [open] = await tx.select({ id: appointments.id }).from(appointments).where(and(
+          eq(appointments.tenantId, input.tenantId), eq(appointments.ticketId, input.ticketId!),
+          eq(appointments.type, "dropoff"), inArray(appointments.status, ["pending", "accepted"]), isNull(appointments.deletedAt),
+        )).limit(1);
+        if (open) throw new CustomerError("CUSTOMER_APPOINTMENT_CONFLICT", "A return delivery is already scheduled for this work order.", 409);
+      }
+      const [appointment] = await tx.insert(appointments).values({ ...input, id, status: "pending" }).returning();
+      if (!appointment) throw new Error("Customer appointment insert failed.");
+      return toAppointment(appointment);
+    });
   }
 
   async listAppointments({
     tenantId,
     customerAccountId,
+    limit = 51, offset = 0,
   }: {
     tenantId: string;
     customerAccountId: string;
+    limit?: number; offset?: number;
   }): Promise<CustomerAppointment[]> {
     const rows = await this.db
-      .select({ ...getTableColumns(appointments) })
+      .select({ ...getTableColumns(appointments), deliveryStatus: deliveryTasks.status, deliveryUpdatedAt: deliveryTasks.updatedAt })
       .from(appointments)
       .innerJoin(customers, eq(customers.id, appointments.customerId))
+      .leftJoin(deliveryTasks, and(eq(deliveryTasks.id, appointments.deliveryTaskId), eq(deliveryTasks.tenantId, tenantId), isNull(deliveryTasks.deletedAt)))
       .where(
         and(
           eq(appointments.tenantId, tenantId),
@@ -1010,9 +1042,9 @@ export class CustomerRepository {
           isNull(customers.deletedAt),
         ),
       )
-      .orderBy(desc(appointments.expectedAt), desc(appointments.createdAt));
+      .orderBy(desc(appointments.expectedAt), desc(appointments.createdAt), desc(appointments.id)).limit(limit).offset(offset);
 
-    return rows.map(toAppointment);
+    return rows.map(row => ({ ...toAppointment(row), deliveryStatus: row.deliveryStatus, deliveryUpdatedAt: row.deliveryUpdatedAt?.toISOString() ?? null }));
   }
 
   async findOwnedAppointmentById({

@@ -118,6 +118,7 @@ export type CustomerRepositoryLike = {
   listOrders(input: {
     tenantId: string;
     customerAccountId: string;
+    limit?: number; offset?: number;
   }): Promise<CustomerActivityList["orders"]>;
   getOrderDetail(input: {
     tenantId: string;
@@ -127,6 +128,7 @@ export type CustomerRepositoryLike = {
   listTickets(input: {
     tenantId: string;
     customerAccountId: string;
+    limit?: number; offset?: number;
   }): Promise<CustomerActivityList["tickets"]>;
   getTicketDetail(input: {
     tenantId: string;
@@ -134,6 +136,8 @@ export type CustomerRepositoryLike = {
     ticketId: string;
   }): Promise<CustomerTicketDetail | null>;
   createAppointment(input: {
+    id?: string;
+    ticketId?: string;
     tenantId: string;
     branchId: string;
     customerId: string;
@@ -145,6 +149,7 @@ export type CustomerRepositoryLike = {
   listAppointments(input: {
     tenantId: string;
     customerAccountId: string;
+    limit?: number; offset?: number;
   }): Promise<CustomerAppointment[]>;
   findOwnedAppointmentById(input: {
     tenantId: string;
@@ -445,20 +450,23 @@ export class CustomerService {
 
   async listOrdersAndTickets(
     authContext: MobileAuthContext,
+    pagination: { limit?: number; offset?: number } = {},
   ): Promise<CustomerActivityList> {
     const customer = assertCustomerContext(authContext);
+    const limit = pagination.limit ?? 50, offset = pagination.offset ?? 0;
     const [orders, tickets] = await Promise.all([
       this.repository.listOrders({
         tenantId: customer.tenantId,
-        customerAccountId: customer.subjectId,
+        customerAccountId: customer.subjectId, limit: limit + 1, offset,
       }),
       this.repository.listTickets({
         tenantId: customer.tenantId,
-        customerAccountId: customer.subjectId,
+        customerAccountId: customer.subjectId, limit: limit + 1, offset,
       }),
     ]);
 
-    return { orders, tickets };
+    return { orders: orders.slice(0, limit), tickets: tickets.slice(0, limit),
+      nextOffset: orders.length > limit || tickets.length > limit ? offset + limit : null };
   }
 
   async getOrderDetail(
@@ -529,6 +537,7 @@ export class CustomerService {
     });
 
     return this.repository.createAppointment({
+      id: input.id, ticketId: input.ticketId,
       tenantId: customer.tenantId,
       branchId,
       customerId,
@@ -541,10 +550,12 @@ export class CustomerService {
 
   async listAppointments(
     authContext: MobileAuthContext,
+    pagination: { limit?: number; offset?: number } = {},
   ): Promise<CustomerAppointment[]> {
     const customer = assertCustomerContext(authContext);
 
     return this.repository.listAppointments({
+      ...pagination,
       tenantId: customer.tenantId,
       customerAccountId: customer.subjectId,
     });
@@ -660,10 +671,12 @@ export class CustomerService {
       }
     }
 
+    const country = input.country?.trim().toUpperCase() || customer.country;
+    if (!country || !/^[A-Z]{2}$/.test(country)) throw validationError("Select a valid country for this address.");
     return {
       ...input,
       customerId,
-      country: input.country ?? "TH",
+      country,
     };
   }
 

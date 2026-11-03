@@ -254,6 +254,7 @@ export function refundRejectedEvent(input: {
 }
 
 export function deliveryStatusChangedEvent(input: {
+  appointmentId?: string | null;
   tenantId: string;
   branchId: string;
   customerId: string;
@@ -272,8 +273,8 @@ export function deliveryStatusChangedEvent(input: {
     tenantId: input.tenantId,
     branchId: input.branchId,
     customerId: input.customerId,
-    relatedType: "delivery_task",
-    relatedId: input.taskId,
+    relatedType: input.appointmentId ? "appointment" : input.ticketId ? "service_ticket" : input.orderId ? "order" : "delivery_task",
+    relatedId: input.appointmentId ?? input.ticketId ?? input.orderId ?? input.taskId,
     locale: input.locale,
     idempotencyKey: `delivery.status_changed:${input.taskId}:${input.toStatus}`,
     payload: {

@@ -1,3 +1,4 @@
+import { assertDeliveryBusinessLink } from "../delivery/delivery-business.service.js";
 import {
   and,
   asc,
@@ -99,6 +100,7 @@ function toAppointment(row: OwnerAppointmentRow): OwnerAppointment {
     expectedAt: row.expectedAt.toISOString(),
     address: row.address,
     notes: row.notes,
+    ticketId: row.ticketId,
     deliveryTaskId: row.deliveryTaskId,
     assigneeUserId: row.assigneeUserId,
     assigneeName: row.assigneeName,
@@ -504,6 +506,7 @@ export class OwnerRepository {
             isNull(appointments.deletedAt),
           ),
         )
+        .for("update")
         .limit(1);
 
       if (!appointment) {
@@ -540,6 +543,7 @@ export class OwnerRepository {
         return null;
       }
 
+      await assertDeliveryBusinessLink(tx, appointment);
       const now = new Date();
       const taskId = createId();
 
@@ -549,6 +553,7 @@ export class OwnerRepository {
         branchId: appointment.branchId,
         assigneeUserId: input.assigneeUserId,
         appointmentId: appointment.id,
+        ticketId: appointment.ticketId,
         customerId: appointment.customerId,
         type: appointment.type,
         status: "pending_dispatch",

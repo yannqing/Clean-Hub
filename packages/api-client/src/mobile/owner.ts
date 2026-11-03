@@ -16,6 +16,8 @@ type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
 
 export function createMobileOwnerApi(client: ApiClient) {
   return {
+    receiveAppointment: (appointmentId: string, input: { ticketType: "laundry" | "car_wash" }, options?: RequestOptions) =>
+      client.post<{ ticketId: string; idempotent: boolean }>(`/mobile/owner/appointments/${encodeURIComponent(appointmentId)}/receive`, input, options),
     getTodaySummary: (options?: RequestOptions) =>
       client.get<MobileOwnerTodaySummary>(
         "/mobile/owner/summary/today",

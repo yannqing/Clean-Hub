@@ -1,3 +1,5 @@
+import { PosOrderError } from "../../pos/orders/orders.errors.js";
+import { assertDeliveryBusinessLink, completeDeliveryBusinessRecords } from "./delivery-business.service.js";
 import { createId } from "@cleanhub/id";
 import {
   and,
@@ -15,6 +17,9 @@ import {
 } from "drizzle-orm";
 
 import {
+  appointments,
+  branches,
+  customers,
   deliveryProofs,
   deliveryTaskEvents,
   deliveryTasks,
@@ -532,6 +537,12 @@ export class DeliveryRepository {
     return this.db.transaction(async (tx) => {
       const repository = new DeliveryRepository(tx);
       const now = new Date();
+      const [task] = await tx.select().from(deliveryTasks).where(and(
+        eq(deliveryTasks.tenantId, input.tenantId), eq(deliveryTasks.id, input.taskId),
+        eq(deliveryTasks.assigneeUserId, input.driverUserId), isNull(deliveryTasks.deletedAt),
+      )).for("update").limit(1);
+      if (!task || task.status !== input.fromStatus) return null;
+      await completeDeliveryBusinessRecords(tx, { ...task, driverUserId: input.driverUserId });
       const updatedRows = await tx
         .update(deliveryTasks)
         .set({
@@ -584,6 +595,11 @@ export class DeliveryRepository {
         createdBy: input.driverUserId,
       });
 
+      if (task.appointmentId) {
+        await tx.update(appointments).set({ status: "done", doneAt: now, doneBy: input.driverUserId,
+          updatedAt: now, updatedBy: input.driverUserId, version: sql`${appointments.version} + 1`,
+        }).where(and(eq(appointments.tenantId, input.tenantId), eq(appointments.id, task.appointmentId), eq(appointments.deliveryTaskId, task.id), eq(appointments.status, "accepted")));
+      }
       return { event, proof, appointmentId: updatedRows[0].appointmentId };
     });
   }
@@ -604,6 +620,14 @@ export class DeliveryRepository {
     notes?: string;
     appointmentId?: string;
   }): Promise<string> {
+    const [customer] = await this.db.select({ id: customers.id }).from(customers).where(and(
+      eq(customers.tenantId, input.tenantId), eq(customers.id, input.customerId), eq(customers.status, "active"), isNull(customers.deletedAt),
+    )).limit(1);
+    const [branch] = await this.db.select({ id: branches.id }).from(branches).where(and(
+      eq(branches.tenantId, input.tenantId), eq(branches.id, input.branchId), eq(branches.status, "active"), isNull(branches.deletedAt),
+    )).limit(1);
+    if (!customer || !branch) throw new PosOrderError("VALIDATION_ERROR", "The delivery customer or store is unavailable.", 422);
+    await assertDeliveryBusinessLink(this.db, input);
     const rows = await this.db
       .insert(deliveryTasks)
       .values({
