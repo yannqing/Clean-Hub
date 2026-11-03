@@ -5,13 +5,17 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
+  varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { customers } from "../commerce/customer.js";
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
 import { branches } from "../tenancy/branches.js";
 import { tenants } from "../tenancy/tenants.js";
+import { serviceTickets } from "../tickets/service-tickets.js";
 
 export const appointmentTypeEnum = pgEnum("appointment_type", [
   "pickup",
@@ -44,6 +48,7 @@ export const appointments = pgTable(
     address: text("address").notNull(),
     notes: text("notes"),
     deliveryTaskId: ulidColumn("delivery_task_id"),
+    ticketId: ulidColumn("ticket_id").references(() => serviceTickets.id),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
     acceptedBy: ulidColumn("accepted_by").references(() => users.id),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
@@ -64,6 +69,8 @@ export const appointments = pgTable(
     version: integer("version").notNull().default(1),
   },
   (table) => [
+    uniqueIndex("appointments_active_dropoff_ticket_unique").on(table.tenantId, table.ticketId)
+      .where(sql`${table.ticketId} is not null and ${table.type} = 'dropoff' and ${table.status} in ('pending', 'accepted') and ${table.deletedAt} is null`),
     index("appointments_tenant_branch_status_idx").on(
       table.tenantId,
       table.branchId,

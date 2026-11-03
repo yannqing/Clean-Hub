@@ -9,7 +9,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { orders, paymentTransactions } from "../commerce/orders.js";
+import { orders, paymentTransactions, refundRequests } from "../commerce/orders.js";
 import { customers } from "../commerce/customer.js";
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
@@ -54,6 +54,7 @@ export const posPaymentAdjustments = pgTable(
       .notNull()
       .default("succeeded"),
     salesReturnId: ulidColumn("sales_return_id"),
+    customerRefundRequestId: ulidColumn("customer_refund_request_id").references(() => refundRequests.id),
     amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
     currency: varchar("currency", { length: 3 }).notNull(),
     idempotencyKey: varchar("idempotency_key", { length: 120 }).notNull(),

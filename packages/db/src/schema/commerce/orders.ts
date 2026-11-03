@@ -513,7 +513,7 @@ export const refundRequests = pgTable(
     uniqueIndex("refund_requests_active_order_unique")
       .on(table.tenantId, table.orderId)
       .where(
-        sql`${table.deletedAt} is null and ${table.status} in ('pending', 'processing')`,
+        sql`${table.deletedAt} is null and ${table.status} in ('pending', 'approved', 'processing')`,
       ),
     index("refund_requests_tenant_status_idx").on(table.tenantId, table.status),
     index("refund_requests_order_id_idx").on(table.orderId),

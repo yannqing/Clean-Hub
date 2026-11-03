@@ -34,6 +34,8 @@ export const customers = pgTable(
     email: varchar("email", { length: 320 }),
     relationship: varchar("relationship", { length: 80 }),
     address: text("address"),
+    // Hiding a personal contact must not delete the store's business customer.
+    appArchivedAt: timestamp("app_archived_at", { withTimezone: true }),
     notes: text("notes"),
     status: customerProfileStatusEnum("status").notNull().default("active"),
     createdAt: timestamp("created_at", { withTimezone: true })

@@ -30,6 +30,8 @@ export const platformSettings = pgTable(
       .default("XOF"),
     timezone: varchar("timezone", { length: 64 }).notNull().default("UTC"),
     maintenanceMode: boolean("maintenance_mode").notNull().default(false),
+    mobileMinimumVersion: varchar("mobile_minimum_version", { length: 32 }).notNull().default("0.0.0"),
+    mobileUpdateUrl: text("mobile_update_url"),
     /** Shown to tenants while maintenance is on; a generic notice when null. */
     maintenanceMessage: text("maintenance_message"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
