@@ -627,6 +627,7 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
 async function createService(options: {
   testOtpEnabled?: boolean;
   customerOtpEnabled?: boolean;
+  senderConfigured?: boolean;
 } = {}): Promise<{
   service: MobileAuthService;
   repository: FakeMobileAuthRepository;
@@ -642,6 +643,7 @@ async function createService(options: {
     accessTokenTtlSeconds: 60,
     refreshTokenTtlSeconds: 60 * 60,
     testOtpEnabled: options.testOtpEnabled ?? false,
+    otpSender: options.senderConfigured === false ? undefined : async () => {},
   });
 
   return { service, repository };
@@ -980,6 +982,9 @@ async function assertRefreshAndLogout(): Promise<void> {
 }
 
 export async function runMobileAuthSmokeChecks(): Promise<void> {
+  const unavailable = await createService({ customerOtpEnabled: true, senderConfigured: false });
+  assert(!(await unavailable.service.getCustomerLoginOptions("CLEAN-001")).customerOtpEnabled, "OTP login is hidden when the delivery provider is missing");
+  await assertRejectsAuth(() => unavailable.service.requestCustomerOtp({ tenantCode: "CLEAN-001", phone: "+100000000" }), "FEATURE_DISABLED");
   await assertCustomerOtpCanBeDisabled();
   await assertCustomerOtpDoesNotExposeCodeByDefault();
   await assertCustomerOtpSuccess();

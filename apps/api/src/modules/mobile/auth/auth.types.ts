@@ -12,6 +12,8 @@ export type MobileAuthContext = {
   tenantId: string;
   currency: string;
   timezone?: string;
+  country?: string | null;
+  deliveryEnabled?: boolean;
   branchIds: string[];
   role: MobileRole;
   roles: MobileRole[];
@@ -43,6 +45,8 @@ export type MobileTenant = {
   id: string;
   defaultCurrency: string;
   timezone?: string;
+  country?: string | null;
+  deliveryEnabled?: boolean;
   customerOtpEnabled: boolean;
 };
 
@@ -51,6 +55,7 @@ export type MobileCustomerLoginOptions = {
 };
 
 export type MobileRequestOtpInput = MobileAuthRequestMeta & {
+  locale?: string;
   tenantCode: string;
   phone: string;
 };

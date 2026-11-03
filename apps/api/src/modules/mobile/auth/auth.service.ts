@@ -18,6 +18,7 @@ import {
   assertLoginNotLocked,
 } from "../../auth/login-lockout.helper.js";
 import { MobileAuthRepository } from "./auth.repository.js";
+import { createCustomerOtpSender, type CustomerOtpSender } from "./otp-delivery.js";
 import type {
   MobileAuthContext,
   MobileAuthResult,
@@ -44,6 +45,7 @@ export type MobileAuthServiceOptions = {
   accessTokenTtlSeconds?: number;
   refreshTokenTtlSeconds?: number;
   testOtpEnabled?: boolean;
+  otpSender?: CustomerOtpSender;
 };
 
 export type CreateMobileAuthServiceFromEnvOptions = {
@@ -185,6 +187,9 @@ export function createMobileAuthServiceFromEnv({
   env = process.env,
 }: CreateMobileAuthServiceFromEnvOptions = {}): MobileAuthService {
   const accessTokenSecret = env.AUTH_TOKEN_SECRET;
+  if (env.NODE_ENV === "production" && readBooleanFlag(env.MOBILE_AUTH_TEST_OTP_ENABLED)) {
+    throw new Error("MOBILE_AUTH_TEST_OTP_ENABLED must be disabled in production.");
+  }
 
   if (!accessTokenSecret) {
     throw new AuthError(
@@ -203,6 +208,7 @@ export function createMobileAuthServiceFromEnv({
       env.AUTH_REFRESH_TOKEN_TTL_SECONDS,
     ),
     testOtpEnabled: readBooleanFlag(env.MOBILE_AUTH_TEST_OTP_ENABLED),
+    otpSender: createCustomerOtpSender(env),
   });
 }
 
@@ -213,6 +219,7 @@ export class MobileAuthService {
   private readonly envRefreshTokenTtlSeconds: number;
   private readonly securityPolicy?: EffectiveSecurityPolicy;
   private readonly testOtpEnabled: boolean;
+  private readonly otpSender?: CustomerOtpSender;
 
   constructor({
     db,
@@ -222,11 +229,13 @@ export class MobileAuthService {
     accessTokenTtlSeconds,
     refreshTokenTtlSeconds,
     testOtpEnabled = false,
+    otpSender,
   }: MobileAuthServiceOptions) {
     this.db = db;
     this.repository = repository ?? new MobileAuthRepository(db);
     this.securityPolicy = securityPolicy;
     this.testOtpEnabled = testOtpEnabled;
+    this.otpSender = otpSender;
     this.envRefreshTokenTtlSeconds =
       refreshTokenTtlSeconds ?? 30 * 24 * 60 * 60;
     this.tokenService = new TokenService({
@@ -246,7 +255,7 @@ export class MobileAuthService {
   ): Promise<MobileCustomerLoginOptions> {
     const tenant = await this.resolveTenant(tenantCode);
 
-    return { customerOtpEnabled: tenant.customerOtpEnabled };
+    return { customerOtpEnabled: tenant.customerOtpEnabled && (this.testOtpEnabled || Boolean(this.otpSender)) };
   }
 
   async requestCustomerOtp(
@@ -254,6 +263,9 @@ export class MobileAuthService {
   ): Promise<MobileTestOtpResult> {
     const tenant = await this.resolveTenant(input.tenantCode);
     assertCustomerOtpEnabled(tenant);
+    if (!this.testOtpEnabled && !this.otpSender) {
+      throw new AuthError("FEATURE_DISABLED", "One-time-code delivery is unavailable. Ask the store to issue an app password.");
+    }
     const phone = normalizePhone(input.phone);
     const customer = await this.repository.findCustomerByPhone({
       tenantId: tenant.id,
@@ -275,7 +287,13 @@ export class MobileAuthService {
       phone,
       code,
       expiresAt,
+      minimumIntervalSeconds: this.testOtpEnabled ? 0 : 60,
     });
+
+    if (this.otpSender) {
+      try { await this.otpSender({ tenantId: tenant.id, phone, code, locale: input.locale }); }
+      catch { throw new AuthError("FEATURE_DISABLED", "The sign-in code could not be sent. Please try again later or contact the store."); }
+    }
 
     return {
       code: this.testOtpEnabled ? code : undefined,
@@ -325,6 +343,7 @@ export class MobileAuthService {
   ): Promise<MobileAuthResult> {
     const tenant = await this.resolveTenant(input.tenantCode);
     assertCustomerOtpEnabled(tenant);
+    if (!this.testOtpEnabled && !this.otpSender) throw new AuthError("FEATURE_DISABLED", "One-time-code delivery is unavailable. Ask the store to issue an app password.");
     const phone = normalizePhone(input.phone);
     const customer = await this.repository.findCustomerByPhone({
       tenantId: tenant.id,
@@ -703,6 +722,8 @@ export class MobileAuthService {
       tenantId: tenant.id,
       currency: tenant.defaultCurrency,
       timezone: tenant.timezone ?? "UTC",
+      country: tenant.country ?? null,
+      deliveryEnabled: tenant.deliveryEnabled ?? false,
       branchIds: [],
       role: "customer" as const,
       roles: ["customer" as const],
@@ -822,6 +843,8 @@ export class MobileAuthService {
         tenantId: tenant.id,
         currency: tenant.defaultCurrency,
         timezone: tenant.timezone ?? "UTC",
+      country: tenant.country ?? null,
+      deliveryEnabled: tenant.deliveryEnabled ?? false,
         branchIds: access.branchIds,
         role,
         roles: access.roles.filter(
@@ -905,6 +928,8 @@ export class MobileAuthService {
       tenantId: tenant.id,
       currency: tenant.defaultCurrency,
       timezone: tenant.timezone ?? "UTC",
+      country: tenant.country ?? null,
+      deliveryEnabled: tenant.deliveryEnabled ?? false,
       branchIds: [],
       role: "customer",
       roles: ["customer"],
@@ -953,6 +978,8 @@ export class MobileAuthService {
       tenantId: tenant.id,
       currency: tenant.defaultCurrency,
       timezone: tenant.timezone ?? "UTC",
+      country: tenant.country ?? null,
+      deliveryEnabled: tenant.deliveryEnabled ?? false,
       branchIds: access.branchIds,
       role,
       roles: access.roles.filter(

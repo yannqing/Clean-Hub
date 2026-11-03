@@ -1,5 +1,7 @@
 "use client";
 
+import { replayPendingLogouts } from "@/lib/pending-logouts";
+
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { isApiHttpError, type MobileAuthContext } from "@cleanhub/api-client";
 import type { TranslationKey } from "@cleanhub/i18n";
@@ -73,6 +75,19 @@ export function MobileAuthShell() {
   const [otpCooldownSeconds, setOtpCooldownSeconds] = useState(0);
   const [isBooting, setIsBooting] = useState(true);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    const clear = () => setSession(null);
+    const update = (event: Event) => setSession({ authContext: (event as CustomEvent<MobileAuthContext>).detail });
+    window.addEventListener("online", replayPendingLogouts);
+    window.addEventListener("cleanhub:session-cleared", clear);
+    window.addEventListener("cleanhub:session-updated", update);
+    return () => {
+      window.removeEventListener("online", replayPendingLogouts);
+      window.removeEventListener("cleanhub:session-cleared", clear);
+      window.removeEventListener("cleanhub:session-updated", update);
+    };
+  }, []);
   const showTestOtp = mobileReleaseConfig.appEnvironment !== "prod";
 
   const accountRoles = useMemo(
@@ -172,8 +187,8 @@ export function MobileAuthShell() {
   function runAction(action: () => Promise<void>) {
     setError(null);
     setMessage(null);
-    startTransition(() => {
-      void action().catch((nextError: unknown) => {
+    startTransition(async () => {
+      await action().catch((nextError: unknown) => {
         setError(getErrorMessage(nextError, t("common.errors.genericAction"), t));
       });
     });
@@ -259,6 +274,7 @@ export function MobileAuthShell() {
   function handleTenantReset() {
     runAction(async () => {
       await disablePushNotifications(apiClient);
+      await logoutLocally();
       await resetTenantContext();
       setTenantCode(null);
       setTenantInput("");
@@ -295,14 +311,8 @@ export function MobileAuthShell() {
       <CustomerFirstPassword
         isLoggingOut={isPending}
         onChanged={async () => {
-          // Re-read the context so the cleared flag is picked up; the password
-          // change revokes refresh tokens, so a failure here means the session
-          // is gone and signing out is the honest outcome.
-          try {
-            setSession({ authContext: await apiClient.mobile.auth.me() });
-          } catch {
-            handleLogout();
-          }
+          handleLogout();
+          setMessage(t("customer.messages.passwordChangedOtherDevices"));
         }}
         onLogout={handleLogout}
       />
@@ -312,6 +322,7 @@ export function MobileAuthShell() {
   if (tenantCode && session) {
     return session.authContext.role === "driver" ? (
       <DeliveryHome
+        key={`${session.authContext.tenantId}:${session.authContext.subjectId}`}
         currency={session.authContext.currency}
         driverName={session.authContext.displayName}
         isLoggingOut={isPending}
@@ -319,12 +330,14 @@ export function MobileAuthShell() {
       />
     ) : session.authContext.role === "owner" ? (
       <OwnerHome
+        key={`${session.authContext.tenantId}:${session.authContext.subjectId}`}
         currency={session.authContext.currency}
         isLoggingOut={isPending}
         onLogout={handleLogout}
       />
     ) : (
       <CustomerHome
+        key={`${session.authContext.tenantId}:${session.authContext.subjectId}`}
         initialAuthContext={session.authContext}
         isLoggingOut={isPending}
         onLogout={handleLogout}
@@ -464,6 +477,7 @@ export function MobileAuthShell() {
             </div>
           ) : null}
 
+          {mode === "customer-password" ? <p className="mt-4 text-sm text-slate-600">{t("common.readiness.setupHelp")}</p> : null}
           <form className="mt-5 space-y-4" onSubmit={handleLogin}>
             {mode === "customer-otp" ? (
               <>

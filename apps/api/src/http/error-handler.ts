@@ -1,12 +1,16 @@
 import { ZodError } from "zod";
 
 import { AuthError } from "../modules/auth/auth.errors.js";
+import { ServiceTicketError } from "../modules/pos/service-tickets/service-tickets.errors.js";
+import { CustomerError } from "../modules/mobile/customer/customer.types.js";
+import { PosOrderError } from "../modules/pos/orders/orders.errors.js";
 import { localizeErrorMessage } from "./error-messages.js";
 import { localizeValidationMessage } from "./validation-messages.js";
 import type { AppBindings, ApiErrorResponse } from "./types.js";
 
-function getAuthErrorStatus(error: AuthError): 400 | 401 | 403 | 422 | 500 {
+function getAuthErrorStatus(error: AuthError): 400 | 401 | 403 | 422 | 429 | 500 {
   switch (error.code) {
+    case "OTP_RATE_LIMITED": return 429;
     case "INVALID_CREDENTIALS":
     case "TOKEN_INVALID":
     case "TOKEN_EXPIRED":
@@ -44,6 +48,10 @@ export function handleApiError(
   const logger = c.get("logger");
 
   const locale = c.get("locale");
+
+  if (error instanceof PosOrderError || error instanceof ServiceTicketError || error instanceof CustomerError) {
+    return c.json<ApiErrorResponse>({ message: localizeErrorMessage(error.message, locale), code: error.code, requestId }, error.status);
+  }
 
   if (error instanceof ZodError) {
     const validation = error.flatten((issue) =>

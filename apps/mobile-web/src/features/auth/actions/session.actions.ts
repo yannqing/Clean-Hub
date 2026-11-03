@@ -1,4 +1,6 @@
 import type { MobileTokenResponse } from "@cleanhub/api-client";
+import { rememberPendingLogout, replayPendingLogouts } from "@/lib/pending-logouts";
+import { apiClient } from "@/lib/api-client";
 
 import {
   clearMobileSession,
@@ -17,6 +19,7 @@ function isSessionExpired(refreshTokenExpiresAt: string): boolean {
 }
 
 export async function loadStoredAuthState() {
+  void replayPendingLogouts();
   const [tenantCode, storedSession, deviceId] = await Promise.all([
     getTenantCode(),
     getMobileSession(),
@@ -60,5 +63,14 @@ export async function resetTenantContext(): Promise<void> {
 }
 
 export async function logoutLocally(): Promise<void> {
-  await clearMobileSession();
+  const session = await getMobileSession();
+  let saved = false;
+  const deviceId = await getOrCreateDeviceId();
+  try {
+    if (session) { await rememberPendingLogout(session, deviceId); saved = true; }
+  } catch { /* Sign-out still clears the active session if device storage fails. */ }
+  finally { await clearMobileSession(); }
+  if (saved) void replayPendingLogouts();
+  else if (session) void apiClient.mobile.auth.logout({ refreshToken: session.refreshToken, deviceId },
+    { skipAuthRefresh: true, timeoutMs: 5000 }).catch(() => undefined);
 }

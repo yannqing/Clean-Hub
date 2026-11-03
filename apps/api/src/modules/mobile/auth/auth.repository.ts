@@ -20,6 +20,7 @@ import {
 } from "@cleanhub/db";
 
 import type { AuthRequestMeta, UserAccess } from "../../auth/auth.types.js";
+import { AuthError } from "../../auth/auth.errors.js";
 import type {
   MobileCustomerAccount,
   MobileCustomerCredential,
@@ -39,6 +40,8 @@ export class MobileAuthRepository {
         defaultCurrency: sql<string>`coalesce(${tenantSettings.defaultCurrency}, 'XOF')`,
         timezone: sql<string>`coalesce(${tenantSettings.timezone}, 'UTC')`,
         customerOtpEnabled: sql<boolean>`coalesce(${tenantFeatureFlags.customerOtpEnabled}, false)`,
+        country: tenants.country,
+        deliveryEnabled: sql<boolean>`coalesce(${tenantFeatureFlags.deliveryEnabled}, false)`,
       })
       .from(tenants)
       .leftJoin(tenantSettings, eq(tenantSettings.tenantId, tenants.id))
@@ -62,11 +65,13 @@ export class MobileAuthRepository {
         defaultCurrency: sql<string>`coalesce(${tenantSettings.defaultCurrency}, 'XOF')`,
         timezone: sql<string>`coalesce(${tenantSettings.timezone}, 'UTC')`,
         customerOtpEnabled: sql<boolean>`coalesce(${tenantFeatureFlags.customerOtpEnabled}, false)`,
+        country: tenants.country,
+        deliveryEnabled: sql<boolean>`coalesce(${tenantFeatureFlags.deliveryEnabled}, false)`,
       })
       .from(tenants)
       .leftJoin(tenantSettings, eq(tenantSettings.tenantId, tenants.id))
       .leftJoin(tenantFeatureFlags, eq(tenantFeatureFlags.tenantId, tenants.id))
-      .where(and(eq(tenants.id, tenantId), isNull(tenants.deletedAt)))
+      .where(and(eq(tenants.id, tenantId), eq(tenants.status, "active"), isNull(tenants.deletedAt)))
       .limit(1);
 
     return rows[0] ?? null;
@@ -197,14 +202,27 @@ export class MobileAuthRepository {
     phone,
     code,
     expiresAt,
+    minimumIntervalSeconds = 0,
   }: {
     tenantId: string;
     customerAccountId: string;
     phone: string;
     code: string;
     expiresAt: Date;
+    minimumIntervalSeconds?: number;
   }): Promise<void> {
-    await this.db.insert(customerAuthOtps).values({
+    await this.db.transaction(async tx => {
+      await tx.select({ id: customerAccounts.id }).from(customerAccounts)
+        .where(and(eq(customerAccounts.tenantId, tenantId), eq(customerAccounts.id, customerAccountId))).for("update");
+      if (minimumIntervalSeconds > 0) {
+        const [latest] = await tx.select({ createdAt: customerAuthOtps.createdAt }).from(customerAuthOtps)
+          .where(and(eq(customerAuthOtps.tenantId, tenantId), eq(customerAuthOtps.customerAccountId, customerAccountId)))
+          .orderBy(desc(customerAuthOtps.createdAt)).limit(1);
+        if (latest && Date.now() - latest.createdAt.getTime() < minimumIntervalSeconds * 1000) {
+          throw new AuthError("OTP_RATE_LIMITED", "Please wait one minute before requesting another sign-in code.");
+        }
+      }
+      await tx.insert(customerAuthOtps).values({
       id: createId(),
       tenantId,
       customerAccountId,
@@ -212,6 +230,7 @@ export class MobileAuthRepository {
       code,
       purpose: "login",
       expiresAt,
+      });
     });
   }
 

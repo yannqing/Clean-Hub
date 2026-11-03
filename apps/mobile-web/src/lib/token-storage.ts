@@ -1,4 +1,5 @@
 import type { MobileAuthContext, MobileTokenResponse } from "@cleanhub/api-client";
+import { setBusinessTimeZone } from "./business-time";
 
 const STORAGE_KEYS = {
   accessToken: "cleanhub.mobile.accessToken",
@@ -114,6 +115,7 @@ export async function getRefreshToken(): Promise<string | null> {
 }
 
 export async function saveMobileSession(response: MobileTokenResponse): Promise<void> {
+  setBusinessTimeZone(response.authContext.timezone);
   await Promise.all([
     writeValue(STORAGE_KEYS.accessToken, response.accessToken),
     writeValue(STORAGE_KEYS.refreshToken, response.refreshToken),
@@ -121,6 +123,7 @@ export async function saveMobileSession(response: MobileTokenResponse): Promise<
     writeValue(STORAGE_KEYS.refreshTokenExpiresAt, response.refreshTokenExpiresAt),
     writeValue(STORAGE_KEYS.authContext, JSON.stringify(response.authContext)),
   ]);
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("cleanhub:session-updated", { detail: response.authContext }));
 }
 
 export async function getMobileSession(): Promise<StoredMobileSession | null> {
@@ -138,12 +141,14 @@ export async function getMobileSession(): Promise<StoredMobileSession | null> {
   }
 
   try {
+    const context = JSON.parse(authContext) as MobileAuthContext;
+    setBusinessTimeZone(context.timezone);
     return {
       accessToken,
       refreshToken,
       accessTokenExpiresAt,
       refreshTokenExpiresAt,
-      authContext: JSON.parse(authContext) as MobileAuthContext,
+      authContext: context,
     };
   } catch {
     await clearMobileSession();
@@ -159,6 +164,7 @@ export async function clearMobileSession(): Promise<void> {
     removeValue(STORAGE_KEYS.refreshTokenExpiresAt),
     removeValue(STORAGE_KEYS.authContext),
   ]);
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("cleanhub:session-cleared"));
 }
 
 export async function saveTenantCode(tenantCode: string): Promise<void> {

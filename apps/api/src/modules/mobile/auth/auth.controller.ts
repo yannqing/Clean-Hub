@@ -94,6 +94,7 @@ export function createMobileAuthController({
     requestCustomerOtp: async (c: Context<AppBindings>) => {
       const body = requestOtpBodySchema.parse(await readJson(c));
       const result = await mobileAuthService.requestCustomerOtp({
+        locale: c.get("locale"),
         tenantCode: body.tenantCode,
         phone: body.phone,
         ...getRequestMeta(c, body.deviceId),

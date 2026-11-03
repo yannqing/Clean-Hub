@@ -1,4 +1,5 @@
 export type AuthErrorCode =
+  | "OTP_RATE_LIMITED"
   | "ACCOUNT_LOCKED"
   | "FORBIDDEN"
   | "FEATURE_DISABLED"

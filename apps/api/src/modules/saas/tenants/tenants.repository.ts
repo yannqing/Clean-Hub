@@ -15,6 +15,7 @@ import {
 import {
   type Database,
   authRefreshTokens,
+  customerAuthRefreshTokens,
   branches,
   getDb,
   platformSettings,
@@ -690,6 +691,8 @@ export async function revokeTenantRefreshTokens(
   db: Database,
   tenantId: string,
 ): Promise<void> {
+  await db.update(customerAuthRefreshTokens).set({ revokedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(customerAuthRefreshTokens.tenantId, tenantId), isNull(customerAuthRefreshTokens.revokedAt)));
   await db
     .update(authRefreshTokens)
     .set({

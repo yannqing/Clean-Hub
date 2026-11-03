@@ -1,4 +1,5 @@
-import { createCleanHubApiClient } from "@cleanhub/api-client";
+import { createCleanHubApiClient, isApiHttpError } from "@cleanhub/api-client";
+import { defaultLocale, localeStorageKey, normalizeLocale } from "@cleanhub/i18n";
 
 import { clearMobileSession, getAccessToken, getOrCreateDeviceId, getRefreshToken, saveMobileSession } from "./token-storage";
 import { mobileReleaseConfig } from "./mobile-release-config";
@@ -25,19 +26,38 @@ async function refreshSessionOnce(): Promise<"retry" | "logout"> {
       },
       { skipAuthRefresh: true },
     );
+    if (await getRefreshToken() !== refreshToken) {
+      // A completed request from the previous account must never restore it.
+      return await getAccessToken() ? "retry" : "logout";
+    }
     await saveMobileSession(nextSession);
     return "retry";
-  } catch {
-    await clearMobileSession();
-    return "logout";
+  } catch (error) {
+    if (isApiHttpError(error) && (error.status === 401 || error.status === 403)) {
+      if (await getRefreshToken() === refreshToken) await clearMobileSession();
+      return await getAccessToken() ? "retry" : "logout";
+    }
+    // A network failure is not evidence that a refresh credential is invalid.
+    throw error;
   }
 }
 
 export const apiClient = createCleanHubApiClient({
   baseUrl: mobileReleaseConfig.apiBaseUrl,
   credentials: "omit",
-  defaultHeaders: {
-    "X-CleanHub-Auth-Client": "mobile",
+  defaultHeaders: async () => {
+    let storedLocale: string | null = null;
+    if (typeof window !== "undefined") {
+      try {
+        const { Preferences } = await import("@capacitor/preferences");
+        storedLocale = (await Preferences.get({ key: localeStorageKey })).value;
+      } catch { /* Device language remains usable if preferences are unavailable. */ }
+    }
+    return {
+      "X-CleanHub-Auth-Client": "mobile",
+      "Accept-Language": normalizeLocale(storedLocale) ??
+        normalizeLocale(typeof navigator === "undefined" ? null : navigator.language) ?? defaultLocale,
+    };
   },
   tokenProvider: getAccessToken,
   onUnauthorized: async () => {

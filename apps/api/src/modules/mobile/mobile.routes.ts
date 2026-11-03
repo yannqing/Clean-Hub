@@ -4,6 +4,7 @@ import { createMobileTenantDatabaseContextMiddleware } from "../../http/database
 import type { AppBindings } from "../../http/types.js";
 import { createMobileAuthMiddleware } from "../../http/mobile-auth.middleware.js";
 import { createCustomerPasswordChangeMiddleware } from "../../http/customer-password-change.middleware.js";
+import { createMobileCapabilitiesMiddleware } from "../../http/mobile-capabilities.middleware.js";
 import { createMobileAuthRoutes } from "./auth/auth.routes.js";
 import type { MobileAuthService } from "./auth/auth.service.js";
 import { createCustomerRoutes } from "./customer/index.js";
@@ -45,6 +46,7 @@ export function createMobileRoutes({
   routes.use("/*", createMobileAuthMiddleware(mobileAuthService));
   routes.use("/*", createCustomerPasswordChangeMiddleware());
   routes.use("/*", createMobileTenantDatabaseContextMiddleware());
+  routes.use("/*", createMobileCapabilitiesMiddleware());
   const ownerService = new OwnerService({
     notificationPublisher: notificationsService,
   });
