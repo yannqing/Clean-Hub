@@ -26,9 +26,18 @@ function isDisabled(value: string | undefined): boolean {
   return ["1", "true", "yes", "on"].includes(value?.trim().toLowerCase() ?? "");
 }
 
+export function notificationDeliveryChannels(env: NodeJS.ProcessEnv = process.env) {
+  return {
+    email: !isDisabled(env.EMAIL_DELIVERY_DISABLED),
+    push: !isDisabled(env.PUSH_DELIVERY_DISABLED),
+    overdue: !isDisabled(env.EMAIL_OVERDUE_TICKET_DISABLED),
+  };
+}
+
 export async function runEmailDeliveryOnce(
   service = new NotificationsService(),
 ): Promise<void> {
+  const channels = notificationDeliveryChannels();
   await runWithSystemDatabaseContext(async () => {
     const batchSize = readPositiveInteger(
       process.env.EMAIL_DELIVERY_BATCH_SIZE,
@@ -43,11 +52,11 @@ export async function runEmailDeliveryOnce(
       100,
     );
     const [overdueResult, deliveryResult, pushResult] = await Promise.all([
-      isDisabled(process.env.EMAIL_OVERDUE_TICKET_DISABLED)
+      !channels.overdue
         ? Promise.resolve(null)
         : service.publishOverdueTicketEvents({ limit: overdueBatchSize }),
-      service.processEmailDeliveries({ limit: batchSize }),
-      isDisabled(process.env.PUSH_DELIVERY_DISABLED)
+      channels.email ? service.processEmailDeliveries({ limit: batchSize }) : Promise.resolve(null),
+      !channels.push
         ? Promise.resolve(null)
         : service.processPushDeliveries({ limit: pushBatchSize }),
     ]);
@@ -71,8 +80,8 @@ export async function runEmailDeliveryOnce(
  * directly as TypeScript and is false in the bundled output.
  */
 export async function startEmailDeliveryCron(): Promise<void> {
-  if (isDisabled(process.env.EMAIL_DELIVERY_DISABLED)) {
-    logger.info("Email delivery cron disabled");
+  if (!Object.values(notificationDeliveryChannels()).some(Boolean)) {
+    logger.info("Notification delivery cron disabled");
     return;
   }
 

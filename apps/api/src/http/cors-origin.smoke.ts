@@ -216,3 +216,28 @@ assert.ok(
 );
 
 console.log("Credentialed CORS origin smoke passed.");
+
+const nativeApp = createApiApp({ env: {
+  ...process.env, NODE_ENV: "development", AUTH_COOKIE_SECURE: "false",
+  AUTH_TOKEN_SECRET: "native-cors-smoke-secret-at-least-thirty-two-characters",
+  CORS_ENFORCE_SAME_ORIGIN: "true", CORS_ORIGINS: allowedOrigins.join(","),
+  MOBILE_NATIVE_ORIGINS: "https://localhost,capacitor://localhost",
+} }).app;
+for (const origin of ["https://localhost", "capacitor://localhost"]) {
+  const preflight = await nativeApp.request("http://api:4000/mobile/auth/customer/password", {
+    method: "OPTIONS", headers: { origin, "access-control-request-method": "POST",
+      "access-control-request-headers": "content-type,x-cleanhub-auth-client" },
+  });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get("access-control-allow-origin"), origin,
+    "native preflights work with a production web allowlist and no actual client header");
+  const response = await nativeApp.request("http://api:4000/mobile/customer/profile", {
+    headers: { origin, "x-cleanhub-auth-client": "mobile" },
+  });
+  assert.equal(response.status, 401);
+  assert.equal(response.headers.get("access-control-allow-origin"), origin);
+  const webMutation = await nativeApp.request("http://api:4000/auth/logout", {
+    method: "POST", headers: { origin, "x-cleanhub-auth-client": "mobile" },
+  });
+  assert.equal(webMutation.status, 403, "native exception never grants cookie-auth web access");
+}

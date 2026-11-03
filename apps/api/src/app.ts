@@ -183,6 +183,8 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
           allowedOrigins: apiEnv.corsOrigins,
           mobileNativeOrigins: apiEnv.mobileNativeOrigins,
           authClient: c.req.header("x-cleanhub-auth-client"),
+          method: c.req.method,
+          requestedHeaders: c.req.header("access-control-request-headers"),
           enforceSameOrigin: apiEnv.corsEnforceSameOrigin,
           requestUrl: c.req.url,
           forwardedProto: c.req.header("x-forwarded-proto"),

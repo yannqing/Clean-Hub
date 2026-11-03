@@ -119,7 +119,7 @@ cp env/production.env.example .env.production
 ```env
 CLEANHUB_API_BASE_URL=http://api:4000
 CORS_ORIGINS=https://cleanhub.example.com
-MOBILE_NATIVE_ORIGINS=https://localhost
+MOBILE_NATIVE_ORIGINS=https://localhost,capacitor://localhost
 AUTH_COOKIE_SECURE=true
 WEB_ADMIN_PUBLIC_HOST=cleanhub.example.com
 POS_PUBLIC_HOST=pos.cleanhub.example.com
@@ -133,7 +133,7 @@ release 的机器上执行
 
 原生 Android/iOS 包内的 Capacitor WebView 使用 `https://localhost` 作为页面来源，
 并以 Bearer token 调用 API。因此生产 API 的 `CORS_ORIGINS` 必须同时包含
-`https://localhost`，并配置 `MOBILE_NATIVE_ORIGINS=https://localhost`；不要关闭
+`https://localhost`，并配置 `MOBILE_NATIVE_ORIGINS=https://localhost,capacitor://localhost`；不要关闭
 `CORS_ENFORCE_SAME_ORIGIN` 来解决移动端访问问题。
 
 不要提交真实 `.env.production`。

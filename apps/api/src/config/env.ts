@@ -51,7 +51,7 @@ export function loadApiEnv(env: NodeJS.ProcessEnv = process.env): ApiEnv {
     port: readPort(env.PORT),
     corsOrigins: readCorsOrigins(env.CORS_ORIGINS),
     mobileNativeOrigins: readCorsOrigins(
-      env.MOBILE_NATIVE_ORIGINS ?? "https://localhost",
+      env.MOBILE_NATIVE_ORIGINS ?? "https://localhost,capacitor://localhost",
     ),
     corsEnforceSameOrigin: readBoolean(
       env.CORS_ENFORCE_SAME_ORIGIN,

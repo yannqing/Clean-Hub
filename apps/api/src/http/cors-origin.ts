@@ -3,6 +3,8 @@ type ResolveCorsOriginInput = {
   allowedOrigins: readonly string[];
   mobileNativeOrigins?: readonly string[];
   authClient?: string;
+  method?: string;
+  requestedHeaders?: string;
   enforceSameOrigin: boolean;
   requestUrl: string;
   forwardedProto?: string;
@@ -20,8 +22,13 @@ function isMobileNativeRequest(
   input: ResolveCorsOriginInput,
   normalizedOrigin: string,
 ): boolean {
+  const pathname = new URL(input.requestUrl).pathname;
+  const mobilePath = pathname === "/mobile" || pathname.startsWith("/mobile/");
+  const preflight = input.method?.toUpperCase() === "OPTIONS" &&
+    input.requestedHeaders?.toLowerCase().split(",").some(header => header.trim() === "x-cleanhub-auth-client");
   return (
-    input.authClient?.trim().toLowerCase() === "mobile" &&
+    mobilePath &&
+    (input.authClient?.trim().toLowerCase() === "mobile" || preflight === true) &&
     input.mobileNativeOrigins?.includes(normalizedOrigin) === true
   );
 }
@@ -33,6 +40,10 @@ function firstForwardedValue(value: string | undefined): string | undefined {
 function normalizeOrigin(value: string): string | null {
   try {
     const url = new URL(value);
+    // WKWebView's local Capacitor bundle has a custom-scheme origin.
+    if (url.protocol === "capacitor:" && url.host === "localhost" &&
+      !url.username && !url.password && !url.search && !url.hash &&
+      (url.pathname === "" || url.pathname === "/")) return "capacitor://localhost";
     if (
       (url.protocol !== "http:" && url.protocol !== "https:") ||
       url.username ||
@@ -87,18 +98,14 @@ export function resolveCredentialedCorsOrigin(
   if (!input.origin) return null;
 
   const normalizedOrigin = normalizeOrigin(input.origin);
-  if (!normalizedOrigin || !input.allowedOrigins.includes(normalizedOrigin)) {
-    return null;
-  }
+  if (!normalizedOrigin) return null;
+
+  // Native origins are a separate allowlist, restricted to bearer-only mobile
+  // routes. Browser preflights carry requested header names, not their values.
+  if (isMobileNativeRequest(input, normalizedOrigin)) return normalizedOrigin;
+  if (!input.allowedOrigins.includes(normalizedOrigin)) return null;
 
   if (!input.enforceSameOrigin) {
-    return normalizedOrigin;
-  }
-
-  // Capacitor serves the signed mobile bundle from https://localhost while it
-  // talks to the public API with bearer tokens. It cannot use the web apps'
-  // same-origin reverse proxy, so allow this explicit mobile-client origin.
-  if (isMobileNativeRequest(input, normalizedOrigin)) {
     return normalizedOrigin;
   }
 
