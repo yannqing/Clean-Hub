@@ -198,6 +198,391 @@ test("French order detail uses historical currency and cached detail works offli
   expect(errors).toEqual([]);
 });
 
+test("cached order opens even when refund history has never been cached", async ({
+  page,
+}) => {
+  await seedSession(page);
+  await page.addInitScript(
+    ({ auth, order, now }) => {
+      localStorage.setItem(
+        `CapacitorStorage.cleanhub.mobile.customer.v1:${auth.tenantId}:${auth.subjectId}:order:${order.id}`,
+        JSON.stringify({
+          loadedAt: now,
+          value: { ...order, orderType: "manual", notes: null, items: [] },
+        }),
+      );
+    },
+    { auth, order, now },
+  );
+  await mockApi(page, { offline: true });
+  await page.goto(`/?view=order&id=${orderId}`);
+  await expect(page.getByRole("dialog")).toContainText("POS-TEST-0003");
+  await expect(page.getByRole("dialog")).toContainText("€");
+  await expect(page).toHaveURL(new RegExp(`view=order&id=${orderId}`));
+});
+
+test("owner refund detail retains order and refund currency after tenant currency changes", async ({
+  page,
+}) => {
+  const owner: MobileAuthContext = {
+    ...auth,
+    subjectType: "staff",
+    role: "owner",
+    roles: ["owner"],
+  };
+  await seedSession(page, subjectId, owner);
+  await mockApi(page);
+  const fulfill = (json: unknown) => ({
+    json,
+    headers: { "access-control-allow-origin": "*" },
+  });
+  await page.route("**/mobile/auth/me", (route) =>
+    route.fulfill(fulfill(owner)),
+  );
+  await page.route("**/mobile/owner/branches", (route) =>
+    route.fulfill(fulfill({ data: [] })),
+  );
+  await page.route("**/mobile/owner/summary/today", (route) =>
+    route.fulfill(
+      fulfill({
+        tenantId,
+        tenantName: "Test shop",
+        tenantStatus: "active",
+        currency: "XOF",
+        businessDate: "2026-11-03",
+        featureFlags: {
+          laundryEnabled: true,
+          carWashEnabled: false,
+          retailProductsEnabled: true,
+          deliveryEnabled: true,
+          notificationsEnabled: true,
+        },
+        todayOrderCount: 0,
+        todayRevenueAmount: 0,
+        pendingPickupCount: 0,
+        inProgressOrderCount: 0,
+        appointmentSummary: { pending: 0, accepted: 0, cancelled: 0, done: 0 },
+        deliverySummary: {
+          pendingDispatch: 0,
+          inProgress: 0,
+          signed: 0,
+          exception: 0,
+        },
+      }),
+    ),
+  );
+  await page.route(/\/mobile\/payment\/refund-requests(?:\?.*)?$/, (route) =>
+    route.fulfill(
+      fulfill({
+        data: [
+          {
+            id: appointmentId,
+            tenantId,
+            branchId: tenantId,
+            customerAccountId: subjectId,
+            customerId: subjectId,
+            orderId,
+            paymentTransactionId: null,
+            amount: "5.00",
+            currency: "EUR",
+            reason: "Historical currency",
+            status: "pending",
+            gateway: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      }),
+    ),
+  );
+  await page.route(
+    `**/mobile/payment/refund-requests/${appointmentId}/order`,
+    (route) =>
+      route.fulfill(
+        fulfill({
+          ...order,
+          notes: null,
+          items: [
+            {
+              id: subjectId,
+              itemName: "Historical service",
+              quantity: "2",
+              unitAmount: "9.00",
+              lineAmount: "18.00",
+            },
+          ],
+        }),
+      ),
+  );
+  await page.goto("/");
+  await page.getByRole("tab", { name: /Remboursements/ }).click();
+  await page.getByRole("button", { name: /Voir la commande/ }).click();
+  const detail = page.getByRole("dialog");
+  await expect(detail).toContainText("Historical service");
+  await expect(detail).toContainText("€");
+  await expect(detail).not.toContainText(/XOF|FCFA/);
+  await expect(detail).not.toContainText("paid");
+});
+
+type NativeTestState = {
+  secure: Record<string, string>;
+  listeners: Record<string, (event: unknown) => void>;
+  failSecureWrite: boolean;
+};
+
+async function nativeBridge(
+  page: Page,
+  platform: "android" | "ios",
+  failSecureWrite = false,
+) {
+  await page.addInitScript(
+    ({ platform, failSecureWrite }) => {
+      const state: NativeTestState = {
+        secure: {},
+        listeners: {},
+        failSecureWrite,
+      };
+      Object.assign(window, {
+        __nativeTest: state,
+        CapacitorCustomPlatform: { name: platform },
+        Capacitor: {
+          PluginHeaders: ["Preferences", "SecureStorage"].map((name) => ({
+            name,
+            methods: ["get", "set", "remove"].map((name) => ({
+              name,
+              rtype: "promise",
+            })),
+          })),
+          nativePromise: async (
+            plugin: string,
+            method: string,
+            options: { key: string; value?: string },
+          ) => {
+            if (plugin === "SecureStorage") {
+              if (method === "get")
+                return { value: state.secure[options.key] ?? null };
+              if (method === "set") {
+                if (state.failSecureWrite)
+                  throw new Error("SECURE_WRITE_FAILED");
+                state.secure[options.key] = options.value!;
+              } else delete state.secure[options.key];
+            } else {
+              const key = `CapacitorStorage.${options.key}`;
+              if (method === "get") return { value: localStorage.getItem(key) };
+              if (method === "set") localStorage.setItem(key, options.value!);
+              else localStorage.removeItem(key);
+            }
+            return {};
+          },
+          Plugins: {
+            FirebaseMessaging: {
+              checkPermissions: async () => ({ receive: "granted" }),
+              getToken: async () => ({ token: "test-only-fcm" }),
+              deleteToken: async () => {},
+              addListener: async (
+                name: string,
+                listener: (event: unknown) => void,
+              ) => {
+                state.listeners[name] = listener;
+                return {
+                  remove: async () => {
+                    delete state.listeners[name];
+                  },
+                };
+              },
+            },
+          },
+        },
+      });
+    },
+    { platform, failSecureWrite },
+  );
+}
+
+for (const platform of ["android", "ios"] as const) {
+  test(`${platform} credential migration and Firebase foreground event contract`, async ({
+    page,
+  }) => {
+    await seedSession(page);
+    await nativeBridge(page, platform);
+    await mockApi(page);
+    await page.route("**/mobile/notifications/device-tokens", (route) =>
+      route.fulfill({
+        json: {},
+        headers: { "access-control-allow-origin": "*" },
+      }),
+    );
+    await page.goto("/");
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Boolean(
+            (window as unknown as { __nativeTest: NativeTestState })
+              .__nativeTest.listeners.notificationReceived,
+          ),
+        ),
+      )
+      .toBe(true);
+    const storage = await page.evaluate(() => ({
+      secure: (window as unknown as { __nativeTest: NativeTestState })
+        .__nativeTest.secure,
+      legacy: localStorage.getItem(
+        "CapacitorStorage.cleanhub.mobile.refreshToken",
+      ),
+    }));
+    expect(storage.secure["cleanhub.mobile.refreshToken"]).toBe("ui-refresh");
+    expect(storage.legacy).toBeNull();
+    await page.evaluate(() => {
+      (
+        window as unknown as { __nativeTest: NativeTestState }
+      ).__nativeTest.listeners.notificationReceived({
+        notification: {
+          title: "NATIVE DELIVERY UPDATE",
+          body: "Ready for collection",
+          data: {},
+        },
+      });
+    });
+    await expect(page.getByText("NATIVE DELIVERY UPDATE")).toBeVisible();
+  });
+}
+
+test("failed native secure migration preserves legacy credentials and never falls back", async ({
+  page,
+}) => {
+  await seedSession(page);
+  await nativeBridge(page, "ios", true);
+  await mockApi(page);
+  await page.goto("/");
+  await expect(
+    page.getByText("Impossible de relire la session locale."),
+  ).toBeVisible();
+  const stored = await page.evaluate(() => ({
+    secure: (window as unknown as { __nativeTest: NativeTestState })
+      .__nativeTest.secure,
+    legacy: localStorage.getItem(
+      "CapacitorStorage.cleanhub.mobile.refreshToken",
+    ),
+  }));
+  expect(stored.legacy).toBe("ui-refresh");
+  expect(stored.secure["cleanhub.mobile.refreshToken"]).toBeUndefined();
+});
+
+test("driver queue replays on startup and resume without duplicate writes", async ({
+  page,
+}) => {
+  const driver: MobileAuthContext = {
+    ...auth,
+    subjectType: "staff",
+    role: "driver",
+    roles: ["driver"],
+    displayName: "Driver",
+  };
+  const task = {
+    id: orderId,
+    tenantId,
+    branchId: tenantId,
+    appointmentId: null,
+    assigneeUserId: subjectId,
+    assigneeName: "Driver",
+    type: "pickup",
+    status: "pending_dispatch",
+    customerName: "Offline task",
+    customerPhone: null,
+    address: "Dakar",
+    orderId: null,
+    ticketId: null,
+    expectedAt: now,
+    updatedAt: now,
+  };
+  await seedSession(page, subjectId, driver);
+  await page.addInitScript(
+    ({ driver, task, now }) => {
+      const queue = [
+        {
+          id: "queued-test",
+          entity: "delivery-task",
+          operation: "update",
+          status: "pending",
+          attempt: 0,
+          createdAt: now,
+          updatedAt: now,
+          idempotencyKey: "queued-test",
+          payload: {
+            kind: "status",
+            taskId: task.id,
+            request: { toStatus: "en_route", idempotencyKey: "queued-test" },
+          },
+        },
+      ];
+      localStorage.setItem(
+        `CapacitorStorage.${driver.tenantId}:${driver.subjectId}:cleanhub.mobile.delivery.queue.v1`,
+        JSON.stringify(queue),
+      );
+    },
+    { driver, task, now },
+  );
+  await mockApi(page);
+  await page.route("**/mobile/auth/me", (route) =>
+    route.fulfill({
+      json: driver,
+      headers: { "access-control-allow-origin": "*" },
+    }),
+  );
+  let writes = 0;
+  await page.route("**/mobile/delivery/**", async (route) => {
+    if (route.request().method() === "OPTIONS")
+      return route.fulfill({
+        status: 204,
+        headers: {
+          "access-control-allow-origin": "*",
+          "access-control-allow-headers": "*",
+        },
+      });
+    let body: unknown = { data: [task] };
+    if (route.request().method() === "POST") {
+      writes++;
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      task.status = "en_route";
+      body = {
+        task: {
+          ...task,
+          notes: null,
+          timeline: [],
+          proofs: [],
+          order: null,
+          ticket: null,
+        },
+        idempotent: false,
+      };
+    }
+    return route.fulfill({
+      json: body,
+      headers: { "access-control-allow-origin": "*" },
+    });
+  });
+  await page.goto("/");
+  await expect.poll(() => writes).toBe(1);
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event("online"));
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        ({ tenantId, subjectId }) =>
+          JSON.parse(
+            localStorage.getItem(
+              `CapacitorStorage.${tenantId}:${subjectId}:cleanhub.mobile.delivery.queue.v1`,
+            ) ?? "[]",
+          ).length,
+        { tenantId, subjectId },
+      ),
+    )
+    .toBe(0);
+  expect(writes).toBe(1);
+});
+
 test("appointment push destination opens customer tracking, including offline", async ({
   page,
 }) => {
@@ -326,7 +711,19 @@ test("another driver cannot read or replay previous account caches and queues", 
   await page.goto("/");
   await expect(page.getByText("Driver B").first()).toBeVisible();
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
-  await expect(page.getByText("0 action(s) synchronisée(s).")).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        ({ tenantId, previousId }) =>
+          JSON.parse(
+            localStorage.getItem(
+              `CapacitorStorage.${tenantId}:${previousId}:cleanhub.mobile.delivery.queue.v1`,
+            ) ?? "[]",
+          ).length,
+        { tenantId, previousId: subjectId },
+      ),
+    )
+    .toBe(1);
   await expect(page.locator("body")).not.toContainText(
     "Private customer of driver A",
   );

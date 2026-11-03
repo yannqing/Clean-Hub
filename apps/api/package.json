@@ -71,7 +71,10 @@
     "test:integration:pos-intake": "tsx src/modules/pos/service-tickets/service-tickets.intake.integration.ts",
     "test:integration:tenant-branding": "tsx src/modules/tenant/settings/settings.branding.integration.ts",
     "test:integration:mobile-readiness": "tsx src/modules/mobile/mobile-readiness.integration.ts",
-    "smoke:notification-channels": "tsx src/cron/notification-channels.smoke.ts"
+    "smoke:notification-channels": "tsx src/cron/notification-channels.smoke.ts",
+    "smoke:payment-production": "tsx src/modules/mobile/payment/payment.production.smoke.ts",
+    "smoke:mobile-delivery": "tsx src/modules/mobile/delivery/delivery.smoke.ts && tsx src/modules/mobile/owner/owner.smoke.ts",
+    "smoke:notifications": "tsx src/modules/notifications/notifications.smoke.ts"
   },
   "dependencies": {
     "@cleanhub/db": "workspace:*",

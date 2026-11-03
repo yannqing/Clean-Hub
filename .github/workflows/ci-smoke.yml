@@ -148,7 +148,8 @@ jobs:
           pnpm --filter @cleanhub/domain smoke:money
           pnpm --filter @cleanhub/domain smoke:currency
           pnpm --filter @cleanhub/api smoke:cron-schedule
-          pnpm --filter @cleanhub/api smoke:payment
+          NODE_ENV=test pnpm --filter @cleanhub/api smoke:payment
+          NODE_ENV=production pnpm --filter @cleanhub/api smoke:payment-production
           pnpm --filter @cleanhub/api smoke:payment-config
           pnpm --filter @cleanhub/api smoke:pos-carts
           pnpm --filter @cleanhub/api smoke:pos-orders

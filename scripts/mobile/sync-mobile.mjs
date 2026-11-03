@@ -15,6 +15,7 @@ function run(command, args, options = {}) {
       env: { ...process.env, ...(options.env ?? {}) },
     });
 
+    child.on("error", reject);
     child.on("exit", (code) => {
       if (code === 0) {
         resolve();

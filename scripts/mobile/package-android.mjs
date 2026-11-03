@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveMobileReleaseEnv } from "./mobile-release-env.mjs";
 import { validateMobileRelease } from "./mobile-release-validation.mjs";
+import { verifyAndroidArtifacts } from "./mobile-artifacts.mjs";
 
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const androidDir = join(rootDir, "apps", "mobile", "android");
@@ -28,6 +29,7 @@ function run(command, args, options = {}) {
       env: { ...process.env, ...(options.env ?? {}) },
     });
 
+    child.on("error", reject);
     child.on("exit", (code) => {
       if (code === 0) {
         complete();
@@ -65,3 +67,4 @@ await run(
     env: signingEnv,
   },
 );
+console.log("Validated Android release artifacts:", await verifyAndroidArtifacts(androidDir, releaseEnv));

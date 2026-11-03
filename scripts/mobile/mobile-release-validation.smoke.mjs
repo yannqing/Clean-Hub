@@ -27,6 +27,12 @@ function assertThrows(run, label) {
 
 // A well-formed production environment passes.
 assertProductionReleaseEnv(prodEnv);
+for (const version of ["", "../1.0.0", "1.0", "1.0.0-beta"]) {
+  assertThrows(() => assertProductionReleaseEnv({ ...prodEnv, version }), "invalid shared store version");
+}
+for (const buildNumber of ["0", "-1", "1.5", "2147483648"]) {
+  assertThrows(() => assertProductionReleaseEnv({ ...prodEnv, buildNumber }), "invalid shared build number");
+}
 
 // The default environment is "dev". Packaging without CLEANHUB_MOBILE_ENV used
 // to produce a signed release APK pointing at http://localhost:4000.

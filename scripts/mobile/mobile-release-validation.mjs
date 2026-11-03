@@ -13,9 +13,9 @@ const dataExtractionRulesPath = join(
 );
 
 /**
- * Every backup domain Android can carry off the device. The session lives in
- * Capacitor Preferences, which is SharedPreferences, so an omission here is
- * an access and refresh token leaving for Google Drive.
+ * Every backup domain Android can carry off the device. Keep credentials and
+ * offline business data bound to this installation, including legacy values
+ * that have not yet migrated from Capacitor Preferences.
  */
 const ANDROID_BACKUP_DOMAINS = [
   "root",
@@ -38,6 +38,10 @@ function getXmlSection(contents, tagName) {
 
 export function assertProductionReleaseEnv(releaseEnv) {
   const failures = [];
+  if (!/^\d+\.\d+\.\d+$/.test(releaseEnv.version ?? ""))
+    failures.push("CLEANHUB_MOBILE_VERSION must use the shared Android/iOS format X.Y.Z");
+  if (!/^[1-9]\d*$/.test(releaseEnv.buildNumber ?? "") || Number(releaseEnv.buildNumber) > 2147483647)
+    failures.push("CLEANHUB_MOBILE_BUILD_NUMBER must be a positive Android-compatible integer");
 
   if (releaseEnv.appEnvironment !== "prod") {
     failures.push(
