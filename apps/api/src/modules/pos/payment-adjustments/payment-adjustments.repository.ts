@@ -185,6 +185,7 @@ export async function insertPaymentAdjustment(
     direction: PosPaymentAdjustmentDirection;
     status?: "pending" | "succeeded";
     salesReturnId?: string;
+    customerRefundRequestId?: string;
     amount: string;
     currency: string;
     idempotencyKey: string;
@@ -206,6 +207,7 @@ export async function insertPaymentAdjustment(
       direction: input.direction,
       status: input.status ?? "succeeded",
       salesReturnId: input.salesReturnId,
+      customerRefundRequestId: input.customerRefundRequestId,
       // Already a validated <=2-decimal string; normalize it without a float
       // round-trip so this write path matches the rest of the module.
       amount: centsToAmount(amountToCents(input.amount)),

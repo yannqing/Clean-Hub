@@ -1348,8 +1348,9 @@ export async function findPosChannelOverviewMetrics(
       select 1
       from ${posPaymentAdjustments} as "linked_pos_refund"
       where "linked_pos_refund"."tenant_id" = ${refundRequests.tenantId}
-        and "linked_pos_refund"."original_payment_id" = ${refundRequests.paymentTransactionId}
+        and "linked_pos_refund"."customer_refund_request_id" = ${refundRequests.id}
         and "linked_pos_refund"."adjustment_type" = 'refund'
+        and "linked_pos_refund"."status" = 'succeeded'
     )`,
   ];
   applyDateRange(refundFilters, refundRequests.refundedAt, input);

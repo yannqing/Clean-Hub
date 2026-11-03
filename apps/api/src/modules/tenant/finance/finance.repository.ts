@@ -187,6 +187,10 @@ function createRefundFilters(
     eq(refundRequests.currency, input.currency),
     isNotNull(refundRequests.refundedAt),
     isNull(refundRequests.deletedAt),
+    sql`not exists (select 1 from ${posPaymentAdjustments} as linked_customer_refund
+      where linked_customer_refund.tenant_id = ${refundRequests.tenantId}
+        and linked_customer_refund.customer_refund_request_id = ${refundRequests.id}
+        and linked_customer_refund.status = 'succeeded')`,
   ];
 
   applyBranchScope(filters, input, refundRequests.branchId);

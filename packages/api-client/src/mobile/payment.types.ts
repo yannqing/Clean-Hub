@@ -136,3 +136,11 @@ export type MobileApproveRefundResponse = {
 export type MobileRejectRefundRequest = {
   reason: string;
 };
+
+export type MobileRefundSettlementPlan = {
+  requestId: string; orderId: string; status: MobileRefundRequestStatus;
+  amount: string; currency: string; canSettle: boolean;
+  allocations: Array<{ paymentId: string; paymentMethod: string; amount: string; currency: string }>;
+};
+export type MobileRefundSettlementInput = { cashReturned: boolean; providerReferences: Record<string, string> };
+export type MobileRefundSettlementResult = { requestId: string; status: "refunded"; idempotent: boolean };

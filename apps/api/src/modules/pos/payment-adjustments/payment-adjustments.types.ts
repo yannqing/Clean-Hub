@@ -25,6 +25,7 @@ export type PosPaymentAdjustment = {
 };
 
 export type CreatePosRefundRequest = {
+  customerRefundRequestId?: string;
   orderId: string;
   originalPaymentId: string;
   amount: string;

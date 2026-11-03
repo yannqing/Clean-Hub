@@ -61,7 +61,7 @@ export type PaymentRepositoryLike = Pick<
   | "sumOpenRefundRequests"
   | "findRefundRequest"
   | "getRefundOrderDetail"
-  | "startRefundProcessing"
+  | "approveRefundRequestRecord"
   | "releaseRefundProcessing"
   | "attachRefundGateway"
   | "rejectRefundRequest"
@@ -119,7 +119,7 @@ function assertAmountIsPayable(
 
   if (amountToCents(amount) % payableStep !== BigInt(0)) {
     throw validationError(
-      `An amount of ${amount} cannot be paid in ${currency}.`,
+      "The amount does not match the currency's settlement unit.",
       { amount, currency },
     );
   }
@@ -446,6 +446,9 @@ export class PaymentService {
   async handleWebhook(
     input: PaymentWebhookInput,
   ): Promise<PaymentWebhookResult> {
+    if (process.env.NODE_ENV === "production" && input.gateway === "mock") {
+      throw validationError("Mock payment callbacks are disabled in production.");
+    }
     const gateway = this.assertGateway(input.gateway);
     const verification = await gateway.verifyCallback({
       payload: input.payload,
@@ -507,7 +510,7 @@ export class PaymentService {
         callbackId: callback.callback.id,
         verification,
       });
-      await this.publishPaymentNotification(verification);
+
     }
 
     return {
@@ -684,123 +687,16 @@ export class PaymentService {
       });
     }
 
-    const paymentTransactionId = refundRequest.paymentTransactionId;
-
-    if (!paymentTransactionId) {
-      throw validationError(
-        "Refund request is not linked to a paid transaction.",
-      );
-    }
-
-    const processing = await this.repository.startRefundProcessing({
+    const approved = await this.repository.approveRefundRequestRecord({
       tenantId: owner.tenantId,
       refundRequestId: refundRequest.id,
       operatorUserId: owner.subjectId,
     });
-
-    if (!processing) {
-      throw conflict("Refund request changed while approving.");
-    }
-
-    // The row is `processing` from here, which is what the partial unique
-    // index uses to keep a second operator out. If the gateway never accepts
-    // the refund, that claim has to be given back: leaving it set would strand
-    // the request in a status neither approve nor reject can act on, and the
-    // index would block the customer from ever asking again.
-    let gateway: Awaited<ReturnType<PaymentGateway["createRefund"]>>;
-
-    try {
-      gateway = await this.gateway.createRefund({
-        tenantId: owner.tenantId,
-        refundRequestId: refundRequest.id,
-        transactionId: paymentTransactionId,
-        amount: refundRequest.amount,
-        currency: refundRequest.currency,
-      });
-    } catch (error) {
-      const released = await this.repository
-        .releaseRefundProcessing({
-          tenantId: owner.tenantId,
-          refundRequestId: refundRequest.id,
-        })
-        .catch((releaseError: unknown) => {
-          this.logger.error(
-            {
-              tenantId: owner.tenantId,
-              refundRequestId: refundRequest.id,
-              err: releaseError,
-            },
-            "Failed to release a refund request after a gateway error",
-          );
-          return null;
-        });
-
-      this.logger.error(
-        {
-          tenantId: owner.tenantId,
-          refundRequestId: refundRequest.id,
-          operatorUserId: owner.subjectId,
-          released: Boolean(released),
-          err: error,
-        },
-        "Mobile refund gateway rejected the refund",
-      );
-
-      throw error;
-    }
-    const approved = await this.repository.attachRefundGateway({
-      tenantId: owner.tenantId,
-      refundRequestId: refundRequest.id,
-      gateway: gateway.gateway,
-      externalId: gateway.externalId,
-    });
-
-    if (!approved) {
-      throw conflict("Refund request changed after gateway refund creation.");
-    }
-
-    this.logger.info(
-      {
-        tenantId: owner.tenantId,
-        refundRequestId: approved.id,
-        gateway: gateway.gateway,
-        operatorUserId: owner.subjectId,
-      },
-      "Mobile refund request approved",
-    );
-
-    let completed = approved;
-
-    if (this.gateway instanceof MockPaymentGateway) {
-      const callback = this.gateway.createSignedCallbackPayload({
-        action: "refund",
-        tenantId: approved.tenantId,
-        externalId: gateway.externalId,
-        event: `mock.refund.refunded.${approved.id}`,
-        status: "refunded",
-        amount: approved.amount,
-        transactionId: paymentTransactionId,
-        refundRequestId: approved.id,
-      });
-
-      await this.handleWebhook({
-        gateway: "mock",
-        payload: callback.payload,
-        headers: callback.headers,
-      });
-      completed =
-        (await this.repository.findRefundRequest({
-          tenantId: owner.tenantId,
-          refundRequestId: approved.id,
-        })) ?? approved;
-    }
-
-    await this.publishRefundApproved(completed);
-
-    return {
-      refundRequest: completed,
-      gateway,
-    };
+    if (!approved) throw conflict("Refund request changed while approving.");
+    // Approval authorizes a refund. Only the shared POS ledger settlement
+    // service may confirm money was returned and reduce the order balance.
+    await this.publishRefundApproved(approved);
+    return { refundRequest: approved };
   }
 
   async rejectRefundRequest(
@@ -818,8 +714,8 @@ export class PaymentService {
 
     assertBranchAccess(owner, refundRequest.branchId);
 
-    if (refundRequest.status !== "pending") {
-      throw conflict("Only pending refund requests can be rejected.", {
+    if (!["pending", "approved"].includes(refundRequest.status)) {
+      throw conflict("Only unprocessed refund requests can be rejected.", {
         currentStatus: refundRequest.status,
       });
     }
@@ -851,54 +747,6 @@ export class PaymentService {
     }
 
     return this.gateway;
-  }
-
-  private async publishPaymentNotification(verification: {
-    status: string;
-    tenantId: string;
-    externalId: string;
-    transactionId?: string;
-    amount: string;
-  }): Promise<void> {
-    if (!this.notificationPublisher || verification.status !== "paid") {
-      return;
-    }
-
-    const transaction = await this.repository.findTransactionByExternalId({
-      tenantId: verification.tenantId,
-      gateway: this.gateway.name,
-      externalId: verification.externalId,
-    });
-
-    if (!transaction) {
-      return;
-    }
-
-    try {
-      await this.notificationPublisher.publish({
-        name: "order.completed",
-        tenantId: transaction.tenantId,
-        branchId: transaction.branchId,
-        customerId: transaction.customerId,
-        relatedType: "order",
-        relatedId: transaction.orderId,
-        idempotencyKey: `payment.paid:${transaction.id}`,
-        payload: {
-          orderId: transaction.orderId,
-          paymentId: transaction.id,
-          amount: transaction.amount,
-        },
-      });
-    } catch (error) {
-      this.logger.error(
-        {
-          error,
-          tenantId: transaction.tenantId,
-          transactionId: transaction.id,
-        },
-        "Payment notification event failed",
-      );
-    }
   }
 
   private async publishRefundApproved(

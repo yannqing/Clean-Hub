@@ -673,7 +673,7 @@ export class PaymentRepository {
         and(
           eq(refundRequests.tenantId, input.tenantId),
           eq(refundRequests.orderId, input.orderId),
-          inArray(refundRequests.status, ["pending", "processing"]),
+          inArray(refundRequests.status, ["pending", "approved", "processing"]),
           input.excludeRefundRequestId
             ? ne(refundRequests.id, input.excludeRefundRequestId)
             : undefined,
@@ -761,7 +761,7 @@ export class PaymentRepository {
     };
   }
 
-  async startRefundProcessing(input: {
+  async approveRefundRequestRecord(input: {
     tenantId: string;
     refundRequestId: string;
     operatorUserId: string;
@@ -770,7 +770,7 @@ export class PaymentRepository {
     const [row] = await this.db
       .update(refundRequests)
       .set({
-        status: "processing",
+        status: "approved",
         approvedAt: now,
         approvedBy: input.operatorUserId,
         updatedAt: now,
@@ -880,7 +880,7 @@ export class PaymentRepository {
         and(
           eq(refundRequests.id, input.refundRequestId),
           eq(refundRequests.tenantId, input.tenantId),
-          eq(refundRequests.status, "pending"),
+          inArray(refundRequests.status, ["pending", "approved"]),
           isNull(refundRequests.deletedAt),
         ),
       )

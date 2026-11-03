@@ -450,7 +450,7 @@ function createRepository(): PaymentRepositoryLike & {
         (refund) =>
           refund.tenantId === input.tenantId &&
           refund.orderId === input.orderId &&
-          (refund.status === "pending" || refund.status === "processing"),
+          (["pending", "approved", "processing"].includes(refund.status)),
       );
 
       if (hasActiveRefund) {
@@ -494,7 +494,7 @@ function createRepository(): PaymentRepositoryLike & {
             refund.tenantId === tenantId &&
             refund.orderId === orderId &&
             refund.id !== excludeRefundRequestId &&
-            (refund.status === "pending" || refund.status === "processing"),
+            (["pending", "approved", "processing"].includes(refund.status)),
         )
         .reduce((total, refund) => addAmounts(total, refund.amount), "0.00");
     },
@@ -526,7 +526,7 @@ function createRepository(): PaymentRepositoryLike & {
         items: [],
       };
     },
-    async startRefundProcessing({ tenantId, refundRequestId, operatorUserId }) {
+    async approveRefundRequestRecord({ tenantId, refundRequestId, operatorUserId }) {
       const refund = refunds.get(refundRequestId);
 
       if (
@@ -539,7 +539,7 @@ function createRepository(): PaymentRepositoryLike & {
 
       const updated = {
         ...refund,
-        status: "processing" as const,
+        status: "approved" as const,
         approvedAt: new Date().toISOString(),
         approvedBy: operatorUserId,
         updatedAt: new Date().toISOString(),
@@ -608,7 +608,7 @@ function createRepository(): PaymentRepositoryLike & {
       if (
         !refund ||
         refund.tenantId !== tenantId ||
-        refund.status !== "pending"
+        !["pending", "approved"].includes(refund.status)
       ) {
         return null;
       }
@@ -875,8 +875,8 @@ export async function runPaymentSmokeChecks(): Promise<void> {
     "first paid callback should add 40.00",
   );
   assert(
-    notificationPublisher.events[0]?.idempotencyKey === "payment.paid:tx_1",
-    "payment success should publish a notification event",
+    !notificationPublisher.events.some(event => event.name === "order.completed"),
+    "a payment does not mean the order has been delivered",
   );
 
   const duplicatePaid = await sendSignedCallback(service, {
@@ -1043,73 +1043,11 @@ export async function runPaymentSmokeChecks(): Promise<void> {
     refundRequestId: refund.id,
   });
 
-  assert(
-    approval.refundRequest.status === "refunded",
-    "mock refund approval should complete its signed callback",
-  );
-  assert(
-    notificationPublisher.events.some(
-      (event) =>
-        event.name === "refund.approved" &&
-        event.relatedId === refund.id &&
-        event.customerId === "customer_1",
-    ),
-    "approved refund should publish a notification event",
-  );
-  assert(
-    notificationPublisher.events.some(
-      (event) =>
-        event.name === "refund.approved" &&
-        event.relatedId === refund.id &&
-        event.customerId === "customer_1",
-    ),
-    "approved refund should publish a notification event",
-  );
-
-  await assertRejectsPayment(
-    () =>
-      service.approveRefundRequest({
-        authContext: ownerContext,
-        refundRequestId: refund.id,
-      }),
-    409,
-  );
-
-  await sendSignedCallback(service, {
-    action: "refund",
-    tenantId: "tenant_1",
-    externalId: approval.gateway?.externalId ?? "",
-    event: "refund.amount-mismatch.refund_1",
-    status: "refunded",
-    amount: "1.00",
-    transactionId: second.transaction.id,
-    refundRequestId: refund.id,
-  });
-
-  assert(
-    repository.orders.get("order_1")?.paidAmount === "70.00",
-    "amount-mismatched refund callback must not update the order",
-  );
-
-  await sendSignedCallback(service, {
-    action: "refund",
-    tenantId: "tenant_1",
-    externalId: approval.gateway?.externalId ?? "",
-    event: "refund.succeeded.refund_1",
-    status: "refunded",
-    amount: "30.00",
-    transactionId: second.transaction.id,
-    refundRequestId: refund.id,
-  });
-
-  assert(
-    repository.refunds.get(refund.id)?.status === "refunded",
-    "refund callback should mark request refunded",
-  );
-  assert(
-    repository.orders.get("order_1")?.paidAmount === "70.00",
-    "refund callback should reduce paid amount",
-  );
+  assert(approval.refundRequest.status === "approved", "approval must not pretend that money has been returned");
+  assert(!approval.gateway, "approval must not invoke a mock or live refund gateway");
+  assert(repository.orders.get("order_1")?.paidAmount === "100.00", "approval must not reduce collected money");
+  await assertRejectsPayment(() => service.approveRefundRequest({ authContext: ownerContext, refundRequestId: refund.id }), 409);
+  await service.rejectRefundRequest({ authContext: ownerContext, refundRequestId: refund.id, reason: "Not settled" });
 
   const rejectedRefund = await service.createRefundRequest({
     authContext: customerContext,
@@ -1168,6 +1106,8 @@ export async function runPaymentSmokeChecks(): Promise<void> {
   // XOF has no sub-franc coin, so an amount carrying centimes is one nobody
   // can tender. Money is stored in hundredths whatever the currency, so only
   // an explicit currency check rejects it -- the request schema cannot.
+  repository.orders.get("order_1")!.paidAmount = "70.00";
+  repository.orders.get("order_1")!.paymentStatus = "partial";
   await assertRejectsPayment(
     () =>
       service.createPayment({
@@ -1190,17 +1130,12 @@ export async function runPaymentSmokeChecks(): Promise<void> {
     422,
   );
 
-  // A refund request whose gateway call fails must not be left in
-  // `processing`. The partial unique index on ('pending', 'processing') would
-  // then block every future refund request for the order, and neither approve
-  // nor reject can move a `processing` row, so the customer would be locked
-  // out of refunds entirely with no recovery path through the API.
+  // Approval never calls a refund gateway, even a failing one. An approved
+  // request can still be rejected before real settlement, releasing the order.
   const strandedRepository = createRepository();
   const strandedService = new PaymentService({
     repository: strandedRepository,
-    // A real MockPaymentGateway with only the refund call made to fail, so the
-    // payment the refund hangs off still settles normally and the service's
-    // own `instanceof MockPaymentGateway` branch behaves as in production.
+    // Fail if approval accidentally attempts a simulated refund.
     gateway: new RefundFailingGateway({
       secret: mockSecret,
       paymentBaseUrl: "http://localhost:3002",
@@ -1235,43 +1170,10 @@ export async function runPaymentSmokeChecks(): Promise<void> {
     reason: "Gateway will fail",
   });
 
-  let gatewayErrorSurfaced = false;
+  const authorization = await strandedService.approveRefundRequest({ authContext: ownerContext, refundRequestId: strandedRefund.id });
+  assert(authorization.refundRequest.status === "approved", "approval must not call even a failing refund gateway");
+  await strandedService.rejectRefundRequest({ authContext: ownerContext, refundRequestId: strandedRefund.id, reason: "Not settled" });
 
-  try {
-    await strandedService.approveRefundRequest({
-      authContext: ownerContext,
-      refundRequestId: strandedRefund.id,
-    });
-  } catch {
-    gatewayErrorSurfaced = true;
-  }
-
-  assert(
-    gatewayErrorSurfaced,
-    "a failing gateway must surface its error to the caller",
-  );
-
-  const afterFailure = await strandedRepository.findRefundRequest({
-    tenantId: "tenant_1",
-    refundRequestId: strandedRefund.id,
-  });
-
-  assert(
-    afterFailure?.status === "pending",
-    `a refund whose gateway call failed must return to pending, got ${afterFailure?.status}`,
-  );
-
-  // Because it is pending again, the operator can still act on it.
-  const rejectedAfterFailure = await strandedService.rejectRefundRequest({
-    authContext: ownerContext,
-    refundRequestId: strandedRefund.id,
-    reason: "Gateway unavailable",
-  });
-
-  assert(
-    rejectedAfterFailure.status === "rejected",
-    "a released refund request must still be rejectable",
-  );
 }
 
 if (process.argv[1]?.endsWith("payment.smoke.ts")) {

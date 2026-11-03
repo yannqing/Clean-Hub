@@ -202,6 +202,7 @@ async function createAdjustment(
       direction,
       status: adjustmentStatus,
       salesReturnId: refundData?.salesReturnId,
+      customerRefundRequestId: refundData?.customerRefundRequestId,
       amount: input.data.amount,
       currency: order.currency,
       idempotencyKey: input.data.idempotencyKey,

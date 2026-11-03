@@ -8,6 +8,9 @@ import type {
   MobileRefundRequestListQuery,
   MobileRefundRequestListResponse,
   MobileRejectRefundRequest,
+  MobileRefundSettlementInput,
+  MobileRefundSettlementPlan,
+  MobileRefundSettlementResult,
 } from "./payment.types";
 
 type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
@@ -19,6 +22,10 @@ type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
  */
 export function createMobilePaymentApi(client: ApiClient) {
   return {
+    getRefundSettlement: (requestId: string, options?: RequestOptions) =>
+      client.get<MobileRefundSettlementPlan>(`/mobile/payment/refund-requests/${encodeURIComponent(requestId)}/settlement`, options),
+    settleRefund: (requestId: string, input: MobileRefundSettlementInput, options?: RequestOptions) =>
+      client.post<MobileRefundSettlementResult>(`/mobile/payment/refund-requests/${encodeURIComponent(requestId)}/settlement`, input, options),
     getPaymentStatus: (paymentId: string, options?: RequestOptions) =>
       client.get<MobilePaymentStatusResponse>(
         `/mobile/payment/payments/${encodeURIComponent(paymentId)}`,

@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { AppBindings } from "../../../http/types.js";
 import { createPaymentController } from "./payment.controller.js";
 import { PaymentService } from "./payment.service.js";
+import { getRefundSettlementController, settleRefundController } from "./refund-settlement.controller.js";
 
 export type CreatePaymentRoutesOptions = {
   paymentService?: PaymentService;
@@ -38,6 +39,8 @@ export function createPaymentRoutes({
   routes.get("/payments/:paymentId", controller.getPaymentStatus);
   routes.post("/orders/:orderId/refund-requests", controller.createRefundRequest);
   routes.get("/refund-requests", controller.listRefundRequests);
+  routes.get("/refund-requests/:refundRequestId/settlement", getRefundSettlementController);
+  routes.post("/refund-requests/:refundRequestId/settlement", settleRefundController);
   routes.get(
     "/refund-requests/:refundRequestId/order",
     controller.getRefundOrderDetail,
