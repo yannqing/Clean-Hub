@@ -11,6 +11,7 @@ const output = path.join(
 const messages = new Map();
 for (const [file, declaration] of [
   ["tenant-error-messages.ts", "tenantErrorMessages"],
+  ["mobile-error-messages.ts", "mobileErrorMessages"],
   ["schema-error-messages.ts", "schemaErrorMessages"],
   ["error-messages.ts", "API_ERROR_MESSAGES"],
 ]) {

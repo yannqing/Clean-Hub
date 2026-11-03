@@ -12,7 +12,8 @@
     "./error-messages": "./src/error-messages.ts",
     "./tenant-error-messages": "./src/tenant-error-messages.ts",
     "./schema-error-messages": "./src/schema-error-messages.ts",
-    "./system-notifications": "./src/system-notifications.ts"
+    "./system-notifications": "./src/system-notifications.ts",
+    "./mobile-error-messages": "./src/mobile-error-messages.ts"
   },
   "scripts": {
     "test": "tsx src/i18n.test.ts",

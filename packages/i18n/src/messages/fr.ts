@@ -2,6 +2,36 @@ import type { MessageCatalog } from "./types";
 
 export const frMessages = {
   common: {
+    readiness: {
+      loadMoreAppointments: "Charger les anciens rendez-vous",
+      loadMore: "Charger les anciennes commandes et bons de service",
+      setupHelp: "Demandez au magasin son code locataire et un mot de passe pour l’application. La création d’un client au POS n’active pas son accès. En cas d’oubli, contactez le magasin.",
+      deliveryDisabled: "La collecte et la livraison ne sont pas activées pour ce magasin.",
+      contact: "Contact",
+      workOrder: "Bon de service à retourner",
+      chooseWorkOrder: "Choisissez un bon prêt",
+      timeZone: "Fuseau horaire du magasin : {zone}",
+      deliveryProgress: "Suivi de livraison",
+      receiveItems: "Réceptionner les articles dans un bon POS",
+      receiveHelp: "Crée un bon pour le contrôle. Ajoutez les articles, prestations et tarifs dans le POS après réception.",
+      laundry: "Blanchisserie",
+      carWash: "Lavage automobile",
+      settleRefund: "Enregistrer le remboursement réel",
+      refundHelp: "L’approbation ne rembourse pas le client. Confirmez la remise des espèces et renseignez la référence réelle du prestataire pour chaque autre paiement.",
+      cashReturned: "Je confirme avoir rendu les espèces au client",
+      providerReference: "Référence du remboursement du prestataire",
+      refundBalanceChanged: "Le solde remboursable a changé. Vérifiez les paiements avant de continuer.",
+      refundRecorded: "Remboursement réel enregistré. Le journal POS et le statut client ont été mis à jour.",
+      subtotal: "Sous-total",
+      taxable: "Montant imposable",
+      tax: "Taxe",
+      taxNumber: "Numéro fiscal",
+      offlineData: "Données enregistrées · dernière synchronisation : {time}",
+      partialLoad: "Certaines données n’ont pas pu être actualisées. Des données enregistrées peuvent être affichées ; réessayez.",
+      receiveSuccess: "Articles réceptionnés. Poursuivez dans le POS avec ce bon.",
+      businessType: "Type de prestation",
+      refreshFailed: "Actualisation impossible. La dernière version chargée reste affichée.",
+    },
     appName: "CleanHub Mobile",
     loading: "Chargement...",
     retry: "Réessayer",
@@ -77,7 +107,7 @@ export const frMessages = {
       submit: "Se connecter",
       success: "Connexion réussie.",
       chooseTenant: "Choisissez d'abord un pressing.",
-      otpSent: "Code envoyé. Le canal de test est affiché pour la recette MVP.",
+      otpSent: "Un code de connexion a été envoyé sur votre téléphone.",
       testCodeFetched: "Code de test récupéré.",
       sessionReadFailed: "Impossible de relire la session locale.",
       logoutSuccess: "Session fermée sur cet appareil.",
@@ -257,10 +287,10 @@ export const frMessages = {
       deleteAddressDescription:
         "Cette adresse de collecte ou livraison sera retiree du carnet d'adresses.",
       deleteAddressConfirm: "Supprimer l'adresse",
-      deleteContactTitle: "Supprimer le contact ?",
+      deleteContactTitle: "Masquer le contact ?",
       deleteContactDescription:
-        "Ce contact client lie sera retire de votre profil.",
-      deleteContactConfirm: "Supprimer le contact",
+        "Ce contact sera masqué de votre profil. Les dossiers du magasin et les commandes passées restent disponibles.",
+      deleteContactConfirm: "Masquer le contact",
     },
     profile: {
       editTitle: "Modifier le profil",
@@ -345,7 +375,7 @@ export const frMessages = {
       contactNameRequired: "Nom du contact requis.",
       contactUpdated: "Contact mis a jour.",
       contactAdded: "Contact ajoute.",
-      contactDeleted: "Contact supprime.",
+      contactDeleted: "Contact masqué. Les commandes passées sont conservées.",
       addressRequired: "Libelle et adresse requis.",
       addressUpdated: "Adresse mise a jour.",
       addressAdded: "Adresse ajoutee.",
@@ -355,7 +385,7 @@ export const frMessages = {
       addressLocationUnavailable:
         "Position actuelle indisponible. Verifiez l'autorisation.",
       passwordChangedOtherDevices:
-        "Mot de passe mis a jour. Reconnectez-vous sur les autres appareils.",
+        "Mot de passe mis à jour. Reconnectez-vous avec votre nouveau mot de passe.",
       customerSessionRequired: "Session client requise.",
       detailUnavailable:
         "Ce detail est introuvable ou indisponible pour ce compte.",

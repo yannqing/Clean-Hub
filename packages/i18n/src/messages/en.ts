@@ -2,6 +2,36 @@ import type { MessageCatalog } from "./types";
 
 export const enMessages = {
   common: {
+    readiness: {
+      loadMoreAppointments: "Load older appointments",
+      loadMore: "Load older orders and work orders",
+      setupHelp: "Ask your store for its tenant code and an app password. POS customer registration alone does not activate app access. Contact the store if you forget your password.",
+      deliveryDisabled: "Pickup and delivery are not enabled for this store.",
+      contact: "Contact",
+      workOrder: "Work order for return delivery",
+      chooseWorkOrder: "Select a ready work order",
+      timeZone: "Store time zone: {zone}",
+      deliveryProgress: "Delivery progress",
+      receiveItems: "Receive items into POS work order",
+      receiveHelp: "Creates a work order for inspection. Add articles, services and prices in POS after receiving the items.",
+      laundry: "Laundry",
+      carWash: "Car wash",
+      settleRefund: "Record actual refund",
+      refundHelp: "Approval does not return money. Confirm cash was handed back and enter the actual provider reference for each non-cash payment.",
+      cashReturned: "I confirm the cash was returned to the customer",
+      providerReference: "Provider refund reference",
+      refundBalanceChanged: "The refundable balance has changed. Review the payments before continuing.",
+      refundRecorded: "Actual refund recorded. The POS ledger and customer status have been updated.",
+      subtotal: "Subtotal",
+      taxable: "Taxable amount",
+      tax: "Tax",
+      taxNumber: "Tax registration number",
+      offlineData: "Saved data · last successful sync: {time}",
+      partialLoad: "Some data could not refresh. Previously saved data may be shown; retry to update it.",
+      receiveSuccess: "Items received. Continue with this work order in POS.",
+      businessType: "Service type",
+      refreshFailed: "Unable to refresh this detail. The last loaded version is shown.",
+    },
     appName: "CleanHub Mobile",
     loading: "Loading...",
     retry: "Retry",
@@ -77,7 +107,7 @@ export const enMessages = {
       submit: "Sign in",
       success: "Signed in.",
       chooseTenant: "Choose a store first.",
-      otpSent: "Code sent. The test channel is shown for MVP acceptance.",
+      otpSent: "A sign-in code has been sent to your phone.",
       testCodeFetched: "Test code fetched.",
       sessionReadFailed: "Unable to read the local session.",
       logoutSuccess: "Session closed on this device.",
@@ -255,10 +285,10 @@ export const enMessages = {
       deleteAddressDescription:
         "This saved pickup or delivery address will be removed from your address book.",
       deleteAddressConfirm: "Delete address",
-      deleteContactTitle: "Delete contact?",
+      deleteContactTitle: "Hide contact?",
       deleteContactDescription:
-        "This linked customer contact will be removed from your profile.",
-      deleteContactConfirm: "Delete contact",
+        "This contact will be hidden from your app profile. Store records and past orders remain available.",
+      deleteContactConfirm: "Hide contact",
     },
     profile: {
       editTitle: "Edit profile",
@@ -343,7 +373,7 @@ export const enMessages = {
       contactNameRequired: "Contact name is required.",
       contactUpdated: "Contact updated.",
       contactAdded: "Contact added.",
-      contactDeleted: "Contact deleted.",
+      contactDeleted: "Contact hidden. Previous orders are retained.",
       addressRequired: "Label and address are required.",
       addressUpdated: "Address updated.",
       addressAdded: "Address added.",
@@ -353,7 +383,7 @@ export const enMessages = {
       addressLocationUnavailable:
         "Current location unavailable. Check location permission.",
       passwordChangedOtherDevices:
-        "Password updated. Sign in again on other devices.",
+        "Password updated. Sign in again with your new password.",
       customerSessionRequired: "Customer session required.",
       detailUnavailable:
         "This detail was not found or is not available for this account.",

@@ -1,3 +1,4 @@
+import { mobileErrorMessages } from "@cleanhub/i18n/mobile-error-messages";
 import type { SupportedLocale } from "./locales.js";
 import { tenantErrorMessages } from "@cleanhub/i18n/tenant-error-messages";
 import { schemaErrorMessages } from "@cleanhub/i18n/schema-error-messages";
@@ -23,6 +24,7 @@ import { schemaErrorMessages } from "@cleanhub/i18n/schema-error-messages";
 const API_ERROR_MESSAGES: Readonly<
   Record<string, Readonly<Record<SupportedLocale, string>>>
 > = {
+  ...mobileErrorMessages,
   ...tenantErrorMessages,
   ...schemaErrorMessages,
   "This item type is not enabled for this tenant. Ask an administrator to update the item catalog.":
