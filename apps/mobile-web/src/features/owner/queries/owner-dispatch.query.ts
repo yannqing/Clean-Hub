@@ -82,6 +82,7 @@ function toAppointmentItem(
     serviceType: appointment.type,
     notes: appointment.notes,
     assigneeUserId: appointment.assigneeUserId,
+    ticketId: appointment.ticketId,
     deliveryTaskId: appointment.deliveryTaskId,
     createdAt: appointment.createdAt,
     updatedAt: appointment.updatedAt,

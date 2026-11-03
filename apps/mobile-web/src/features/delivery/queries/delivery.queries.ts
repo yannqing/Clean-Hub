@@ -1,6 +1,13 @@
 import { apiClient } from "@/lib/api-client";
+import { ApiNetworkError, ApiTimeoutError, isApiHttpError } from "@cleanhub/api-client";
+
+function mayUseCache(error: unknown) {
+  return error instanceof ApiNetworkError || error instanceof ApiTimeoutError ||
+    (isApiHttpError(error) && error.status >= 500);
+}
 
 import {
+  getDeliveryStorageScope,
   getCachedDeliveryTaskDetail,
   getCachedDeliveryTasks,
   saveCachedDeliveryTaskDetail,
@@ -8,16 +15,18 @@ import {
 } from "../lib/offline-store";
 
 export async function getDeliveryTasks() {
+  const scope = await getDeliveryStorageScope();
   try {
     const response = await apiClient.mobile.delivery.listTasks();
-    await saveCachedDeliveryTasks(response.data);
+    await saveCachedDeliveryTasks(response.data, scope);
 
     return {
       tasks: response.data,
       source: "network" as const,
     };
   } catch (error) {
-    const cachedTasks = await getCachedDeliveryTasks();
+    if (!mayUseCache(error)) throw error;
+    const cachedTasks = await getCachedDeliveryTasks(scope);
 
     if (cachedTasks.length > 0) {
       return {
@@ -31,16 +40,18 @@ export async function getDeliveryTasks() {
 }
 
 export async function getDeliveryTaskDetail(taskId: string) {
+  const scope = await getDeliveryStorageScope();
   try {
     const task = await apiClient.mobile.delivery.getTask(taskId);
-    await saveCachedDeliveryTaskDetail(task);
+    await saveCachedDeliveryTaskDetail(task, scope);
 
     return {
       task,
       source: "network" as const,
     };
   } catch (error) {
-    const cachedTask = await getCachedDeliveryTaskDetail(taskId);
+    if (!mayUseCache(error)) throw error;
+    const cachedTask = await getCachedDeliveryTaskDetail(taskId, scope);
 
     if (cachedTask) {
       return {

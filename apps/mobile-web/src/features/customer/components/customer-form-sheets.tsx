@@ -1,9 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
+import { getBusinessTimeZone } from "@/lib/business-time";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import type {
   MobileCustomerAddress,
+  MobileCustomerContact,
+  MobileCustomerTicketListItem,
   MobileCustomerBranchOption,
 } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
@@ -75,6 +78,8 @@ function AlertMessage({ message, tone }: { message: string; tone: "error" | "suc
 }
 
 type AppointmentFormSheetProps = {
+  contacts: MobileCustomerContact[];
+  tickets: MobileCustomerTicketListItem[];
   addressBook: MobileCustomerAddress[];
   branches: MobileCustomerBranchOption[];
   error: string | null;
@@ -87,6 +92,7 @@ type AppointmentFormSheetProps = {
 };
 
 export function AppointmentFormSheet({
+  contacts, tickets,
   addressBook,
   branches,
   error,
@@ -110,6 +116,7 @@ export function AppointmentFormSheet({
         {error ? <AlertMessage tone="error" message={error} /> : null}
 
         <AppointmentForm
+          contacts={contacts} tickets={tickets}
           addressBook={addressBook}
           branches={branches}
           form={form}
@@ -123,6 +130,8 @@ export function AppointmentFormSheet({
 }
 
 type AppointmentFormProps = {
+  contacts: MobileCustomerContact[];
+  tickets: MobileCustomerTicketListItem[];
   addressBook: MobileCustomerAddress[];
   branches: MobileCustomerBranchOption[];
   form: AppointmentFormState;
@@ -132,6 +141,7 @@ type AppointmentFormProps = {
 };
 
 export function AppointmentForm({
+  contacts, tickets,
   addressBook,
   branches,
   form,
@@ -191,6 +201,20 @@ export function AppointmentForm({
         ))}
       </fieldset>
 
+      <p className="text-xs text-slate-600">{t("common.readiness.timeZone", { zone: getBusinessTimeZone() })}</p>
+      <div className="space-y-2">
+        <Label>{t("common.readiness.contact")}</Label>
+        <MobileOptionSheet placeholder={t("common.readiness.contact")} title={t("common.readiness.contact")} value={form.customerId || ""}
+          options={contacts.filter(contact => contact.status === "active").map(contact => ({ value: contact.customerId, label: contact.fullName }))}
+          onValueChange={customerId => onFormChange(current => ({ ...current, customerId, ticketId: "" }))} />
+      </div>
+      {form.type === "dropoff" ? <div className="space-y-2">
+        <Label>{t("common.readiness.workOrder")}</Label>
+        <MobileOptionSheet title={t("common.readiness.workOrder")} placeholder={t("common.readiness.chooseWorkOrder")} value={form.ticketId || ""}
+          options={tickets.filter(ticket => ticket.ticketStatus === "ready_to_pick" && (!form.customerId || ticket.customerId === form.customerId) && (!form.branchId || ticket.branchId === form.branchId))
+            .map(ticket => ({ value: ticket.id, label: ticket.ticketNo || ticket.id }))}
+          onValueChange={ticketId => { const ticket = tickets.find(item => item.id === ticketId); onFormChange(current => ({ ...current, ticketId, customerId: ticket?.customerId, branchId: ticket?.branchId || current.branchId })); }} />
+      </div> : null}
       {branches.length > 1 ? (
         <div className="space-y-2">
           <Label htmlFor="appointment-branch">{t("customer.appointments.branch")}</Label>
@@ -288,7 +312,7 @@ export function AppointmentForm({
       </div>
 
       <SheetFooter className="sticky bottom-0 -mx-5 mt-5 border-t border-slate-200 bg-white px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
-        <Button className="h-12 w-full" disabled={isSubmitting} type="submit">
+        <Button className="h-12 w-full" disabled={isSubmitting || !form.customerId || (form.type === "dropoff" && !form.ticketId)} type="submit">
           {isSubmitting ? (
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
           ) : (

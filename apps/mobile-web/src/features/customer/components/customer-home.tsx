@@ -1,5 +1,9 @@
 "use client";
 
+import { dateTimeLocalToUtc } from "@cleanhub/domain/timezone";
+import { getBusinessTimeZone } from "@/lib/business-time";
+import { createLocalId } from "@/features/delivery/lib/id";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   MobileAuthContext,
@@ -15,8 +19,9 @@ import type {
 } from "@cleanhub/api-client";
 import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
-import { toast } from "@cleanhub/ui";
+import { Button, toast } from "@cleanhub/ui";
 
+import { CustomerTrackingSheet } from "./customer-tracking-sheet";
 import { getMobileSession } from "@/lib/token-storage";
 import { ConfirmSheet } from "@/components/confirm-sheet";
 import { MobilePageSkeleton } from "@/components/mobile-skeleton";
@@ -118,7 +123,7 @@ type ActivitySelection = {
 
 type ProfileSheet = "profile" | "contact" | "address" | "password" | null;
 
-const customerDetailUrlViews = ["order", "ticket"] as const;
+const customerDetailUrlViews = ["order", "ticket", "appointment"] as const;
 
 type CustomerSnapshot = {
   authContext: MobileAuthContext | null;
@@ -128,28 +133,18 @@ type CustomerSnapshot = {
   activity: MobileCustomerActivityList;
   appointments: MobileCustomerAppointment[];
   refundRequests: MobileRefundRequest[];
+  appointmentNextOffset?: number | null;
   errorKey: TranslationKey | null;
+  cachedAt?: string;
 };
 
-type CustomerSnapshotFallback = Omit<CustomerSnapshot, "authContext" | "errorKey">;
+type CustomerSnapshotFallback = Omit<
+  CustomerSnapshot,
+  "authContext" | "errorKey" | "cachedAt"
+>;
 
-function getSettledValue<T>(
-  result: PromiseSettledResult<T>,
-  fallback: T,
-): T {
+function getSettledValue<T>(result: PromiseSettledResult<T>, fallback: T): T {
   return result.status === "fulfilled" ? result.value : fallback;
-}
-
-function hasCustomerSnapshotData(snapshot: CustomerSnapshotFallback): boolean {
-  return Boolean(
-    snapshot.profile ||
-      snapshot.addressBook.length ||
-      snapshot.branches.length ||
-      snapshot.activity.orders.length ||
-      snapshot.activity.tickets.length ||
-      snapshot.appointments.length ||
-      snapshot.refundRequests.length,
-  );
 }
 
 async function fetchCustomerSnapshot(
@@ -177,7 +172,14 @@ async function fetchCustomerSnapshot(
     };
   }
 
-  const [profile, addressBook, branches, activity, appointments, refundRequests] = await Promise.allSettled([
+  const [
+    profile,
+    addressBook,
+    branches,
+    activity,
+    appointments,
+    refundRequests,
+  ] = await Promise.allSettled([
     getCustomerProfile(),
     getCustomerAddresses(),
     getCustomerBranches(),
@@ -193,7 +195,11 @@ async function fetchCustomerSnapshot(
     activity,
     appointments,
     refundRequests,
-  ].some((result) => result.status === "rejected");
+  ].some(
+    (result) =>
+      result.status === "rejected" ||
+      (result.status === "fulfilled" && result.value.cachedAt),
+  );
   const nextProfile = getSettledValue(profile, fallback.profile);
   const nextAddressBook = getSettledValue(addressBook, {
     data: fallback.addressBook,
@@ -219,13 +225,29 @@ async function fetchCustomerSnapshot(
     refundRequests: nextRefundRequests,
   };
 
+  const cacheTimes = [
+    profile,
+    addressBook,
+    branches,
+    activity,
+    appointments,
+    refundRequests,
+  ]
+    .flatMap((result) =>
+      result.status === "fulfilled" && result.value.cachedAt
+        ? [result.value.cachedAt]
+        : [],
+    )
+    .sort();
   return {
+    appointmentNextOffset:
+      appointments.status === "fulfilled"
+        ? appointments.value.nextOffset
+        : fallback.appointmentNextOffset,
+    cachedAt: cacheTimes[0],
     authContext: session.authContext,
     ...nextSnapshotData,
-    errorKey:
-      hasFailedRequest && !hasCustomerSnapshotData(nextSnapshotData)
-        ? "common.errors.genericLoad"
-        : null,
+    errorKey: hasFailedRequest ? "common.readiness.partialLoad" : null,
   };
 }
 
@@ -240,30 +262,53 @@ export function CustomerHome({
   isLoggingOut = false,
   onLogout,
 }: CustomerHomeProps) {
-  const { t } = useTranslation();
+  const { locale, t } = useTranslation();
   const [activeTab, setActiveTab] = useState<CustomerTab>("resume");
-  const [activityFilter, setActivityFilter] = useState<ActivityStatusFilter>("all");
+  const [activityFilter, setActivityFilter] =
+    useState<ActivityStatusFilter>("all");
   const [authContext, setAuthContext] = useState<MobileAuthContext | null>(
     initialAuthContext,
   );
   const [profile, setProfile] = useState<MobileCustomerProfile | null>(null);
   const [addressBook, setAddressBook] = useState<MobileCustomerAddress[]>([]);
   const [branches, setBranches] = useState<MobileCustomerBranchOption[]>([]);
-  const [activity, setActivity] = useState<MobileCustomerActivityList>(emptyActivity);
-  const [appointments, setAppointments] = useState<MobileCustomerAppointment[]>([]);
-  const [refundRequests, setRefundRequests] = useState<MobileRefundRequest[]>([]);
-  const [selectedActivity, setSelectedActivity] = useState<ActivitySelection | null>(null);
-  const [activityDetail, setActivityDetail] = useState<ActivityDetail | null>(null);
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
+  const [appointmentNextOffset, setAppointmentNextOffset] = useState<
+    number | null | undefined
+  >();
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [cachedAt, setCachedAt] = useState<string | undefined>();
+  const refreshBusy = useRef(false);
+  const [activity, setActivity] =
+    useState<MobileCustomerActivityList>(emptyActivity);
+  const [appointments, setAppointments] = useState<MobileCustomerAppointment[]>(
+    [],
+  );
+  const [refundRequests, setRefundRequests] = useState<MobileRefundRequest[]>(
+    [],
+  );
+  const [selectedActivity, setSelectedActivity] =
+    useState<ActivitySelection | null>(null);
+  const [activityDetail, setActivityDetail] = useState<ActivityDetail | null>(
+    null,
+  );
+  const [trackingId, setTrackingId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [appointmentSheetOpen, setAppointmentSheetOpen] = useState(false);
   const [profileSheet, setProfileSheet] = useState<ProfileSheet>(null);
-  const [confirmTarget, setConfirmTarget] = useState<CustomerConfirmTarget | null>(null);
+  const [confirmTarget, setConfirmTarget] =
+    useState<CustomerConfirmTarget | null>(null);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
-  const [profileForm, setProfileForm] = useState<CustomerProfileFormState>(() => toProfileForm(null));
-  const [contactForm, setContactForm] = useState<CustomerContactFormState>(emptyContactForm);
-  const [addressForm, setAddressForm] = useState<CustomerAddressFormState>(emptyAddressForm);
-  const [passwordForm, setPasswordForm] = useState<CustomerPasswordFormState>(emptyPasswordForm);
+  const [profileForm, setProfileForm] = useState<CustomerProfileFormState>(() =>
+    toProfileForm(null),
+  );
+  const [contactForm, setContactForm] =
+    useState<CustomerContactFormState>(emptyContactForm);
+  const [addressForm, setAddressForm] =
+    useState<CustomerAddressFormState>(emptyAddressForm);
+  const [passwordForm, setPasswordForm] =
+    useState<CustomerPasswordFormState>(emptyPasswordForm);
   const [refundSheetOpen, setRefundSheetOpen] = useState(false);
   const [appointmentForm, setAppointmentForm] = useState<AppointmentFormState>({
     type: "pickup",
@@ -288,11 +333,14 @@ export function CustomerHome({
   const [isLocatingAddress, setIsLocatingAddress] = useState(false);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
-  const [cancellingAppointmentId, setCancellingAppointmentId] = useState<string | null>(null);
+  const [cancellingAppointmentId, setCancellingAppointmentId] = useState<
+    string | null
+  >(null);
   const [contactActionId, setContactActionId] = useState<string | null>(null);
   const [addressActionId, setAddressActionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const hasRestoredDetailRef = useRef(false);
+  const appointmentRequestId = useRef<string | null>(null);
 
   const isConfirmSubmitting =
     confirmTarget?.kind === "cancel-appointment"
@@ -303,58 +351,98 @@ export function CustomerHome({
           ? contactActionId === `delete-${confirmTarget.customerId}`
           : false;
 
-  const loadCustomerData = useCallback(async (mode: "boot" | "refresh" = "refresh") => {
-    const currentSnapshotData: CustomerSnapshotFallback = {
-      profile,
-      addressBook,
-      branches,
-      activity,
-      appointments,
-      refundRequests,
-    };
+  const loadCustomerData = useCallback(
+    async (mode: "boot" | "refresh" = "refresh") => {
+      if (refreshBusy.current) return;
+      refreshBusy.current = true;
+      const currentSnapshotData: CustomerSnapshotFallback = {
+        profile,
+        addressBook,
+        branches,
+        activity,
+        appointments,
+        refundRequests,
+      };
 
-    if (mode === "boot") {
-      setIsLoading(true);
-    } else {
-      setIsRefreshing(true);
-    }
-
-    setError(null);
-
-    try {
-      const snapshot = await fetchCustomerSnapshot(
-        mode === "refresh" ? currentSnapshotData : undefined,
-      );
-      setAuthContext(snapshot.authContext);
-      setProfile(snapshot.profile);
-      setAddressBook(snapshot.addressBook);
-      setBranches(snapshot.branches);
-      setActivity(snapshot.activity);
-      setAppointments(snapshot.appointments);
-      setRefundRequests(snapshot.refundRequests);
-      setError(snapshot.errorKey ? t(snapshot.errorKey) : null);
-      setProfileForm(toProfileForm(snapshot.profile));
-      setAppointmentForm((current) => ({
-        ...current,
-        branchId: current.branchId || snapshot.branches[0]?.id || "",
-        addressId:
-          current.addressId === CUSTOM_APPOINTMENT_ADDRESS_ID && current.address
-            ? current.addressId
-            : getAddressBookPrimaryAddressId(snapshot.addressBook),
-        address:
-          current.address ||
-          getAddressBookPrimaryAddress(snapshot.addressBook) ||
-          getPrimaryAddress(snapshot.profile),
-      }));
-    } catch (nextError) {
-      if (mode === "boot" || !hasCustomerSnapshotData(currentSnapshotData)) {
-        setError(getErrorMessage(nextError, t("common.errors.genericAction")));
+      if (mode === "boot") {
+        setIsLoading(true);
+      } else {
+        setIsRefreshing(true);
       }
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [activity, addressBook, appointments, branches, profile, refundRequests, t]);
+
+      setError(null);
+
+      try {
+        const snapshot = await fetchCustomerSnapshot(
+          mode === "refresh" ? currentSnapshotData : undefined,
+        );
+        setAuthContext(snapshot.authContext);
+        setProfile(snapshot.profile);
+        setAddressBook(snapshot.addressBook);
+        setBranches(snapshot.branches);
+        setActivity((current) => ({
+          ...snapshot.activity,
+          orders: [
+            ...snapshot.activity.orders,
+            ...current.orders.filter(
+              (item) =>
+                !snapshot.activity.orders.some((next) => next.id === item.id),
+            ),
+          ],
+          tickets: [
+            ...snapshot.activity.tickets,
+            ...current.tickets.filter(
+              (item) =>
+                !snapshot.activity.tickets.some((next) => next.id === item.id),
+            ),
+          ],
+          nextOffset:
+            current.orders.length > snapshot.activity.orders.length ||
+            current.tickets.length > snapshot.activity.tickets.length
+              ? current.nextOffset
+              : snapshot.activity.nextOffset,
+        }));
+        setCachedAt(snapshot.cachedAt);
+        setAppointments((current) =>
+          sortAppointments([
+            ...snapshot.appointments,
+            ...current.filter(
+              (item) =>
+                !snapshot.appointments.some((next) => next.id === item.id),
+            ),
+          ]),
+        );
+        setAppointmentNextOffset((current) =>
+          current === undefined ||
+          appointments.length <= snapshot.appointments.length
+            ? snapshot.appointmentNextOffset
+            : current,
+        );
+        setRefundRequests(snapshot.refundRequests);
+        setError(snapshot.errorKey ? t(snapshot.errorKey) : null);
+        setAppointmentForm((current) => ({
+          ...current,
+          branchId: current.branchId || snapshot.branches[0]?.id || "",
+          addressId:
+            current.addressId === CUSTOM_APPOINTMENT_ADDRESS_ID &&
+            current.address
+              ? current.addressId
+              : getAddressBookPrimaryAddressId(snapshot.addressBook),
+          address:
+            current.address ||
+            getAddressBookPrimaryAddress(snapshot.addressBook) ||
+            getPrimaryAddress(snapshot.profile),
+        }));
+      } catch (nextError) {
+        setError(getErrorMessage(nextError, t("common.readiness.partialLoad")));
+      } finally {
+        refreshBusy.current = false;
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [activity, addressBook, appointments, branches, profile, refundRequests, t],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -369,8 +457,31 @@ export function CustomerHome({
         setProfile(snapshot.profile);
         setAddressBook(snapshot.addressBook);
         setBranches(snapshot.branches);
-        setActivity(snapshot.activity);
+        setActivity((current) => ({
+          ...snapshot.activity,
+          orders: [
+            ...snapshot.activity.orders,
+            ...current.orders.filter(
+              (item) =>
+                !snapshot.activity.orders.some((next) => next.id === item.id),
+            ),
+          ],
+          tickets: [
+            ...snapshot.activity.tickets,
+            ...current.tickets.filter(
+              (item) =>
+                !snapshot.activity.tickets.some((next) => next.id === item.id),
+            ),
+          ],
+          nextOffset:
+            current.orders.length > snapshot.activity.orders.length ||
+            current.tickets.length > snapshot.activity.tickets.length
+              ? current.nextOffset
+              : snapshot.activity.nextOffset,
+        }));
+        setCachedAt(snapshot.cachedAt);
         setAppointments(snapshot.appointments);
+        setAppointmentNextOffset(snapshot.appointmentNextOffset);
         setRefundRequests(snapshot.refundRequests);
         setError(snapshot.errorKey ? t(snapshot.errorKey) : null);
         setProfileForm(toProfileForm(snapshot.profile));
@@ -378,7 +489,8 @@ export function CustomerHome({
           ...current,
           branchId: current.branchId || snapshot.branches[0]?.id || "",
           addressId:
-            current.addressId === CUSTOM_APPOINTMENT_ADDRESS_ID && current.address
+            current.addressId === CUSTOM_APPOINTMENT_ADDRESS_ID &&
+            current.address
               ? current.addressId
               : getAddressBookPrimaryAddressId(snapshot.addressBook),
           address:
@@ -389,7 +501,9 @@ export function CustomerHome({
       })
       .catch((nextError: unknown) => {
         if (mounted) {
-          setError(getErrorMessage(nextError, t("common.errors.genericAction")));
+          setError(
+            getErrorMessage(nextError, t("common.errors.genericAction")),
+          );
         }
       })
       .finally(() => {
@@ -413,21 +527,28 @@ export function CustomerHome({
   );
   const tenantCurrency = resolveTenantCurrency(authContext?.currency);
 
+  const refreshDataRef = useRef(loadCustomerData);
   useEffect(() => {
-    const refreshWhenActive = () => {
-      if (document.visibilityState === "visible") {
-        void loadCustomerData("refresh");
-      }
-    };
-
-    window.addEventListener("focus", refreshWhenActive);
-    document.addEventListener("visibilitychange", refreshWhenActive);
-
-    return () => {
-      window.removeEventListener("focus", refreshWhenActive);
-      document.removeEventListener("visibilitychange", refreshWhenActive);
-    };
+    refreshDataRef.current = loadCustomerData;
   }, [loadCustomerData]);
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible")
+        void refreshDataRef.current("refresh");
+    };
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    window.addEventListener("cleanhub:notification", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    const timer = window.setInterval(refresh, 30_000);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      window.removeEventListener("cleanhub:notification", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, []);
 
   const closeActivityDetail = useCallback((syncUrl = true) => {
     setDetailOpen(false);
@@ -439,48 +560,53 @@ export function CustomerHome({
     }
   }, []);
 
-  const openActivityDetail = useCallback(async (
-    selection: ActivitySelection,
-    options: { syncUrl?: boolean } = {},
-  ) => {
-    if (options.syncUrl ?? true) {
-      writeMobileDetailUrlState(
-        { view: selection.kind, id: selection.id },
-        "push",
-      );
-    }
-
-    setSelectedActivity(selection);
-    setActivityDetail(null);
-    setDetailOpen(true);
-    setIsDetailLoading(true);
-    setError(null);
-
-    try {
-      const [detail, nextRefundRequests] = await Promise.all([
-        getCustomerActivityDetail(selection),
-        selection.kind === "order"
-          ? getCustomerRefundRequests()
-          : Promise.resolve(null),
-      ]);
-
-      if (nextRefundRequests) {
-        setRefundRequests(nextRefundRequests.data);
+  const openActivityDetail = useCallback(
+    async (
+      selection: ActivitySelection,
+      options: { syncUrl?: boolean } = {},
+    ) => {
+      if (options.syncUrl ?? true) {
+        writeMobileDetailUrlState(
+          { view: selection.kind, id: selection.id },
+          "push",
+        );
       }
 
-      setActivityDetail(
-        selection.kind === "order"
-          ? { kind: "order", data: detail as MobileCustomerOrderDetail }
-          : { kind: "ticket", data: detail as MobileCustomerTicketDetail },
-      );
-    } catch (nextError) {
-      closeActivityDetail(false);
-      writeMobileDetailUrlState(null, "replace");
-      setError(getErrorMessage(nextError, t("customer.messages.detailUnavailable")));
-    } finally {
-      setIsDetailLoading(false);
-    }
-  }, [closeActivityDetail, t]);
+      setSelectedActivity(selection);
+      setActivityDetail(null);
+      setDetailOpen(true);
+      setIsDetailLoading(true);
+      setError(null);
+
+      try {
+        const [detail, nextRefundRequests] = await Promise.all([
+          getCustomerActivityDetail(selection),
+          selection.kind === "order"
+            ? getCustomerRefundRequests()
+            : Promise.resolve(null),
+        ]);
+
+        if (nextRefundRequests) {
+          setRefundRequests(nextRefundRequests.data);
+        }
+
+        setActivityDetail(
+          selection.kind === "order"
+            ? { kind: "order", data: detail as MobileCustomerOrderDetail }
+            : { kind: "ticket", data: detail as MobileCustomerTicketDetail },
+        );
+      } catch (nextError) {
+        closeActivityDetail(false);
+        writeMobileDetailUrlState(null, "replace");
+        setError(
+          getErrorMessage(nextError, t("customer.messages.detailUnavailable")),
+        );
+      } finally {
+        setIsDetailLoading(false);
+      }
+    },
+    [closeActivityDetail, t],
+  );
 
   function handleSelectActivity(item: ActivityListItem) {
     void openActivityDetail({ kind: item.kind, id: item.id });
@@ -494,12 +620,20 @@ export function CustomerHome({
     hasRestoredDetailRef.current = true;
     const detailState = readMobileDetailUrlState(customerDetailUrlViews);
 
+    if (detailState?.view === "appointment") {
+      const timer = window.setTimeout(() => {
+        setActiveTab("appointments");
+        setTrackingId(detailState.id);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
     if (detailState) {
+      const selection: ActivitySelection = {
+        kind: detailState.view,
+        id: detailState.id,
+      };
       const restoreTimeoutId = window.setTimeout(() => {
-        void openActivityDetail(
-          { kind: detailState.view, id: detailState.id },
-          { syncUrl: false },
-        );
+        void openActivityDetail(selection, { syncUrl: false });
       }, 0);
 
       return () => window.clearTimeout(restoreTimeoutId);
@@ -511,10 +645,16 @@ export function CustomerHome({
       const detailState = readMobileDetailUrlState(customerDetailUrlViews);
 
       if (!detailState) {
+        setTrackingId(null);
         closeActivityDetail(false);
         return;
       }
 
+      if (detailState.view === "appointment") {
+        setActiveTab("appointments");
+        setTrackingId(detailState.id);
+        return;
+      }
       void openActivityDetail(
         { kind: detailState.view, id: detailState.id },
         { syncUrl: false },
@@ -526,25 +666,26 @@ export function CustomerHome({
     return () => window.removeEventListener("popstate", handlePopState);
   }, [closeActivityDetail, openActivityDetail]);
 
-  const refreshSelectedOrder = useCallback(async (
-    orderId: string,
-  ): Promise<MobileCustomerOrderDetail> => {
-    const [detail, nextActivity, nextRefundRequests] = await Promise.all([
-      getCustomerActivityDetail({ kind: "order", id: orderId }),
-      getCustomerOrdersAndTickets(),
-      getCustomerRefundRequests(),
-    ]);
-    const orderDetail = detail as MobileCustomerOrderDetail;
+  const refreshSelectedOrder = useCallback(
+    async (orderId: string): Promise<MobileCustomerOrderDetail> => {
+      const [detail, nextActivity, nextRefundRequests] = await Promise.all([
+        getCustomerActivityDetail({ kind: "order", id: orderId }),
+        getCustomerOrdersAndTickets(),
+        getCustomerRefundRequests(),
+      ]);
+      const orderDetail = detail as MobileCustomerOrderDetail;
 
-    setActivity(nextActivity.data);
-    setRefundRequests(nextRefundRequests.data);
-    setActivityDetail({
-      kind: "order",
-      data: orderDetail,
-    });
+      setActivity(nextActivity.data);
+      setRefundRequests(nextRefundRequests.data);
+      setActivityDetail({
+        kind: "order",
+        data: orderDetail,
+      });
 
-    return orderDetail;
-  }, []);
+      return orderDetail;
+    },
+    [],
+  );
 
   // Payment is taken at the counter, so the customer's phone learns about it
   // only by asking again. Refresh the open order when the app comes back to
@@ -555,20 +696,35 @@ export function CustomerHome({
       if (
         document.visibilityState !== "visible" ||
         !detailOpen ||
-        selectedActivity?.kind !== "order"
+        !selectedActivity
       ) {
         return;
       }
 
-      void refreshSelectedOrder(selectedActivity.id).catch((nextError) => {
+      const refresh =
+        selectedActivity.kind === "order"
+          ? refreshSelectedOrder(selectedActivity.id)
+          : getCustomerActivityDetail(selectedActivity).then((detail) =>
+              setActivityDetail({
+                kind: "ticket",
+                data: detail as MobileCustomerTicketDetail,
+              }),
+            );
+      void refresh.catch((nextError) => {
         setError(getErrorMessage(nextError, t("common.errors.genericAction")));
       });
     };
 
+    const timer = window.setInterval(refreshOpenOrder, 30_000);
+    window.addEventListener("online", refreshOpenOrder);
+    window.addEventListener("cleanhub:notification", refreshOpenOrder);
     window.addEventListener("focus", refreshOpenOrder);
     document.addEventListener("visibilitychange", refreshOpenOrder);
 
     return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("online", refreshOpenOrder);
+      window.removeEventListener("cleanhub:notification", refreshOpenOrder);
       window.removeEventListener("focus", refreshOpenOrder);
       document.removeEventListener("visibilitychange", refreshOpenOrder);
     };
@@ -613,19 +769,24 @@ export function CustomerHome({
     }
   }
 
-  async function handleCreateAppointment(event: React.FormEvent<HTMLFormElement>) {
+  async function handleCreateAppointment(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
     setError(null);
     setIsSubmittingAppointment(true);
 
     try {
-      const expectedAt = new Date(appointmentForm.expectedAt);
+      const expectedAt = dateTimeLocalToUtc(
+        appointmentForm.expectedAt,
+        getBusinessTimeZone(),
+      );
 
       if (!appointmentForm.address.trim()) {
         throw new Error(t("customer.messages.appointmentAddressRequired"));
       }
 
-      if (Number.isNaN(expectedAt.getTime())) {
+      if (!expectedAt || Number.isNaN(expectedAt.getTime())) {
         throw new Error(t("customer.messages.invalidAppointmentDate"));
       }
 
@@ -633,7 +794,14 @@ export function CustomerHome({
         throw new Error(t("customer.messages.appointmentInPast"));
       }
 
+      appointmentRequestId.current ??= createLocalId();
       const created = await createCustomerAppointment({
+        id: appointmentRequestId.current,
+        ticketId:
+          appointmentForm.type === "dropoff"
+            ? appointmentForm.ticketId
+            : undefined,
+        customerId: appointmentForm.customerId,
         type: appointmentForm.type,
         branchId: appointmentForm.branchId || undefined,
         expectedAt: expectedAt.toISOString(),
@@ -641,7 +809,13 @@ export function CustomerHome({
         notes: appointmentForm.notes,
       });
 
-      setAppointments((current) => sortAppointments([created, ...current]));
+      appointmentRequestId.current = null;
+      setAppointments((current) =>
+        sortAppointments([
+          created,
+          ...current.filter((item) => item.id !== created.id),
+        ]),
+      );
       setAppointmentForm((current) => ({
         ...current,
         expectedAt: getDefaultExpectedAt(),
@@ -664,7 +838,11 @@ export function CustomerHome({
     try {
       const updated = await cancelCustomerAppointment(appointmentId);
       setAppointments((current) =>
-        sortAppointments(current.map((appointment) => (appointment.id === updated.id ? updated : appointment))),
+        sortAppointments(
+          current.map((appointment) =>
+            appointment.id === updated.id ? updated : appointment,
+          ),
+        ),
       );
       toast.success(t("customer.messages.appointmentCancelled"));
     } catch (nextError) {
@@ -708,7 +886,7 @@ export function CustomerHome({
     setEditingAddressId(null);
     setAddressForm({
       ...emptyAddressForm,
-      country: getDeviceCountry(),
+      country: authContext?.country ?? getDeviceCountry(),
       label: t("customer.forms.defaultAddressLabel"),
       contactName: profile?.account.accountName ?? "",
       contactPhone: profile?.account.phone ?? "",
@@ -866,14 +1044,18 @@ export function CustomerHome({
         : await createCustomerAddress(input);
 
       setAddressBook((current) => {
-        const withoutSaved = current.filter((address) => address.id !== saved.id);
+        const withoutSaved = current.filter(
+          (address) => address.id !== saved.id,
+        );
         const next = saved.isDefault
           ? withoutSaved.map((address) => ({ ...address, isDefault: false }))
           : withoutSaved;
 
-        return [saved, ...next].sort((left, right) =>
-          Number(right.isDefault) - Number(left.isDefault) ||
-          new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+        return [saved, ...next].sort(
+          (left, right) =>
+            Number(right.isDefault) - Number(left.isDefault) ||
+            new Date(right.updatedAt).getTime() -
+              new Date(left.updatedAt).getTime(),
         );
       });
       setAppointmentForm((current) => ({
@@ -901,7 +1083,9 @@ export function CustomerHome({
 
     try {
       await deleteCustomerAddress(addressId);
-      setAddressBook((current) => current.filter((address) => address.id !== addressId));
+      setAddressBook((current) =>
+        current.filter((address) => address.id !== addressId),
+      );
       setAppointmentForm((current) =>
         current.addressId === addressId
           ? { ...current, addressId: CUSTOM_APPOINTMENT_ADDRESS_ID }
@@ -983,6 +1167,7 @@ export function CustomerHome({
       setPasswordForm(emptyPasswordForm);
       setProfileSheet(null);
       toast.success(t("customer.messages.passwordChangedOtherDevices"));
+      onLogout?.();
     } catch (nextError) {
       setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
@@ -991,6 +1176,17 @@ export function CustomerHome({
   }
 
   function openAppointmentSheet() {
+    if (authContext?.deliveryEnabled !== true) {
+      setError(t("common.readiness.deliveryDisabled"));
+      return;
+    }
+    appointmentRequestId.current = null;
+    setAppointmentForm((current) => ({
+      ...current,
+      customerId:
+        current.customerId ||
+        profile?.addresses.find((item) => item.status === "active")?.customerId,
+    }));
     setError(null);
     setAppointmentSheetOpen(true);
   }
@@ -1005,219 +1201,345 @@ export function CustomerHome({
       label={t("common.refresh")}
       onRefresh={() => loadCustomerData("refresh")}
     >
-    <main className="mobile-page mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(28px,env(safe-area-inset-top))]">
-      <WorkspaceHeader
-        isLoggingOut={isLoggingOut}
-        logoutLabel={t("auth.logout")}
-        subtitle={
-          profile?.account.accountName ??
-          authContext?.displayName ??
-          t("customer.home.defaultCustomer")
-        }
-        title={t("customer.home.clientSpace")}
-        onLogout={onLogout ?? (() => setActiveTab("profile"))}
-      />
-      <span className="sr-only" aria-live="polite">
-        {isRefreshing ? t("common.refresh") : ""}
-      </span>
+      <main className="mobile-page mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(28px,env(safe-area-inset-top))]">
+        <WorkspaceHeader
+          isLoggingOut={isLoggingOut}
+          logoutLabel={t("auth.logout")}
+          subtitle={
+            profile?.account.accountName ??
+            authContext?.displayName ??
+            t("customer.home.defaultCustomer")
+          }
+          title={t("customer.home.clientSpace")}
+          onLogout={onLogout ?? (() => setActiveTab("profile"))}
+        />
+        <span className="sr-only" aria-live="polite">
+          {isRefreshing ? t("common.refresh") : ""}
+        </span>
 
-      {error && !appointmentSheetOpen ? <AlertMessage tone="error" message={error} /> : null}
+        {error && !appointmentSheetOpen ? (
+          <AlertMessage tone="error" message={error} />
+        ) : null}
 
-      <PushNotificationSetupCard />
+        {cachedAt ? (
+          <p className="mb-3 text-xs text-amber-800" role="status">
+            {t("common.readiness.offlineData", {
+              time: new Intl.DateTimeFormat(locale, {
+                dateStyle: "short",
+                timeStyle: "short",
+                timeZone: getBusinessTimeZone(),
+              }).format(new Date(cachedAt)),
+            })}
+          </p>
+        ) : null}
+        <PushNotificationSetupCard />
 
-      {activeTab === "resume" ? (
-        <CustomerOverviewView
-          activityItems={activityItems}
-          appointments={appointments}
+        {activeTab === "resume" ? (
+          <CustomerOverviewView
+            activityItems={activityItems}
+            appointments={appointments}
+            currency={tenantCurrency}
+            onOpenCreateAppointment={openAppointmentSheet}
+            onSelectActivity={(item) => void handleSelectActivity(item)}
+            onShowAppointments={() => setActiveTab("appointments")}
+            onShowOrders={() => setActiveTab("orders")}
+          />
+        ) : null}
+
+        {activeTab === "orders" ? (
+          <section className="space-y-3">
+            <ActivityView
+              activityItems={filteredActivityItems}
+              activeFilter={activityFilter}
+              currency={tenantCurrency}
+              selectedActivity={selectedActivity}
+              totalCount={activityItems.length}
+              onFilterChange={setActivityFilter}
+              onSelectActivity={(item) => void handleSelectActivity(item)}
+            />
+            {activity.nextOffset !== null &&
+            activity.nextOffset !== undefined ? (
+              <Button
+                className="w-full"
+                variant="outline"
+                disabled={loadingMore}
+                onClick={async () => {
+                  setLoadingMore(true);
+                  try {
+                    const next = await getCustomerOrdersAndTickets(
+                      activity.nextOffset ?? 0,
+                    );
+                    setActivity((current) => ({
+                      ...next.data,
+                      orders: [
+                        ...current.orders,
+                        ...next.data.orders.filter(
+                          (item) =>
+                            !current.orders.some(
+                              (existing) => existing.id === item.id,
+                            ),
+                        ),
+                      ],
+                      tickets: [
+                        ...current.tickets,
+                        ...next.data.tickets.filter(
+                          (item) =>
+                            !current.tickets.some(
+                              (existing) => existing.id === item.id,
+                            ),
+                        ),
+                      ],
+                    }));
+                    setCachedAt(next.cachedAt);
+                  } catch (error) {
+                    setError(
+                      getErrorMessage(error, t("common.readiness.partialLoad")),
+                    );
+                  } finally {
+                    setLoadingMore(false);
+                  }
+                }}
+              >
+                {loadingMore
+                  ? t("common.loading")
+                  : t("common.readiness.loadMore")}
+              </Button>
+            ) : null}
+          </section>
+        ) : null}
+
+        {activeTab === "appointments" ? (
+          <section className="space-y-3">
+            <AppointmentsView
+              onTrack={(id) => {
+                setTrackingId(id);
+                writeMobileDetailUrlState({ view: "appointment", id });
+              }}
+              appointments={appointments}
+              cancellingAppointmentId={cancellingAppointmentId}
+              onCancelAppointment={requestCancelAppointment}
+              onOpenCreateAppointment={openAppointmentSheet}
+            />
+            {appointmentNextOffset !== null &&
+            appointmentNextOffset !== undefined ? (
+              <Button
+                className="w-full"
+                variant="outline"
+                disabled={loadingAppointments}
+                onClick={async () => {
+                  setLoadingAppointments(true);
+                  try {
+                    const next = await getCustomerAppointments(
+                      appointmentNextOffset,
+                    );
+                    setAppointments((current) =>
+                      sortAppointments([
+                        ...current,
+                        ...next.data.filter(
+                          (item) =>
+                            !current.some(
+                              (existing) => existing.id === item.id,
+                            ),
+                        ),
+                      ]),
+                    );
+                    setAppointmentNextOffset(next.nextOffset);
+                    setCachedAt(next.cachedAt);
+                  } catch (error) {
+                    setError(
+                      getErrorMessage(error, t("common.readiness.partialLoad")),
+                    );
+                  } finally {
+                    setLoadingAppointments(false);
+                  }
+                }}
+              >
+                {loadingAppointments
+                  ? t("common.loading")
+                  : t("common.readiness.loadMoreAppointments")}
+              </Button>
+            ) : null}
+          </section>
+        ) : null}
+
+        {activeTab === "profile" ? (
+          <ProfileView
+            addressActionId={addressActionId}
+            addressBook={addressBook}
+            contactActionId={contactActionId}
+            profile={profile}
+            onCreateAddress={openCreateAddressSheet}
+            onCreateContact={openCreateContactSheet}
+            onDeleteAddress={requestDeleteAddress}
+            onDeleteContact={requestDeleteContact}
+            onEditAddress={openEditAddressSheet}
+            onEditContact={openEditContactSheet}
+            onEditProfile={openProfileSheet}
+            onOpenPassword={openPasswordSheet}
+            onSetDefaultAddress={(addressId) =>
+              void handleSetDefaultAddress(addressId)
+            }
+          />
+        ) : null}
+
+        <ActivityDetailSheet
           currency={tenantCurrency}
-          onOpenCreateAppointment={openAppointmentSheet}
-          onSelectActivity={(item) => void handleSelectActivity(item)}
-          onShowAppointments={() => setActiveTab("appointments")}
-          onShowOrders={() => setActiveTab("orders")}
+          detail={activityDetail}
+          refundRequests={refundRequests}
+          isLoading={isDetailLoading}
+          item={
+            activityItems.find(
+              (item) =>
+                item.kind === selectedActivity?.kind &&
+                item.id === selectedActivity.id,
+            ) ?? null
+          }
+          open={detailOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              closeActivityDetail();
+            } else {
+              setDetailOpen(true);
+            }
+          }}
+          onOpenRefund={openRefundSheet}
         />
-      ) : null}
 
-      {activeTab === "orders" ? (
-        <ActivityView
-          activityItems={filteredActivityItems}
-          activeFilter={activityFilter}
-          currency={tenantCurrency}
-          selectedActivity={selectedActivity}
-          totalCount={activityItems.length}
-          onFilterChange={setActivityFilter}
-          onSelectActivity={(item) => void handleSelectActivity(item)}
+        <ConfirmSheet
+          cancelLabel={t("common.cancel")}
+          confirmLabel={getConfirmLabel(t, confirmTarget)}
+          description={getConfirmDescription(t, confirmTarget)}
+          isSubmitting={isConfirmSubmitting}
+          open={Boolean(confirmTarget)}
+          title={getConfirmTitle(t, confirmTarget)}
+          onConfirm={() => void handleConfirmDestructiveAction()}
+          onOpenChange={(open) => {
+            if (!open && !isConfirmSubmitting) {
+              setConfirmTarget(null);
+            }
+          }}
         />
-      ) : null}
 
-      {activeTab === "appointments" ? (
-        <AppointmentsView
-          appointments={appointments}
-          cancellingAppointmentId={cancellingAppointmentId}
-          onCancelAppointment={requestCancelAppointment}
-          onOpenCreateAppointment={openAppointmentSheet}
+        <CustomerTrackingSheet
+          id={trackingId}
+          onClose={() => {
+            setTrackingId(null);
+            writeMobileDetailUrlState(null, "replace");
+          }}
         />
-      ) : null}
-
-      {activeTab === "profile" ? (
-        <ProfileView
-          addressActionId={addressActionId}
+        <AppointmentFormSheet
+          contacts={profile?.addresses ?? []}
+          tickets={activity.tickets}
           addressBook={addressBook}
-          contactActionId={contactActionId}
-          profile={profile}
-          onCreateAddress={openCreateAddressSheet}
-          onCreateContact={openCreateContactSheet}
-          onDeleteAddress={requestDeleteAddress}
-          onDeleteContact={requestDeleteContact}
-          onEditAddress={openEditAddressSheet}
-          onEditContact={openEditContactSheet}
-          onEditProfile={openProfileSheet}
-          onOpenPassword={openPasswordSheet}
-          onSetDefaultAddress={(addressId) => void handleSetDefaultAddress(addressId)}
+          branches={branches}
+          error={appointmentSheetOpen ? error : null}
+          form={appointmentForm}
+          isSubmitting={isSubmittingAppointment}
+          open={appointmentSheetOpen}
+          onFormChange={setAppointmentForm}
+          onOpenChange={(open) => {
+            setAppointmentSheetOpen(open);
+
+            if (!open) {
+              setError(null);
+            }
+          }}
+          onSubmit={handleCreateAppointment}
         />
-      ) : null}
 
-      <ActivityDetailSheet
-        currency={tenantCurrency}
-        detail={activityDetail}
-        refundRequests={refundRequests}
-        isLoading={isDetailLoading}
-        item={activityItems.find(
-          (item) => item.kind === selectedActivity?.kind && item.id === selectedActivity.id,
-        ) ?? null}
-        open={detailOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            closeActivityDetail();
-          } else {
-            setDetailOpen(true);
+        <RefundRequestSheet
+          currency={
+            activity.orders.find((order) => order.id === refundForm.orderId)
+              ?.currency ?? tenantCurrency
           }
-        }}
-        onOpenRefund={openRefundSheet}
-      />
+          error={refundSheetOpen ? error : null}
+          form={refundForm}
+          isSubmitting={isSubmittingRefund}
+          open={refundSheetOpen}
+          onFormChange={setRefundForm}
+          onOpenChange={(open) => {
+            setRefundSheetOpen(open);
 
-      <ConfirmSheet
-        cancelLabel={t("common.cancel")}
-        confirmLabel={getConfirmLabel(t, confirmTarget)}
-        description={getConfirmDescription(t, confirmTarget)}
-        isSubmitting={isConfirmSubmitting}
-        open={Boolean(confirmTarget)}
-        title={getConfirmTitle(t, confirmTarget)}
-        onConfirm={() => void handleConfirmDestructiveAction()}
-        onOpenChange={(open) => {
-          if (!open && !isConfirmSubmitting) {
-            setConfirmTarget(null);
-          }
-        }}
-      />
+            if (!open) {
+              setError(null);
+            }
+          }}
+          onSubmit={handleCreateRefund}
+        />
 
-      <AppointmentFormSheet
-        addressBook={addressBook}
-        branches={branches}
-        error={appointmentSheetOpen ? error : null}
-        form={appointmentForm}
-        isSubmitting={isSubmittingAppointment}
-        open={appointmentSheetOpen}
-        onFormChange={setAppointmentForm}
-        onOpenChange={(open) => {
-          setAppointmentSheetOpen(open);
+        <ProfileFormSheet
+          error={profileSheet === "profile" ? error : null}
+          form={profileForm}
+          isSubmitting={isSubmittingProfile}
+          open={profileSheet === "profile"}
+          onFormChange={setProfileForm}
+          onOpenChange={(open) => {
+            setProfileSheet(open ? "profile" : null);
 
-          if (!open) {
-            setError(null);
-          }
-        }}
-        onSubmit={handleCreateAppointment}
-      />
+            if (!open) {
+              setError(null);
+            }
+          }}
+          onSubmit={handleUpdateProfile}
+        />
 
-      <RefundRequestSheet
-        currency={tenantCurrency}
-        error={refundSheetOpen ? error : null}
-        form={refundForm}
-        isSubmitting={isSubmittingRefund}
-        open={refundSheetOpen}
-        onFormChange={setRefundForm}
-        onOpenChange={(open) => {
-          setRefundSheetOpen(open);
+        <AddressFormSheet
+          error={profileSheet === "address" ? error : null}
+          form={addressForm}
+          isEditing={Boolean(editingAddressId)}
+          isLocating={isLocatingAddress}
+          isSubmitting={isSubmittingAddress}
+          open={profileSheet === "address"}
+          onFormChange={setAddressForm}
+          onLocate={() => void handleLocateAddress()}
+          onOpenChange={(open) => {
+            setProfileSheet(open ? "address" : null);
 
-          if (!open) {
-            setError(null);
-          }
-        }}
-        onSubmit={handleCreateRefund}
-      />
+            if (!open) {
+              setEditingAddressId(null);
+              setIsLocatingAddress(false);
+              setError(null);
+            }
+          }}
+          onSubmit={handleSaveAddress}
+        />
 
-      <ProfileFormSheet
-        error={profileSheet === "profile" ? error : null}
-        form={profileForm}
-        isSubmitting={isSubmittingProfile}
-        open={profileSheet === "profile"}
-        onFormChange={setProfileForm}
-        onOpenChange={(open) => {
-          setProfileSheet(open ? "profile" : null);
+        <ContactFormSheet
+          error={profileSheet === "contact" ? error : null}
+          form={contactForm}
+          isEditing={Boolean(editingContactId)}
+          isSubmitting={isSubmittingContact}
+          open={profileSheet === "contact"}
+          onFormChange={setContactForm}
+          onOpenChange={(open) => {
+            setProfileSheet(open ? "contact" : null);
 
-          if (!open) {
-            setError(null);
-          }
-        }}
-        onSubmit={handleUpdateProfile}
-      />
+            if (!open) {
+              setEditingContactId(null);
+              setError(null);
+            }
+          }}
+          onSubmit={handleSaveContact}
+        />
 
-      <AddressFormSheet
-        error={profileSheet === "address" ? error : null}
-        form={addressForm}
-        isEditing={Boolean(editingAddressId)}
-        isLocating={isLocatingAddress}
-        isSubmitting={isSubmittingAddress}
-        open={profileSheet === "address"}
-        onFormChange={setAddressForm}
-        onLocate={() => void handleLocateAddress()}
-        onOpenChange={(open) => {
-          setProfileSheet(open ? "address" : null);
+        <PasswordFormSheet
+          error={profileSheet === "password" ? error : null}
+          form={passwordForm}
+          isSubmitting={isSubmittingPassword}
+          open={profileSheet === "password"}
+          onFormChange={setPasswordForm}
+          onOpenChange={(open) => {
+            setProfileSheet(open ? "password" : null);
 
-          if (!open) {
-            setEditingAddressId(null);
-            setIsLocatingAddress(false);
-            setError(null);
-          }
-        }}
-        onSubmit={handleSaveAddress}
-      />
+            if (!open) {
+              setError(null);
+            }
+          }}
+          onSubmit={handleChangePassword}
+        />
 
-      <ContactFormSheet
-        error={profileSheet === "contact" ? error : null}
-        form={contactForm}
-        isEditing={Boolean(editingContactId)}
-        isSubmitting={isSubmittingContact}
-        open={profileSheet === "contact"}
-        onFormChange={setContactForm}
-        onOpenChange={(open) => {
-          setProfileSheet(open ? "contact" : null);
-
-          if (!open) {
-            setEditingContactId(null);
-            setError(null);
-          }
-        }}
-        onSubmit={handleSaveContact}
-      />
-
-      <PasswordFormSheet
-        error={profileSheet === "password" ? error : null}
-        form={passwordForm}
-        isSubmitting={isSubmittingPassword}
-        open={profileSheet === "password"}
-        onFormChange={setPasswordForm}
-        onOpenChange={(open) => {
-          setProfileSheet(open ? "password" : null);
-
-          if (!open) {
-            setError(null);
-          }
-        }}
-        onSubmit={handleChangePassword}
-      />
-
-      <CustomerTabBar activeTab={activeTab} onChange={setActiveTab} />
-    </main>
+        <CustomerTabBar activeTab={activeTab} onChange={setActiveTab} />
+      </main>
     </MobilePullToRefresh>
   );
 }

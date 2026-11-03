@@ -752,6 +752,7 @@ export function OwnerHome({
               ) : visibleAppointments.length ? (
                 visibleAppointments.map((appointment) => (
                   <AppointmentItem
+                    onDone={loadBoard}
                     key={appointment.id}
                     appointment={appointment}
                     onAction={openAction}
@@ -852,6 +853,7 @@ export function OwnerHome({
               ) : visibleRefundRequests.length ? (
                 visibleRefundRequests.map((refundRequest) => (
                   <RefundRequestItem
+                    onDone={loadBoard}
                     currency={tenantCurrency}
                     key={refundRequest.id}
                     onAction={openAction}

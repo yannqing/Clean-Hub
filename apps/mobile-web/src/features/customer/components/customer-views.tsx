@@ -113,14 +113,19 @@ export function CustomerTabBar({
   );
 }
 
-export function AlertMessage({ message, tone }: { message: string; tone: "error" | "success" }) {
+export function AlertMessage({
+  message,
+  tone,
+}: {
+  message: string;
+  tone: "error" | "success";
+}) {
   return <AlertBanner message={message} tone={tone} />;
 }
 
 export function CustomerOverviewView({
   activityItems,
   appointments,
-  currency,
   onOpenCreateAppointment,
   onSelectActivity,
   onShowAppointments,
@@ -179,7 +184,7 @@ export function CustomerOverviewView({
                           amount: formatTenantMoney(
                             nextItem.activity.amount,
                             intlLocale,
-                            currency,
+                            nextItem.activity.source.currency,
                           ),
                         })
                       : nextItem.activity.expectedAt
@@ -192,7 +197,10 @@ export function CustomerOverviewView({
                         : formatDate(nextItem.activity.createdAt, intlLocale)}
                   </p>
                 </div>
-                <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
+                <ChevronRight
+                  className="size-4 shrink-0 text-slate-400"
+                  aria-hidden="true"
+                />
               </div>
             </button>
           ) : (
@@ -210,11 +218,17 @@ export function CustomerOverviewView({
                     {nextItem.appointment.address}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {formatDateTime(nextItem.appointment.expectedAt, intlLocale)}
+                    {formatDateTime(
+                      nextItem.appointment.expectedAt,
+                      intlLocale,
+                    )}
                   </p>
                 </div>
                 <StatusBadge
-                  view={getAppointmentStatusView(t, nextItem.appointment.status)}
+                  view={getAppointmentStatusView(
+                    t,
+                    nextItem.appointment.status,
+                  )}
                 />
               </div>
             </button>
@@ -250,11 +264,20 @@ export function CustomerOverviewView({
 
       <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
         <div className="grid grid-cols-2 gap-2">
-          <Button className="h-11" type="button" onClick={onOpenCreateAppointment}>
+          <Button
+            className="h-11"
+            type="button"
+            onClick={onOpenCreateAppointment}
+          >
             <Plus className="size-4" aria-hidden="true" />
             {t("customer.actions.newAppointment")}
           </Button>
-          <Button className="h-11" type="button" variant="outline" onClick={onShowOrders}>
+          <Button
+            className="h-11"
+            type="button"
+            variant="outline"
+            onClick={onShowOrders}
+          >
             <ReceiptText className="size-4" aria-hidden="true" />
             {t("customer.overview.viewTracking")}
           </Button>
@@ -296,7 +319,6 @@ function OverviewMetric({
 export function ActivityView({
   activeFilter,
   activityItems,
-  currency,
   selectedActivity,
   totalCount,
   onFilterChange,
@@ -345,12 +367,16 @@ export function ActivityView({
       {activityItems.length ? (
         <section className="space-y-3">
           {activityItems.map((item) => {
-            const selected = selectedActivity?.kind === item.kind && selectedActivity.id === item.id;
+            const selected =
+              selectedActivity?.kind === item.kind &&
+              selectedActivity.id === item.id;
 
             return (
               <button
                 className={`w-full rounded-md border bg-white p-4 text-left shadow-sm transition ${
-                  selected ? "border-blue-400 ring-2 ring-blue-100" : "border-slate-200 hover:border-blue-300"
+                  selected
+                    ? "border-blue-400 ring-2 ring-blue-100"
+                    : "border-slate-200 hover:border-blue-300"
                 }`}
                 key={`${item.kind}-${item.id}`}
                 type="button"
@@ -361,8 +387,12 @@ export function ActivityView({
                   <div className="flex min-w-0 gap-3">
                     <ActivityIcon kind={item.kind} />
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-950">{item.title}</p>
-                      <p className="mt-1 truncate text-sm text-slate-600">{item.subtitle}</p>
+                      <p className="truncate text-sm font-semibold text-slate-950">
+                        {item.title}
+                      </p>
+                      <p className="mt-1 truncate text-sm text-slate-600">
+                        {item.subtitle}
+                      </p>
                       <p className="mt-1 text-xs text-slate-500">
                         {formatDate(item.createdAt, intlLocale)}
                       </p>
@@ -374,11 +404,14 @@ export function ActivityView({
                         item.kind === "order" && item.refundStatus
                           ? getRefundStatusView(t, item.refundStatus)
                           : item.kind === "order"
-                          ? getOrderStatusView(t, item.status)
-                          : getTicketStatusView(t, item.status)
+                            ? getOrderStatusView(t, item.status)
+                            : getTicketStatusView(t, item.status)
                       }
                     />
-                    <ChevronRight className="size-4 text-slate-400" aria-hidden="true" />
+                    <ChevronRight
+                      className="size-4 text-slate-400"
+                      aria-hidden="true"
+                    />
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center justify-end gap-2 pl-14">
@@ -388,7 +421,7 @@ export function ActivityView({
                         amount: formatTenantMoney(
                           item.amount,
                           intlLocale,
-                          currency,
+                          item.source.currency,
                         ),
                       })}
                     </span>
@@ -446,7 +479,9 @@ export function ActivityDetailSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="max-h-[90dvh] p-5">
         <SheetHeader className="pr-8 text-left">
-          <SheetTitle>{item?.title ?? t("customer.detail.defaultTitle")}</SheetTitle>
+          <SheetTitle>
+            {item?.title ?? t("customer.detail.defaultTitle")}
+          </SheetTitle>
           <SheetDescription>
             {item?.subtitle ?? t("customer.detail.defaultSubtitle")}
           </SheetDescription>
@@ -455,7 +490,10 @@ export function ActivityDetailSheet({
         {isLoading ? (
           <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-3 text-sm text-slate-600">
-              <Loader2 className="size-4 animate-spin text-blue-600" aria-hidden="true" />
+              <Loader2
+                className="size-4 animate-spin text-blue-600"
+                aria-hidden="true"
+              />
               {t("customer.detail.loading")}
             </div>
           </div>
@@ -485,7 +523,6 @@ export function ActivityDetailSheet({
 }
 
 function ActivityDetailPanel({
-  currency,
   detail,
   onOpenRefund,
   refundRequests,
@@ -504,7 +541,10 @@ function ActivityDetailPanel({
     );
     const balance = getOrderBalance(detail.data);
     const activeRefund = orderRefundRequests.find(
-      (request) => request.status === "pending" || request.status === "processing",
+      (request) =>
+        request.status === "pending" ||
+        request.status === "approved" ||
+        request.status === "processing",
     );
     // Payment is collected at the counter, so the app never offers to pay.
     // It still says that an amount is outstanding, otherwise a customer sees a
@@ -513,25 +553,79 @@ function ActivityDetailPanel({
       amountToCents(balance) > 0 &&
       detail.data.paymentStatus !== "paid" &&
       detail.data.paymentStatus !== "refunded";
-    const canRefund = amountToCents(detail.data.paidAmount) > 0 && !activeRefund;
+    const canRefund =
+      amountToCents(detail.data.paidAmount) > 0 && !activeRefund;
     const formatMoney = (value: string | number) =>
-      formatTenantMoney(value, intlLocale, currency);
+      formatTenantMoney(value, intlLocale, detail.data.currency);
 
     return (
       <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-slate-950">
-              {t("customer.detail.orderPrefix", { id: detail.data.id.slice(-6).toUpperCase() })}
+              {t("customer.detail.orderPrefix", { id: detail.data.orderCode })}
             </p>
-            <p className="mt-1 text-sm text-slate-600">{detail.data.orderType}</p>
+            <p className="mt-1 text-sm text-slate-600">
+              {detail.data.orderType === "ticket"
+                ? t("pos.order.type.ticket")
+                : t("pos.order.type.manual")}
+            </p>
           </div>
           <StatusBadge view={getOrderStatusView(t, detail.data.status)} />
         </div>
 
         <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <DetailTerm label={t("customer.detail.total")} value={formatMoney(detail.data.totalAmount)} />
-          <DetailTerm label={t("customer.detail.paid")} value={formatMoney(detail.data.paidAmount)} />
+          {detail.data.branchName ? (
+            <DetailTerm
+              label={t("customer.appointments.branch")}
+              value={detail.data.branchName}
+            />
+          ) : null}
+          <DetailTerm
+            label={t("customer.detail.total")}
+            value={formatMoney(detail.data.totalAmount)}
+          />
+          {detail.data.subtotalAmount !== undefined ? (
+            <DetailTerm
+              label={t("common.readiness.subtotal")}
+              value={formatMoney(detail.data.subtotalAmount)}
+            />
+          ) : null}
+          {detail.data.taxableAmount !== undefined ? (
+            <DetailTerm
+              label={t("common.readiness.taxable")}
+              value={formatMoney(detail.data.taxableAmount)}
+            />
+          ) : null}
+          {detail.data.taxAmount !== undefined ? (
+            <DetailTerm
+              label={`${detail.data.taxLabelSnapshot || t("common.readiness.tax")} ${detail.data.taxRateSnapshot || "0"}%`}
+              value={formatMoney(detail.data.taxAmount)}
+            />
+          ) : null}
+          {detail.data.taxComponentsSnapshot?.map((part, index) => (
+            <DetailTerm
+              key={`${part.name}:${index}`}
+              label={`${part.name} ${part.rate}%`}
+              value={formatMoney(part.taxAmount)}
+            />
+          ))}
+          {detail.data.taxRegistrationNumberSnapshot ? (
+            <DetailTerm
+              label={t("common.readiness.taxNumber")}
+              value={detail.data.taxRegistrationNumberSnapshot}
+            />
+          ) : null}
+          {detail.data.taxExemptionReason ? (
+            <DetailTerm
+              label={t("common.note")}
+              value={detail.data.taxExemptionReason}
+            />
+          ) : null}
+          <DetailTerm
+            label={t("customer.detail.paid")}
+            value={formatMoney(detail.data.paidAmount)}
+          />
           <DetailTerm
             label={t("customer.detail.payment")}
             value={
@@ -586,7 +680,7 @@ function ActivityDetailPanel({
         />
 
         <RefundRequestList
-          currency={currency}
+          currency={detail.data.currency}
           refundRequests={orderRefundRequests}
         />
       </section>
@@ -602,13 +696,34 @@ function ActivityDetailPanel({
               ? t("customer.detail.ticketPrefix", { id: detail.data.ticketNo })
               : t("customer.detail.ticketFallback")}
           </p>
-          <p className="mt-1 text-sm text-slate-600">{detail.data.ticketType}</p>
+          <p className="mt-1 text-sm text-slate-600">
+            {detail.data.ticketType === "car_wash"
+              ? t("pos.ticket.type.car_wash")
+              : t("pos.ticket.type.laundry")}
+          </p>
         </div>
         <StatusBadge view={getTicketStatusView(t, detail.data.ticketStatus)} />
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-        <DetailTerm label={t("customer.detail.priority")} value={detail.data.priority} />
+        {detail.data.branchName ? (
+          <DetailTerm
+            label={t("customer.appointments.branch")}
+            value={detail.data.branchName}
+          />
+        ) : null}
+        <DetailTerm
+          label={t("customer.detail.priority")}
+          value={t(
+            (
+              {
+                normal: "pos.ticket.priority.normal",
+                urgent: "pos.ticket.priority.urgent",
+                critical: "pos.ticket.priority.critical",
+              } as Record<string, TranslationKey>
+            )[detail.data.priority] ?? "common.unavailable",
+          )}
+        />
         <DetailTerm
           label={t("customer.detail.pickup")}
           value={formatDateTime(detail.data.expectedPickupAt, intlLocale)}
@@ -629,6 +744,20 @@ function ActivityDetailPanel({
         </p>
       ) : null}
 
+      {detail.data.orders?.map((order) => (
+        <div key={order.id} className="mt-3 rounded-md border p-3 text-sm">
+          <p>{order.orderCode}</p>
+          <p>
+            {t("customer.detail.total")}:{" "}
+            {formatTenantMoney(order.totalAmount, intlLocale, order.currency)}
+          </p>
+          <p>
+            {t("customer.detail.paid")}:{" "}
+            {formatTenantMoney(order.paidAmount, intlLocale, order.currency)} ·{" "}
+            {getPaymentStatusLabel(t, order.paymentStatus)}
+          </p>
+        </div>
+      ))}
       <ItemList
         emptyLabel={t("customer.detail.noItems")}
         title={t("customer.detail.articles")}
@@ -638,10 +767,24 @@ function ActivityDetailPanel({
           subtitle: `${item.quantity} x ${formatTenantMoney(
             item.unitAmount,
             intlLocale,
-            currency,
+            detail.data.currency,
           )}${item.itemCategory ? ` - ${item.itemCategory}` : ""}`,
-          amount: formatTenantMoney(item.lineAmount, intlLocale, currency),
-          status: item.itemStatus,
+          amount: formatTenantMoney(
+            item.lineAmount,
+            intlLocale,
+            detail.data.currency,
+          ),
+          status: t(
+            (
+              {
+                pending_wash: "pos.ticket.itemStatus.pending_wash",
+                washing: "pos.ticket.itemStatus.washing",
+                done: "pos.ticket.itemStatus.done",
+                ready_to_pick: "pos.ticket.itemStatus.ready_to_pick",
+                exception: "pos.ticket.itemStatus.exception",
+              } as Record<string, TranslationKey>
+            )[item.itemStatus] ?? "common.unavailable",
+          ),
         }))}
       />
     </section>
@@ -649,7 +792,6 @@ function ActivityDetailPanel({
 }
 
 function RefundRequestList({
-  currency,
   refundRequests,
 }: {
   currency: string;
@@ -683,14 +825,20 @@ function RefundRequestList({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold tabular-nums text-slate-950">
-                      {formatTenantMoney(refundRequest.amount, intlLocale, currency)}
+                      {formatTenantMoney(
+                        refundRequest.amount,
+                        intlLocale,
+                        refundRequest.currency,
+                      )}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
                       {t("customer.detail.refundCreated")}:{" "}
                       {formatDateTime(refundRequest.createdAt, intlLocale)}
                     </p>
                   </div>
-                  <StatusBadge view={getRefundStatusView(t, refundRequest.status)} />
+                  <StatusBadge
+                    view={getRefundStatusView(t, refundRequest.status)}
+                  />
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-700">
                   <span className="font-medium text-slate-900">
@@ -731,7 +879,13 @@ function ItemList({
   title,
 }: {
   emptyLabel: string;
-  items: { id: string; title: string; subtitle: string; amount: string; status?: string }[];
+  items: {
+    id: string;
+    title: string;
+    subtitle: string;
+    amount: string;
+    status?: string;
+  }[];
   title: string;
 }) {
   return (
@@ -742,13 +896,24 @@ function ItemList({
       {items.length ? (
         <div className="mt-3 divide-y divide-slate-100 rounded-md border border-slate-200">
           {items.map((item) => (
-            <div className="flex items-start justify-between gap-3 p-3" key={item.id}>
+            <div
+              className="flex items-start justify-between gap-3 p-3"
+              key={item.id}
+            >
               <div className="min-w-0">
-                <p className="break-words text-sm font-semibold text-slate-950">{item.title}</p>
-                <p className="mt-1 break-words text-xs text-slate-500">{item.subtitle}</p>
-                {item.status ? <p className="mt-1 text-xs text-slate-500">{item.status}</p> : null}
+                <p className="break-words text-sm font-semibold text-slate-950">
+                  {item.title}
+                </p>
+                <p className="mt-1 break-words text-xs text-slate-500">
+                  {item.subtitle}
+                </p>
+                {item.status ? (
+                  <p className="mt-1 text-xs text-slate-500">{item.status}</p>
+                ) : null}
               </div>
-              <p className="shrink-0 text-sm font-semibold text-slate-950">{item.amount}</p>
+              <p className="shrink-0 text-sm font-semibold text-slate-950">
+                {item.amount}
+              </p>
             </div>
           ))}
         </div>
@@ -763,19 +928,24 @@ function ItemList({
 
 export function AppointmentsView({
   appointments,
+  onTrack,
   cancellingAppointmentId,
   onCancelAppointment,
   onOpenCreateAppointment,
 }: {
   appointments: MobileCustomerAppointment[];
+  onTrack: (id: string) => void;
   cancellingAppointmentId: string | null;
   onCancelAppointment: (appointmentId: string) => void;
   onOpenCreateAppointment: () => void;
 }) {
   const { t } = useTranslation();
-  const [statusFilter, setStatusFilter] = useState<"all" | MobileCustomerAppointment["status"]>("all");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | MobileCustomerAppointment["status"]
+  >("all");
   const visibleAppointments = appointments.filter(
-    (appointment) => statusFilter === "all" || appointment.status === statusFilter,
+    (appointment) =>
+      statusFilter === "all" || appointment.status === statusFilter,
   );
   const filters = ["all", "pending", "accepted", "cancelled"] as const;
 
@@ -794,19 +964,27 @@ export function AppointmentsView({
               {t("customer.appointments.subtitle")}
             </p>
           </div>
-          <Button className="h-11 shrink-0" type="button" onClick={onOpenCreateAppointment}>
+          <Button
+            className="h-11 shrink-0"
+            type="button"
+            onClick={onOpenCreateAppointment}
+          >
             <Plus className="size-4" aria-hidden="true" />
             {t("customer.appointments.new")}
           </Button>
         </div>
       </section>
 
-      <div className="grid grid-cols-4 rounded-md border border-slate-200 bg-slate-50 p-1" role="tablist">
+      <div
+        className="grid grid-cols-4 rounded-md border border-slate-200 bg-slate-50 p-1"
+        role="tablist"
+      >
         {filters.map((filter) => {
           const active = statusFilter === filter;
-          const label = filter === "all"
-            ? t("customer.filters.all")
-            : getAppointmentStatusView(t, filter).label;
+          const label =
+            filter === "all"
+              ? t("customer.filters.all")
+              : getAppointmentStatusView(t, filter).label;
           return (
             <button
               aria-selected={active}
@@ -828,6 +1006,7 @@ export function AppointmentsView({
         <section className="space-y-3">
           {visibleAppointments.map((appointment) => (
             <AppointmentCard
+              onTrack={onTrack}
               appointment={appointment}
               cancellingAppointmentId={cancellingAppointmentId}
               key={appointment.id}
@@ -848,10 +1027,12 @@ export function AppointmentsView({
 
 function AppointmentCard({
   appointment,
+  onTrack,
   cancellingAppointmentId,
   onCancelAppointment,
 }: {
   appointment: MobileCustomerAppointment;
+  onTrack: (id: string) => void;
   cancellingAppointmentId: string | null;
   onCancelAppointment: (appointmentId: string) => void;
 }) {
@@ -874,7 +1055,10 @@ function AppointmentCard({
       </div>
 
       <div className="mt-4 flex gap-3 text-sm text-slate-600">
-        <MapPin className="mt-0.5 size-4 shrink-0 text-slate-400" aria-hidden="true" />
+        <MapPin
+          className="mt-0.5 size-4 shrink-0 text-slate-400"
+          aria-hidden="true"
+        />
         <p className="break-words leading-6">{appointment.address}</p>
       </div>
 
@@ -884,6 +1068,13 @@ function AppointmentCard({
         </p>
       ) : null}
 
+      <Button
+        variant="outline"
+        className="mt-3 w-full"
+        onClick={() => onTrack(appointment.id)}
+      >
+        {t("common.readiness.deliveryProgress")}
+      </Button>
       {appointment.status === "pending" ? (
         <Button
           className="mt-4 h-11 w-full"
@@ -975,7 +1166,10 @@ function ActivityIcon({ kind }: { kind: ActivityKind }) {
 
 function StatusBadge({ view }: { view: StatusView }) {
   return (
-    <Badge className={`${view.className} rounded-md border px-2.5 py-1`} variant="outline">
+    <Badge
+      className={`${view.className} rounded-md border px-2.5 py-1`}
+      variant="outline"
+    >
       <CheckCircle2 className="size-3" aria-hidden="true" />
       {view.label}
     </Badge>

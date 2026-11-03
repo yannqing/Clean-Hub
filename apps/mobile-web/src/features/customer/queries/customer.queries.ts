@@ -1,25 +1,26 @@
 import type { MobileCustomerOrderDetail, MobileCustomerTicketDetail } from "@cleanhub/api-client";
 
 import { apiClient } from "@/lib/api-client";
+import { cachedCustomerQuery } from "../lib/customer-cache";
 
 export async function getCustomerProfile() {
-  return apiClient.mobile.customer.getProfile();
+  return cachedCustomerQuery("profile", () => apiClient.mobile.customer.getProfile());
 }
 
 export async function getCustomerAddresses() {
-  return apiClient.mobile.customer.listAddresses();
+  return cachedCustomerQuery("addresses", () => apiClient.mobile.customer.listAddresses());
 }
 
 export async function getCustomerBranches() {
-  return apiClient.mobile.customer.listBranches();
+  return cachedCustomerQuery("branches", () => apiClient.mobile.customer.listBranches());
 }
 
-export async function getCustomerOrdersAndTickets() {
-  return apiClient.mobile.customer.listOrdersAndTickets();
+export async function getCustomerOrdersAndTickets(offset = 0) {
+  return cachedCustomerQuery(`activity:${offset}`, () => apiClient.mobile.customer.listOrdersAndTickets(undefined, { offset }));
 }
 
-export async function getCustomerAppointments() {
-  return apiClient.mobile.customer.listAppointments();
+export async function getCustomerAppointments(offset = 0) {
+  return cachedCustomerQuery(`appointments:${offset}`, () => apiClient.mobile.customer.listAppointments(undefined, { offset }));
 }
 
 export async function getCustomerActivityDetail(input: {
@@ -27,10 +28,10 @@ export async function getCustomerActivityDetail(input: {
   id: string;
 }): Promise<MobileCustomerOrderDetail | MobileCustomerTicketDetail> {
   if (input.kind === "order") {
-    return apiClient.mobile.customer.getOrder(input.id);
+    return cachedCustomerQuery(`order:${input.id}`, () => apiClient.mobile.customer.getOrder(input.id));
   }
 
-  return apiClient.mobile.customer.getTicket(input.id);
+  return cachedCustomerQuery(`ticket:${input.id}`, () => apiClient.mobile.customer.getTicket(input.id));
 }
 
 export async function getCustomerPaymentStatus(paymentId: string) {
@@ -38,5 +39,5 @@ export async function getCustomerPaymentStatus(paymentId: string) {
 }
 
 export async function getCustomerRefundRequests() {
-  return apiClient.mobile.payment.listRefundRequests();
+  return cachedCustomerQuery("refunds", () => apiClient.mobile.payment.listRefundRequests());
 }

@@ -190,6 +190,7 @@ async function storePushToken(token: string | null): Promise<void> {
 }
 
 const DETAIL_VIEW_BY_RELATED_TYPE: Record<string, MobileDetailView> = {
+  appointment: "appointment",
   order: "order",
   ticket: "ticket",
   service_ticket: "ticket",
@@ -315,6 +316,7 @@ async function attachListeners(
     });
 
     await plugin.addListener("notificationReceived", (notification) => {
+      window.dispatchEvent(new Event("cleanhub:notification"));
       showForegroundToast(notification);
     });
 

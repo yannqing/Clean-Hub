@@ -1,4 +1,4 @@
-export type MobileDetailView = "order" | "ticket" | "task";
+export type MobileDetailView = "order" | "ticket" | "task" | "appointment";
 
 export type MobileDetailUrlState<TView extends MobileDetailView = MobileDetailView> = {
   view: TView;

@@ -11,6 +11,7 @@ import { apiClient } from "@/lib/api-client";
 
 export async function createCustomerAppointment(input: MobileCreateCustomerAppointmentRequest) {
   return apiClient.mobile.customer.createAppointment({
+    id: input.id, ticketId: input.ticketId,
     type: input.type,
     expectedAt: input.expectedAt,
     address: input.address.trim(),
@@ -68,7 +69,7 @@ function cleanAddressInput(input: MobileCustomerAddressInput): MobileCustomerAdd
     city: input.city?.trim() || null,
     province: input.province?.trim() || null,
     postalCode: input.postalCode?.trim() || null,
-    country: (input.country?.trim().toUpperCase() || "TH").slice(0, 2),
+    country: (input.country?.trim().toUpperCase() || "").slice(0, 2),
     latitude: input.latitude?.trim() || null,
     longitude: input.longitude?.trim() || null,
     isDefault: input.isDefault,

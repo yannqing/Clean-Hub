@@ -45,7 +45,7 @@ export function getIntlLocale(locale: SupportedLocale): string {
 export function normalizeCountryCode(value: string | null | undefined): string {
   const code = value?.trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2);
 
-  return code || "TH";
+  return code || "";
 }
 
 export function getDeviceCountry(): string {
@@ -70,7 +70,7 @@ export function getDeviceCountry(): string {
     }
   }
 
-  return "TH";
+  return "";
 }
 
 function getLocaleRegion(value: string | null | undefined): string | null {
@@ -94,7 +94,7 @@ export function getCountryOptions(
   selectedCountry: string,
 ): CountryOption[] {
   const selectedCode = normalizeCountryCode(selectedCountry);
-  const options = addressCountryOptions.some((option) => option.code === selectedCode)
+  const options = !selectedCode || addressCountryOptions.some((option) => option.code === selectedCode)
     ? addressCountryOptions
     : [{ code: selectedCode, fallbackLabel: selectedCode }, ...addressCountryOptions];
 

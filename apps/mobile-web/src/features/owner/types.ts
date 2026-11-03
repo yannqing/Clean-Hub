@@ -8,6 +8,7 @@ export type OwnerAppointmentStatus =
   | "done";
 
 export type OwnerAppointmentListItem = {
+  ticketId?: string | null;
   id: string;
   tenantId?: string;
   branchId: string | null;

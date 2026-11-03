@@ -9,6 +9,7 @@ import type {
 } from "../types";
 import { createLocalId } from "./id";
 import { createDeliveryStorage, type DeliveryStorage } from "./storage";
+import { getMobileSession } from "@/lib/token-storage";
 
 const QUEUE_KEY = "cleanhub.mobile.delivery.queue.v1";
 const CACHE_KEY = "cleanhub.mobile.delivery.tasks.v1";
@@ -27,9 +28,7 @@ type SharedOfflineQueue = {
   markSynced(id: string): Promise<void>;
   updatePayload?(
     id: string,
-    updater: (
-      payload: DeliveryOfflinePayload,
-    ) => DeliveryOfflinePayload,
+    updater: (payload: DeliveryOfflinePayload) => DeliveryOfflinePayload,
   ): Promise<DeliveryOfflineQueueItem | undefined>;
   replay(
     handler: (item: DeliveryOfflineQueueItem) => Promise<void>,
@@ -39,7 +38,9 @@ type SharedOfflineQueue = {
 type SharedDeliveryTaskCache = {
   saveTasks(tasks: DeliveryTaskListItem[]): Promise<DeliveryTaskCacheSnapshot>;
   getTasks(): Promise<DeliveryTaskListItem[]>;
-  saveTaskDetail(detail: DeliveryTaskDetail): Promise<DeliveryTaskCacheSnapshot>;
+  saveTaskDetail(
+    detail: DeliveryTaskDetail,
+  ): Promise<DeliveryTaskCacheSnapshot>;
   getTaskDetail(taskId: string): Promise<DeliveryTaskDetail | undefined>;
   readSnapshot(): Promise<DeliveryTaskCacheSnapshot>;
 };
@@ -56,8 +57,30 @@ type SharedOfflineModule = {
 };
 
 let sharedModulePromise: Promise<SharedOfflineModule | null> | null = null;
-let queuePromise: Promise<SharedOfflineQueue | LocalDeliveryQueue> | null = null;
-let cachePromise: Promise<SharedDeliveryTaskCache | LocalDeliveryTaskCache> | null = null;
+const queues = new Map<
+  string,
+  Promise<SharedOfflineQueue | LocalDeliveryQueue>
+>();
+const caches = new Map<
+  string,
+  Promise<SharedDeliveryTaskCache | LocalDeliveryTaskCache>
+>();
+
+export async function getDeliveryStorageScope(): Promise<string> {
+  const session = await getMobileSession();
+  if (!session || session.authContext.role !== "driver")
+    throw new Error("auth.error.sessionRequired");
+  return `${session.authContext.tenantId}:${session.authContext.subjectId}`;
+}
+
+function scopedStorage(scope: string): DeliveryStorage {
+  const storage = createDeliveryStorage();
+  return {
+    getItem: (key) => storage.getItem(`${scope}:${key}`),
+    setItem: (key, value) => storage.setItem(`${scope}:${key}`, value),
+    removeItem: (key) => storage.removeItem(`${scope}:${key}`),
+  };
+}
 
 function emptySnapshot(): DeliveryTaskCacheSnapshot {
   return {
@@ -239,7 +262,9 @@ class LocalDeliveryQueue {
 class LocalDeliveryTaskCache {
   constructor(private readonly storage: DeliveryStorage) {}
 
-  async saveTasks(tasks: DeliveryTaskListItem[]): Promise<DeliveryTaskCacheSnapshot> {
+  async saveTasks(
+    tasks: DeliveryTaskListItem[],
+  ): Promise<DeliveryTaskCacheSnapshot> {
     const snapshot = await this.readSnapshot();
     const nextSnapshot: DeliveryTaskCacheSnapshot = {
       ...snapshot,
@@ -255,7 +280,9 @@ class LocalDeliveryTaskCache {
     return (await this.readSnapshot()).tasks;
   }
 
-  async saveTaskDetail(detail: DeliveryTaskDetail): Promise<DeliveryTaskCacheSnapshot> {
+  async saveTaskDetail(
+    detail: DeliveryTaskDetail,
+  ): Promise<DeliveryTaskCacheSnapshot> {
     const snapshot = await this.readSnapshot();
     const nextSnapshot: DeliveryTaskCacheSnapshot = {
       ...snapshot,
@@ -293,42 +320,57 @@ class LocalDeliveryTaskCache {
     }
   }
 
-  private async writeSnapshot(snapshot: DeliveryTaskCacheSnapshot): Promise<void> {
+  private async writeSnapshot(
+    snapshot: DeliveryTaskCacheSnapshot,
+  ): Promise<void> {
     await this.storage.setItem(CACHE_KEY, JSON.stringify(snapshot));
   }
 }
 
-async function getQueue() {
-  if (!queuePromise) {
-    queuePromise = loadSharedOfflineModule().then((offline) => {
-      const storage = createDeliveryStorage();
-      return offline
-        ? offline.createOfflineQueue({ storage, queueKey: QUEUE_KEY })
-        : new LocalDeliveryQueue(storage);
-    });
+async function getQueue(expectedScope?: string) {
+  const scope = await getDeliveryStorageScope();
+  if (expectedScope && scope !== expectedScope)
+    throw new Error("auth.error.sessionRequired");
+  if (!queues.has(scope)) {
+    queues.set(
+      scope,
+      loadSharedOfflineModule().then((offline) => {
+        const storage = scopedStorage(scope);
+        return offline
+          ? offline.createOfflineQueue({ storage, queueKey: QUEUE_KEY })
+          : new LocalDeliveryQueue(storage);
+      }),
+    );
   }
 
-  return queuePromise;
+  return queues.get(scope)!;
 }
 
-async function getCache() {
-  if (!cachePromise) {
-    cachePromise = loadSharedOfflineModule().then((offline) => {
-      const storage = createDeliveryStorage();
-      return offline
-        ? offline.createDeliveryTaskCache({ storage, cacheKey: CACHE_KEY })
-        : new LocalDeliveryTaskCache(storage);
-    });
+async function getCache(expectedScope?: string) {
+  const scope = await getDeliveryStorageScope();
+  if (expectedScope && scope !== expectedScope)
+    throw new Error("auth.error.sessionRequired");
+  if (!caches.has(scope)) {
+    caches.set(
+      scope,
+      loadSharedOfflineModule().then((offline) => {
+        const storage = scopedStorage(scope);
+        return offline
+          ? offline.createDeliveryTaskCache({ storage, cacheKey: CACHE_KEY })
+          : new LocalDeliveryTaskCache(storage);
+      }),
+    );
   }
 
-  return cachePromise;
+  return caches.get(scope)!;
 }
 
 export async function enqueueDeliveryOperation(
   payload: DeliveryOfflinePayload,
   metadata?: Record<string, unknown>,
+  scope?: string,
 ): Promise<DeliveryOfflineQueueItem> {
-  const queue = await getQueue();
+  const queue = await getQueue(scope);
 
   return queue.enqueue({
     entity: "delivery-task",
@@ -350,17 +392,23 @@ export async function listDeliveryQueue(): Promise<DeliveryQueueSummary> {
 }
 
 export async function replayDeliveryQueue(
-  handler: (item: DeliveryOfflineQueueItem) => Promise<void>,
+  handler: (item: DeliveryOfflineQueueItem, scope: string) => Promise<void>,
 ): Promise<DeliveryReplaySummary> {
-  const queue = await getQueue();
-  return queue.replay(handler);
+  const scope = await getDeliveryStorageScope();
+  const queue = await getQueue(scope);
+  return queue.replay(async (item) => {
+    if ((await getDeliveryStorageScope()) !== scope)
+      throw new Error("auth.error.sessionRequired");
+    await handler(item, scope);
+  });
 }
 
 export async function updateQueuedDeliveryPayload(
   id: string,
   updater: (payload: DeliveryOfflinePayload) => DeliveryOfflinePayload,
+  scope?: string,
 ): Promise<DeliveryOfflineQueueItem | undefined> {
-  const queue = await getQueue();
+  const queue = await getQueue(scope);
 
   if (queue.updatePayload) {
     return queue.updatePayload(id, updater);
@@ -371,27 +419,32 @@ export async function updateQueuedDeliveryPayload(
 
 export async function saveCachedDeliveryTasks(
   tasks: DeliveryTaskListItem[],
+  scope?: string,
 ): Promise<DeliveryTaskCacheSnapshot> {
-  const cache = await getCache();
+  const cache = await getCache(scope);
   return cache.saveTasks(tasks);
 }
 
-export async function getCachedDeliveryTasks(): Promise<DeliveryTaskListItem[]> {
-  const cache = await getCache();
+export async function getCachedDeliveryTasks(
+  scope?: string,
+): Promise<DeliveryTaskListItem[]> {
+  const cache = await getCache(scope);
   return cache.getTasks();
 }
 
 export async function saveCachedDeliveryTaskDetail(
   detail: DeliveryTaskDetail,
+  scope?: string,
 ): Promise<DeliveryTaskCacheSnapshot> {
-  const cache = await getCache();
+  const cache = await getCache(scope);
   return cache.saveTaskDetail(detail);
 }
 
 export async function getCachedDeliveryTaskDetail(
   taskId: string,
+  scope?: string,
 ): Promise<DeliveryTaskDetail | undefined> {
-  const cache = await getCache();
+  const cache = await getCache(scope);
   return cache.getTaskDetail(taskId);
 }
 

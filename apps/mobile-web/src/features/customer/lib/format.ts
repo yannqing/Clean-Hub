@@ -1,3 +1,5 @@
+import { toDateTimeLocalValue as dateTimeInZone } from "@cleanhub/domain/timezone";
+import { getBusinessTimeZone } from "@/lib/business-time";
 import type {
   MobileCustomerActivityList,
   MobileCustomerAddress,
@@ -68,6 +70,8 @@ export type CustomerOverviewNextItem =
     };
 
 export type AppointmentFormState = {
+  customerId?: string;
+  ticketId?: string;
   type: MobileCustomerAppointmentType;
   branchId: string;
   addressId: string;
@@ -148,7 +152,7 @@ export const emptyAddressForm: CustomerAddressFormState = {
   city: "",
   province: "",
   postalCode: "",
-  country: "TH",
+  country: "",
   latitude: "",
   longitude: "",
   isDefault: false,
@@ -156,7 +160,6 @@ export const emptyAddressForm: CustomerAddressFormState = {
 };
 
 export const CUSTOM_APPOINTMENT_ADDRESS_ID = "__custom";
-const MIN_APPOINTMENT_LEAD_TIME_MINUTES = 30;
 
 export const emptyPasswordForm: CustomerPasswordFormState = {
   currentPassword: "",
@@ -271,6 +274,7 @@ export function formatDateTime(value: string | null, locale = "fr-FR"): string {
   }
 
   return new Intl.DateTimeFormat(locale, {
+    timeZone: getBusinessTimeZone(),
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
@@ -284,30 +288,19 @@ export function formatDate(value: string, locale = "fr-FR"): string {
   }
 
   return new Intl.DateTimeFormat(locale, {
+    timeZone: getBusinessTimeZone(),
     dateStyle: "medium",
   }).format(date);
 }
 
 export function getDefaultExpectedAt(): string {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  date.setHours(Math.max(date.getHours() + 2, 10), 0, 0, 0);
-  return toDateTimeLocalValue(date);
+  return dateTimeInZone(new Date(Date.now() + 24 * 60 * 60 * 1000), getBusinessTimeZone());
 }
-
 export function getMinimumAppointmentDate(): Date {
-  return new Date(Date.now() + MIN_APPOINTMENT_LEAD_TIME_MINUTES * 60 * 1000);
+  return new Date(Date.now() + 30 * 60 * 1000);
 }
-
 export function getMinimumAppointmentDateValue(): string {
-  return toDateTimeLocalValue(getMinimumAppointmentDate());
-}
-
-function toDateTimeLocalValue(date: Date): string {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
-    date.getHours(),
-  )}:${pad(date.getMinutes())}`;
+  return dateTimeInZone(getMinimumAppointmentDate(), getBusinessTimeZone());
 }
 
 export function getErrorMessage(error: unknown, fallback: string): string {
@@ -383,13 +376,13 @@ export function getActivityItems(
     const refundStatus = refundRequests.find(
       (request) =>
         request.orderId === order.id &&
-        (request.status === "pending" || request.status === "processing"),
+        (request.status === "pending" || request.status === "approved" || request.status === "processing"),
     )?.status;
 
     return {
       kind: "order",
       id: order.id,
-      title: t("customer.detail.orderPrefix", { id: order.id.slice(-6).toUpperCase() }),
+      title: t("customer.detail.orderPrefix", { id: order.orderCode }),
       subtitle: refundStatus
         ? t(refundStatusKeys[refundStatus])
         : `${t("customer.detail.payment")} ${getPaymentStatusLabel(t, order.paymentStatus)}`,

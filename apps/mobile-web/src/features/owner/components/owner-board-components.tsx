@@ -1,5 +1,7 @@
 "use client";
 
+import { AppointmentReceptionControl, RefundSettlementControl } from "./customer-workflow-controls";
+
 import { type ComponentType, type ReactNode, useEffect, useRef } from "react";
 import type {
   MobileDeliveryTaskStatus,
@@ -324,8 +326,10 @@ export function InfiniteScrollSentinel({
 export function AppointmentItem({
   appointment,
   onAction,
+  onDone,
 }: {
   appointment: OwnerAppointmentListItem;
+  onDone: () => void | Promise<void>;
   onAction: (target: ActionTarget) => void;
 }) {
   const { locale, t } = useTranslation();
@@ -396,6 +400,7 @@ export function AppointmentItem({
           {t("owner.actions.reject")}
         </Button>
       </div>
+      {appointment.status === "done" && appointment.serviceType === "pickup" && !appointment.ticketId ? <AppointmentReceptionControl appointmentId={appointment.id} onDone={onDone} /> : null}
     </article>
   );
 }
@@ -482,12 +487,13 @@ export function DispatchTaskItem({
 }
 
 export function RefundRequestItem({
-  currency,
   onAction,
+  onDone,
   onViewOrder,
   refundRequest,
 }: {
   currency: string;
+  onDone: () => void | Promise<void>;
   onAction: (target: ActionTarget) => void;
   onViewOrder: (refundRequest: MobileRefundRequest) => void;
   refundRequest: MobileRefundRequest;
@@ -516,7 +522,7 @@ export function RefundRequestItem({
       <div className="mt-3 flex items-end justify-between gap-3 pl-14">
         <p className="line-clamp-2 text-sm text-slate-600">{refundRequest.reason}</p>
         <p className="shrink-0 text-lg font-bold tabular-nums text-slate-950">
-          {formatTenantMoney(refundRequest.amount, intlLocale, currency)}
+          {formatTenantMoney(refundRequest.amount, intlLocale, refundRequest.currency)}
         </p>
       </div>
       <Button
@@ -543,7 +549,7 @@ export function RefundRequestItem({
         </Button>
         <Button
           className="w-full"
-          disabled={refundRequest.status !== "pending"}
+          disabled={refundRequest.status !== "pending" && refundRequest.status !== "approved"}
           size="sm"
           type="button"
           variant="outline"
@@ -553,6 +559,7 @@ export function RefundRequestItem({
           {t("owner.actions.rejectRefund")}
         </Button>
       </div>
+      {refundRequest.status === "approved" ? <RefundSettlementControl requestId={refundRequest.id} onDone={onDone} /> : null}
     </article>
   );
 }
@@ -688,13 +695,13 @@ export function RefundOrderDetailSheet({
           </div>
         ) : null}
         </div>
-        {refundRequest?.status === "pending" ? (
+        {refundRequest && (refundRequest.status === "pending" || refundRequest.status === "approved") ? (
           <div className="grid grid-cols-2 gap-3 border-t border-slate-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
             <Button className="h-12" type="button" variant="outline" onClick={() => onReject(refundRequest)}>
               <XCircle className="size-4" aria-hidden />
               {t("owner.actions.rejectRefund")}
             </Button>
-            <Button className="h-12" type="button" onClick={() => onApprove(refundRequest)}>
+            <Button className="h-12" type="button" disabled={refundRequest.status !== "pending"} onClick={() => onApprove(refundRequest)}>
               <CheckCircle2 className="size-4" aria-hidden />
               {t("owner.actions.approveRefund")}
             </Button>
