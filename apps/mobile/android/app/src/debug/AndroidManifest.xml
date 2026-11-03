@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!--
         The debug bundle targets the local API through adb reverse at
-        http://localhost:4000. Release builds retain Android's default HTTPS
-        requirement because this manifest is included only in the debug source
-        set.
+        http://localhost:4000. Only this debug source set overrides the main
+        manifest; release builds explicitly keep cleartext traffic disabled.
     -->
-    <application android:usesCleartextTraffic="true" />
+    <application android:usesCleartextTraffic="true"
+        tools:replace="android:usesCleartextTraffic" />
 </manifest>
