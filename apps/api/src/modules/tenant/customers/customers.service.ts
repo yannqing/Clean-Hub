@@ -418,9 +418,8 @@ export async function updateTenantCustomerAccount(
 /**
  * Issue a customer a password so they can sign in to the mobile app.
  *
- * Customer sign-in is otherwise OTP-first, and the OTP is generated but never
- * delivered -- there is no SMS provider -- so a customer who has never had a
- * password has no way into the app at all. Staff create the account at the
+ * Password issuance is the first-release onboarding path. OTP is available
+ * only when the tenant enables it and an SMS sender is configured. Staff create the account at the
  * counter, so staff hand over the first credential too; the customer changes it
  * from the app afterwards.
  *
@@ -457,6 +456,10 @@ export async function resetTenantCustomerAccountPassword(
       "Enable the customer account before issuing a password.",
       422,
     );
+  }
+
+  if (!existing.phone?.trim() && !existing.email?.trim()) {
+    throw new TenantCustomersError("ACCOUNT_CONTACT_REQUIRED", "At least one of phone or email is required.", 422);
   }
 
   // Not checked against the security policy, and not generated: the starter is

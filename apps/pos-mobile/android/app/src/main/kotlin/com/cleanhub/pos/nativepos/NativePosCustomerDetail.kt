@@ -58,6 +58,8 @@ internal fun NativeCustomerDetailPanel(
     var editing by remember(customer.id) { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
+    var confirmingAppPassword by remember(customer.id) { mutableStateOf(false) }
+    var issuedAppPassword by remember(customer.id) { mutableStateOf<String?>(null) }
     var confirmingStatus by remember(customer.id) { mutableStateOf(false) }
     var recentTickets by remember(customer.id) { mutableStateOf<JSONObject?>(null) }
     DisposableEffect(Unit) {
@@ -191,6 +193,18 @@ internal fun NativeCustomerDetailPanel(
         if (account?.nativeText("status") == "disabled") Text(copy.customerDirectoryAccountDisabled, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         Button(onClick = onNewTicket, enabled = !busy && !saving && account?.nativeText("status") != "disabled" && (profile?.nativeText("status") ?: customer.status) == "active",
             modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp)) { Text(copy.detailNewTicket) }
+        account?.optJSONObject("appAccess")?.let { access ->
+            Text(if (access.optBoolean("passwordEnabled")) copy.customerAppPasswordEnabled else copy.customerAppPasswordNotEnabled, style = MaterialTheme.typography.bodySmall, color = POS_MUTED)
+            if (access.optBoolean("mustChangePassword")) Text(copy.customerAppPasswordChangeRequired, style = MaterialTheme.typography.bodySmall, color = POS_MUTED)
+            Text(String.format(copy.customerAppLoginDetails, access.optString("tenantCode"), account?.nativeText("phone")?.ifBlank { account?.nativeText("email").orEmpty() }.orEmpty()), style = MaterialTheme.typography.bodySmall, color = POS_MUTED)
+        }
+        if (terminal?.role in listOf("owner", "manager")) {
+            val hasAppIdentifier = !account?.nativeText("phone").isNullOrBlank() || !account?.nativeText("email").isNullOrBlank()
+            if (account != null && !hasAppIdentifier) Text(copy.customerAppIdentifierRequired, style = MaterialTheme.typography.bodySmall, color = POS_MUTED)
+            OutlinedButton(onClick = { confirmingAppPassword = true; saveError = null },
+                enabled = internetAvailable && !busy && !saving && hasAppIdentifier && account?.nativeText("status") != "disabled",
+                modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)) { Text(copy.customerAppAccess) }
+        }
         saveError?.let { Text(nativeFeedbackText(it, copy), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         if (!internetAvailable) Text(copy.detailCachedNotice, color = POS_MUTED)
         if (failed || pageFailed) {
@@ -436,6 +450,36 @@ internal fun NativeCustomerDetailPanel(
                 }
             }
         }
+    if (confirmingAppPassword) AlertDialog(
+        onDismissRequest = { if (!saving) confirmingAppPassword = false },
+        title = { Text(copy.customerAppAccess) },
+        text = { Text(copy.customerAppAccessHint) },
+        confirmButton = { TextButton(enabled = !saving && internetAvailable, onClick = {
+            saving = true
+            scope.launch {
+                try {
+                    val response = withContext(Dispatchers.IO) { api.post("/pos/accounts/${customer.accountId}/app-password", JSONObject()) }
+                    issuedAppPassword = response.getString("password")
+                    retry++
+                    confirmingAppPassword = false
+                } catch (error: Exception) {
+                    if (error is CancellationException) throw error
+                    saveError = error.message
+                    confirmingAppPassword = false
+                } finally { saving = false }
+            }
+        }) { if (saving) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) else Text(copy.customerAppAccess) } },
+        dismissButton = { TextButton(enabled = !saving, onClick = { confirmingAppPassword = false }) { Text(copy.cancel) } },
+    )
+    issuedAppPassword?.let { password -> AlertDialog(
+        onDismissRequest = { issuedAppPassword = null },
+        title = { Text(copy.customerAppAccess) },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(String.format(copy.customerAppPasswordIssued, password))
+            Text(String.format(copy.customerAppLoginDetails, account?.optJSONObject("appAccess")?.optString("tenantCode").orEmpty(), account?.nativeText("phone")?.ifBlank { account?.nativeText("email").orEmpty() }.orEmpty()))
+        } },
+        confirmButton = { TextButton(onClick = { issuedAppPassword = null }) { Text(copy.close) } },
+    ) }
     if (confirmingStatus) AlertDialog(
         onDismissRequest = { if (!saving) confirmingStatus = false },
         title = { Text(if ((profile?.nativeText("status") ?: customer.status) == "active") copy.customerDirectoryDisable else copy.customerDirectoryEnable) },

@@ -14,6 +14,8 @@ import {
 import {
   type Database,
   customerAccounts,
+  customerCredentials,
+  tenants,
   customers,
   orders,
   serviceTickets,
@@ -63,6 +65,9 @@ export async function findPosAccountById(
 ): Promise<PosCustomerAccountDetail | null> {
   const rows = await db
     .select({
+      passwordCredentialId: customerCredentials.id,
+      mustChangePassword: customerCredentials.mustChangePassword,
+      tenantCode: tenants.pressingCode,
       id: customerAccounts.id,
       accountName: customerAccounts.accountName,
       phone: customerAccounts.phone,
@@ -73,6 +78,8 @@ export async function findPosAccountById(
       version: customerAccounts.version,
     })
     .from(customerAccounts)
+    .innerJoin(tenants, eq(tenants.id, customerAccounts.tenantId))
+    .leftJoin(customerCredentials, and(eq(customerCredentials.tenantId, tenantId), eq(customerCredentials.customerAccountId, customerAccounts.id), isNull(customerCredentials.deletedAt)))
     .where(
       and(
         eq(customerAccounts.id, accountId),
@@ -88,6 +95,7 @@ export async function findPosAccountById(
   }
 
   return {
+    appAccess: { passwordEnabled: Boolean(row.passwordCredentialId), mustChangePassword: row.mustChangePassword ?? false, tenantCode: row.tenantCode },
     id: row.id,
     accountName: row.accountName,
     phone: row.phone,

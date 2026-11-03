@@ -20,6 +20,7 @@ import type {
  */
 export function createPosAccountsApi(client: ApiClient) {
   return {
+    issueAppPassword: (accountId: string) => client.post<{ accountId: string; password: string }>(`/pos/accounts/${encodeURIComponent(accountId)}/app-password`, {}),
     /** Create a customer account. POST /pos/accounts */
     create: (
       input: CreatePosAccountRequest,

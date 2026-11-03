@@ -156,6 +156,14 @@ internal class NativePosCopy(
     val detailItemMaterial: String get() = get("detailItemMaterial")
     val detailPickupHint: String get() = get("detailPickupHint")
     val detailNewTicket: String get() = get("detailNewTicket")
+    val customerAppPasswordEnabled: String get() = get("customerAppPasswordEnabled")
+    val customerAppPasswordNotEnabled: String get() = get("customerAppPasswordNotEnabled")
+    val customerAppPasswordChangeRequired: String get() = get("customerAppPasswordChangeRequired")
+    val customerAppLoginDetails: String get() = get("customerAppLoginDetails")
+    val customerAppIdentifierRequired: String get() = get("customerAppIdentifierRequired")
+    val customerAppAccess: String get() = get("customerAppAccess")
+    val customerAppAccessHint: String get() = get("customerAppAccessHint")
+    val customerAppPasswordIssued: String get() = get("customerAppPasswordIssued")
 
     val checkoutConfirmationMissing: String get() = get("checkoutConfirmationMissing")
     val checkoutPaidTitle: String get() = get("checkoutPaidTitle")
@@ -1201,6 +1209,14 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
     "detailItemMaterial" to "材质",
     "detailPickupHint" to "YYYY-MM-DD HH:mm（门店时区）",
     "detailNewTicket" to "新增工单",
+    "customerAppPasswordEnabled" to "顾客 App 密码已开通",
+    "customerAppPasswordNotEnabled" to "尚未开通顾客 App 密码",
+    "customerAppPasswordChangeRequired" to "顾客首次登录需修改初始密码",
+    "customerAppLoginDetails" to "商家编码：%s\n登录手机号／邮箱：%s",
+    "customerAppIdentifierRequired" to "请先在租户后台完善客户账号的手机号或邮箱，再开通 App 登录。",
+    "customerAppAccess" to "开通／重置顾客 App 密码",
+    "customerAppAccessHint" to "这会重置该顾客账号的 App 密码并撤销旧会话。请当面核实顾客身份，并告知租户编码及登录手机号／邮箱。顾客首次登录必须修改密码。",
+    "customerAppPasswordIssued" to "顾客 App 初始密码：%s。请顾客首次登录后立即修改。",
     "checkoutConfirmationMissing" to "未收到完整的结款确认，交易已保留并将安全重试，请勿重复收款。",
     "orderLineCount" to "条目数量",
     "assistantLabel" to "接待员工",
@@ -2238,6 +2254,14 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
     "detailItemMaterial" to "Material",
     "detailPickupHint" to "YYYY-MM-DD HH:mm (store time zone)",
     "detailNewTicket" to "New service ticket",
+    "customerAppPasswordEnabled" to "Customer app password enabled",
+    "customerAppPasswordNotEnabled" to "Customer app password not issued",
+    "customerAppPasswordChangeRequired" to "The customer must change the starter password at first sign-in",
+    "customerAppLoginDetails" to "Tenant code: %s\nSign-in phone / email: %s",
+    "customerAppIdentifierRequired" to "Add a phone or email to the customer account in tenant administration before issuing app access.",
+    "customerAppAccess" to "Issue / reset customer app password",
+    "customerAppAccessHint" to "This resets the customer app password and revokes old sessions. Verify the customer in person and provide the tenant code and sign-in phone/email. A new password is required at first sign-in.",
+    "customerAppPasswordIssued" to "Customer app starter password: %s. The customer must change it at first sign-in.",
     "checkoutConfirmationMissing" to "Checkout confirmation was incomplete. The sale is retained for a safe retry; do not charge again.",
     "orderLineCount" to "Line items",
     "assistantLabel" to "Assistant",
@@ -3275,6 +3299,14 @@ private val COPY_FR_VALUES: Map<String, String> = mapOf(
     "detailItemMaterial" to "Matière",
     "detailPickupHint" to "YYYY-MM-DD HH:mm (fuseau du magasin)",
     "detailNewTicket" to "Nouveau bon de service",
+    "customerAppPasswordEnabled" to "Mot de passe client activé",
+    "customerAppPasswordNotEnabled" to "Mot de passe client non délivré",
+    "customerAppPasswordChangeRequired" to "Le client doit modifier son mot de passe initial à la première connexion",
+    "customerAppLoginDetails" to "Code locataire : %s\nTéléphone / e-mail de connexion : %s",
+    "customerAppIdentifierRequired" to "Renseignez le téléphone ou l’e-mail du compte client dans l’administration du magasin avant d’activer l’accès.",
+    "customerAppAccess" to "Activer / réinitialiser le mot de passe client",
+    "customerAppAccessHint" to "Le mot de passe sera réinitialisé et les anciennes sessions révoquées. Vérifiez l’identité du client et communiquez le code locataire et son téléphone / e-mail. Le client devra changer son mot de passe à la première connexion.",
+    "customerAppPasswordIssued" to "Mot de passe initial de l’application client : %s. Le client doit le changer à la première connexion.",
     "checkoutConfirmationMissing" to "La confirmation du règlement est incomplète. La vente est conservée pour un nouvel envoi sécurisé ; ne facturez pas à nouveau.",
     "orderLineCount" to "Lignes",
     "assistantLabel" to "Employé",

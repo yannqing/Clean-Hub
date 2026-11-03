@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import type { AppBindings } from "../../../http/types.js";
+import { resetTenantCustomerAccountPasswordController } from "../../tenant/customers/customers.controller.js";
 import {
   changePosAccountStatusController,
   changePosProfileStatusController,
@@ -50,6 +51,7 @@ export function createPosAccountsRoutes() {
   const routes = new Hono<AppBindings>();
 
   routes.post("/", createPosAccountController);
+  routes.post("/:accountId/app-password", resetTenantCustomerAccountPasswordController);
   routes.get("/:accountId", getPosAccountController);
   routes.get("/:accountId/customers", getPosProfilesByAccountController);
   routes.post("/:accountId/customers", createPosProfileUnderAccountController);

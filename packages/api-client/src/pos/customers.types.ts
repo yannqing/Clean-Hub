@@ -29,6 +29,7 @@ export type PosCustomerAccountSummary = {
 };
 
 export type PosCustomerAccountDetail = PosCustomerAccountSummary & {
+  appAccess?: { passwordEnabled: boolean; mustChangePassword: boolean; tenantCode: string };
   updatedAt: string;
   version: number;
 };
