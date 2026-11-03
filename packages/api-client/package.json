@@ -6,9 +6,16 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
+    "build": "tsc --noEmit",
+    "smoke:realtime-url": "tsx src/realtime-url.smoke.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@cleanhub/domain": "workspace:*",
     "@cleanhub/id": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4.21.0"
   }
 }

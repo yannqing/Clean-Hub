@@ -1,0 +1,51 @@
+# appointment-operations Specification
+
+## Purpose
+Define owner/store appointment handling, appointment-to-delivery conversion, and delivery progress callbacks for appointments.
+## Requirements
+### Requirement: 门店处理预约
+
+门店运营 SHALL 能接受或拒绝本租户、本门店下客户提交的待处理预约。处理 MUST 校验门店管理权限，并只能作用于 `pending` 状态的预约。
+
+#### Scenario: 接受预约
+
+- **WHEN** 门店运营接受一条待处理预约
+- **THEN** 系统将预约状态置为已接受并记录接受人与时间
+
+#### Scenario: 拒绝预约
+
+- **WHEN** 门店运营拒绝一条待处理预约
+- **THEN** 系统将预约置为已取消并记录原因与时间
+
+#### Scenario: 非待处理预约不可处理
+
+- **WHEN** 门店运营尝试处理已接受/已取消/已完成的预约
+- **THEN** 系统拒绝并返回当前预约状态
+
+### Requirement: 预约转配送任务
+
+接受预约时系统 SHALL 由该预约生成一个配送任务，并在预约与任务之间建立关联。一个预约 MUST 最多只能转化出一个有效配送任务。转化 MUST 在单事务内完成（置预约已接受、建任务、写关联）。
+
+#### Scenario: 接受后生成配送任务
+
+- **WHEN** 门店运营接受一条预约
+- **THEN** 系统在同一事务内创建对应类型(取件/送达)的待派发配送任务，并写入预约与任务的双向关联
+
+#### Scenario: 重复转化被阻止
+
+- **WHEN** 一条预约已生成有效配送任务后再次被转化
+- **THEN** 系统拒绝重复创建并返回已存在的关联任务
+
+### Requirement: 配送进度回写预约
+
+配送任务到达终态时系统 SHALL 联动更新其来源预约的状态。任务签收完成 MUST 将关联预约置为已完成。
+
+#### Scenario: 配送签收回写预约完成
+
+- **WHEN** 由预约生成的配送任务流转为已签收
+- **THEN** 系统将该预约状态置为已完成并记录完成时间
+
+#### Scenario: 无来源预约的任务不联动
+
+- **WHEN** 一条非预约来源的配送任务到达终态
+- **THEN** 系统不修改任何预约

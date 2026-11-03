@@ -1,0 +1,144 @@
+name: Customer mobile Android and iOS
+
+on:
+  pull_request:
+    branches: [main, master, dev]
+  push:
+    branches: [main, master, dev]
+
+concurrency:
+  group: customer-mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  business-and-ui:
+    name: Customer shared business and offline UI
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: cleanhub_mobile_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cleanhub_mobile_test"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/cleanhub_mobile_test
+      AUTH_TOKEN_SECRET: ci-mobile-isolated-test-secret-at-least-32-characters
+      PAYMENT_MOCK_SECRET: ci-mobile-isolated-mock-secret
+      DATABASE_REQUIRE_RLS: "false"
+      LOG_LEVEL: warn
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:4000
+      # CORS creates the full API app, including media services, but never
+      # uploads objects. Use isolated fixture credentials rather than local .env.
+      OBJECT_STORAGE_ENDPOINT: http://127.0.0.1:9000
+      OBJECT_STORAGE_BUCKET: cleanhub-mobile-ci
+      OBJECT_STORAGE_ACCESS_KEY: isolated-ci
+      OBJECT_STORAGE_SECRET_KEY: isolated-ci-not-for-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      - name: Typecheck customer apps and API
+        run: |
+          pnpm --filter @cleanhub/mobile typecheck
+          pnpm --filter @cleanhub/mobile-web typecheck
+          pnpm --filter @cleanhub/api typecheck
+      - name: Shared delivery, payment and notification regressions
+        run: |
+          pnpm --filter @cleanhub/api test:integration:mobile-readiness
+          pnpm --filter @cleanhub/api smoke:mobile-delivery
+          pnpm --filter @cleanhub/api smoke:payment
+          NODE_ENV=production pnpm --filter @cleanhub/api smoke:payment-production
+          pnpm --filter @cleanhub/api smoke:notifications
+          pnpm --filter @cleanhub/api smoke:cors-origin
+          pnpm --filter @cleanhub/mobile smoke:release-validation
+      - run: pnpm --filter @cleanhub/mobile-web exec playwright install --with-deps chromium
+      - name: French UI, native bridge contracts and offline replay
+        run: pnpm --filter @cleanhub/mobile-web test:e2e:readiness
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: customer-mobile-browser-failures
+          path: /tmp/cleanhub-customer-readiness-results
+          if-no-files-found: ignore
+
+  native:
+    name: Customer native ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: android
+            os: ubuntu-latest
+          - platform: ios
+            os: macos-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        if: matrix.platform == 'android'
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+        if: matrix.platform == 'android'
+        with:
+          packages: platform-tools
+      - uses: maxim-lobanov/setup-xcode@v1
+        if: matrix.platform == 'ios'
+        with:
+          xcode-version: latest-stable
+      - run: pnpm install --frozen-lockfile
+      - name: Build and synchronize the customer bundle
+        run: node scripts/mobile/sync-mobile.mjs ${{ matrix.platform }}
+      - name: Build Android customer APK and check permissions
+        if: matrix.platform == 'android'
+        working-directory: apps/mobile/android
+        run: ./gradlew :app:assembleDebug :app:assembleRelease :app:lintDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        if: matrix.platform == 'android' && always()
+        with:
+          name: customer-android-lint
+          path: apps/mobile/android/app/build/reports/lint-results-debug.*
+          if-no-files-found: ignore
+      - name: Exercise signed Android packaging with an isolated CI key
+        if: matrix.platform == 'android'
+        env:
+          CLEANHUB_MOBILE_ENV: prod
+          CLEANHUB_MOBILE_API_BASE_URL: https://ci.invalid
+          CLEANHUB_MOBILE_UPDATE_URL: https://ci.invalid/app
+          CLEANHUB_ANDROID_KEYSTORE_PATH: /tmp/cleanhub-ci-only.jks
+          CLEANHUB_ANDROID_KEYSTORE_PASSWORD: ci-only-not-for-distribution
+          CLEANHUB_ANDROID_KEY_ALIAS: ci-only
+          CLEANHUB_ANDROID_KEY_PASSWORD: ci-only-not-for-distribution
+        run: |
+          # This disposable key only verifies the packaging path. No app
+          # signed with it is uploaded or used for customer distribution.
+          keytool -genkeypair -keystore "$CLEANHUB_ANDROID_KEYSTORE_PATH" -alias ci-only \
+            -storepass "$CLEANHUB_ANDROID_KEYSTORE_PASSWORD" -keypass "$CLEANHUB_ANDROID_KEY_PASSWORD" \
+            -keyalg RSA -keysize 2048 -validity 2 -dname 'CN=CleanHub CI Only'
+          pnpm --filter @cleanhub/mobile package:android
+      - name: Compile iOS customer application
+        if: matrix.platform == 'ios'
+        working-directory: apps/mobile/ios/App
+        run: >-
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release
+          -sdk iphonesimulator -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath /tmp/cleanhub-customer-ios CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build

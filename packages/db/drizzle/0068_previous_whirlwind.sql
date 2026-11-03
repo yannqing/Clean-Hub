@@ -1,0 +1,1 @@
+ALTER TABLE "tax_rates" ADD COLUMN "template_rate_key" varchar(64);

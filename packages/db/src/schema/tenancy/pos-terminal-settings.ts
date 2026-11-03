@@ -1,0 +1,150 @@
+import {
+  boolean,
+  check,
+  index,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  smallint,
+  text,
+  timestamp,
+  uniqueIndex,
+  varchar,
+} from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+
+import { ulidColumn, ulidPrimaryKey } from "../id.js";
+import { users } from "../identity/users.js";
+import { branches } from "./branches.js";
+import { tenants } from "./tenants.js";
+
+export const posRoundingRuleEnum = pgEnum("pos_rounding_rule", [
+  "none",
+  "round_yuan",
+  "round_jiao",
+]);
+
+export const posTerminalStatusEnum = pgEnum("pos_terminal_status", [
+  "active",
+  "inactive",
+]);
+
+export const posTerminalDeviceTypeEnum = pgEnum("pos_terminal_device_type", [
+  "unknown",
+  "desktop",
+  "tablet",
+  "phone",
+  "browser",
+]);
+
+export const posTerminalSyncStatusEnum = pgEnum("pos_terminal_sync_status", [
+  "never",
+  "syncing",
+  "synced",
+  "error",
+]);
+
+export const posTerminalSettings = pgTable(
+  "pos_terminal_settings",
+  {
+    id: ulidPrimaryKey(),
+    tenantId: ulidColumn("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    branchId: ulidColumn("branch_id")
+      .notNull()
+      .references(() => branches.id),
+    deviceId: varchar("device_id", { length: 128 }).notNull(),
+    label: varchar("label", { length: 64 }),
+    deviceType: posTerminalDeviceTypeEnum("device_type")
+      .notNull()
+      .default("unknown"),
+    platform: varchar("platform", { length: 64 }),
+    platformVersion: varchar("platform_version", { length: 64 }),
+    appVersion: varchar("app_version", { length: 64 }),
+    roundingRule: posRoundingRuleEnum("rounding_rule")
+      .notNull()
+      .default("none"),
+    autoPrintReceipt: boolean("auto_print_receipt").notNull().default(true),
+    printCopies: smallint("print_copies").notNull().default(1),
+    lockTimeoutSeconds: integer("lock_timeout_seconds").notNull().default(300),
+    status: posTerminalStatusEnum("status").notNull().default("active"),
+    credentialDigest: varchar("credential_digest", { length: 128 }),
+    credentialVersion: integer("credential_version").notNull().default(0),
+    credentialIssuedAt: timestamp("credential_issued_at", {
+      withTimezone: true,
+    }),
+    credentialRotatedAt: timestamp("credential_rotated_at", {
+      withTimezone: true,
+    }),
+    credentialLastUsedAt: timestamp("credential_last_used_at", {
+      withTimezone: true,
+    }),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    lastRealtimeSeenAt: timestamp("last_realtime_seen_at", {
+      withTimezone: true,
+    }),
+    connectionLeaseUntil: timestamp("connection_lease_until", {
+      withTimezone: true,
+    }),
+    lastDisconnectedAt: timestamp("last_disconnected_at", {
+      withTimezone: true,
+    }),
+    lastDisconnectReason: varchar("last_disconnect_reason", { length: 64 }),
+    pendingSalesCount: integer("pending_sales_count"),
+    pendingOperationsCount: integer("pending_operations_count"),
+    oldestPendingAt: timestamp("oldest_pending_at", { withTimezone: true }),
+    statusRevision: integer("status_revision").notNull().default(0),
+    realtimeProtocolVersion: smallint("realtime_protocol_version"),
+    syncStatus: posTerminalSyncStatusEnum("sync_status")
+      .notNull()
+      .default("never"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    lastSyncError: text("last_sync_error"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdBy: ulidColumn("created_by").references(() => users.id),
+    updatedBy: ulidColumn("updated_by").references(() => users.id),
+    version: integer("version").notNull().default(1),
+  },
+  (table) => [
+    uniqueIndex("pos_terminal_settings_tenant_device_unique").on(
+      table.tenantId,
+      table.deviceId,
+    ),
+    index("pos_terminal_settings_tenant_id_idx").on(table.tenantId),
+    index("pos_terminal_settings_branch_id_idx").on(table.branchId),
+    index("pos_terminal_settings_status_idx").on(table.status),
+    index("pos_terminal_settings_last_seen_at_idx").on(table.lastSeenAt),
+    index("pos_terminal_settings_tenant_last_seen_at_idx").on(
+      table.tenantId,
+      table.lastSeenAt,
+    ),
+    index("pos_terminal_settings_tenant_connection_lease_idx").on(
+      table.tenantId,
+      table.connectionLeaseUntil,
+    ),
+    index("pos_terminal_settings_tenant_sync_status_idx").on(
+      table.tenantId,
+      table.syncStatus,
+    ),
+    check(
+      "pos_terminal_settings_pending_sales_check",
+      sql`${table.pendingSalesCount} is null or ${table.pendingSalesCount} >= 0`,
+    ),
+    check(
+      "pos_terminal_settings_pending_operations_check",
+      sql`${table.pendingOperationsCount} is null or ${table.pendingOperationsCount} >= 0`,
+    ),
+    check(
+      "pos_terminal_settings_status_revision_check",
+      sql`${table.statusRevision} >= 0`,
+    ),
+  ],
+);

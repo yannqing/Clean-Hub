@@ -1,0 +1,45 @@
+import { Hono } from "hono";
+
+import type { AppBindings } from "../../../http/types.js";
+import {
+  clockActionController,
+  closeRegisterController,
+  createRegisterCashMovementController,
+  getCurrentShiftController,
+  getCurrentRegisterController,
+  getCurrentRegisterReconciliationController,
+  listCurrentRegisterCashMovementsController,
+  getPosStaffController,
+  getPosZReportController,
+  listPosStaffController,
+  listPosZReportsController,
+  openRegisterController,
+} from "./staff.controller.js";
+
+export function createPosStaffRoutes() {
+  const routes = new Hono<AppBindings>();
+
+  routes.get("/", listPosStaffController);
+  routes.get("/current-shift", getCurrentShiftController);
+  routes.get("/current-register", getCurrentRegisterController);
+  routes.post("/register-sessions/open", openRegisterController);
+  routes.post("/register-sessions/close", closeRegisterController);
+  routes.get(
+    "/current-register/reconciliation",
+    getCurrentRegisterReconciliationController,
+  );
+  routes.get(
+    "/current-register/cash-movements",
+    listCurrentRegisterCashMovementsController,
+  );
+  routes.post(
+    "/current-register/cash-movements",
+    createRegisterCashMovementController,
+  );
+  routes.post("/clock", clockActionController);
+  routes.get("/z-reports", listPosZReportsController);
+  routes.get("/z-reports/:zReportId", getPosZReportController);
+  routes.get("/:staffId", getPosStaffController);
+
+  return routes;
+}

@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Badge,
   Card,
@@ -6,22 +8,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@cleanhub/ui";
+import { useWebAdminLocale } from "@/i18n";
 
 type PagePlaceholderProps = {
-  title: string;
-  description?: string;
-  items?: string[];
+  page: "home" | "apiHealth";
 };
 
-export function PagePlaceholder({
-  title,
-  description,
-  items = [],
-}: PagePlaceholderProps) {
+export function PagePlaceholder({ page }: PagePlaceholderProps) {
+  const { messages } = useWebAdminLocale();
+  const { title, description, items } = messages.utilityPages[page];
   return (
     <section className="p-6">
       <div className="max-w-6xl">
-        <Badge variant="secondary">CleanHub Web Admin</Badge>
+        <Badge variant="secondary">{messages.saas.common.badge}</Badge>
         <h1 className="mt-4 text-2xl font-semibold">{title}</h1>
         {description ? (
           <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
@@ -34,7 +33,9 @@ export function PagePlaceholder({
               <Card className="rounded-lg py-0" key={item}>
                 <CardHeader className="px-4 py-4">
                   <CardTitle className="text-sm">{item}</CardTitle>
-                  <CardDescription>Module placeholder</CardDescription>
+                  <CardDescription>
+                    {messages.saas.common.modulePlaceholder}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="px-4 pb-4">
                   <div className="h-2 rounded bg-muted" />

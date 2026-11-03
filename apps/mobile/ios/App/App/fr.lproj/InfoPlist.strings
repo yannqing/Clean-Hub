@@ -1,0 +1,7 @@
+"NSCameraUsageDescription" = "CleanHub utilise l’appareil photo pour joindre une preuve à une tâche de livraison.";
+"NSPhotoLibraryUsageDescription" = "CleanHub vous permet de sélectionner une photo de preuve dans votre photothèque.";
+"NSPhotoLibraryAddUsageDescription" = "CleanHub demande votre autorisation si vous choisissez d’enregistrer une photo de preuve dans votre photothèque.";
+"NSBluetoothAlwaysUsageDescription" = "CleanHub utilise Bluetooth pour rechercher et connecter une imprimante portable de livraison.";
+"NSBluetoothPeripheralUsageDescription" = "CleanHub utilise Bluetooth pour imprimer les reçus et étiquettes de collecte ou de livraison.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "CleanHub utilise votre position uniquement pendant une action de livraison active.";
+"NSLocationWhenInUseUsageDescription" = "CleanHub utilise votre position uniquement pendant une action de livraison active.";

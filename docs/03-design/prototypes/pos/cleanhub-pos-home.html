@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CleanHub POS Workspace</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: "#2563EB",
+              brandDark: "#1D4ED8",
+              violetBrand: "#8B5CF6",
+              ink: "#0F172A",
+              page: "#F7F9FC"
+            },
+            boxShadow: {
+              panel: "0 1px 2px rgba(15, 23, 42, 0.04)",
+              focus: "0 0 0 4px rgba(37, 99, 235, 0.10)"
+            }
+          }
+        }
+      };
+    </script>
+    <style>
+      body {
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .brand-gradient {
+        background: linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #8b5cf6 100%);
+      }
+
+      .scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 transparent;
+      }
+
+      .scrollbar::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 999px;
+      }
+    </style>
+  </head>
+  <body class="bg-page text-ink">
+    <div id="root"></div>
+
+    <script>
+      const workspaceState = { filter: "all", toast: "" };
+      const workItems = [
+        { id: "customer-request", type: "attention", icon: "bell", tone: "red", label: "Urgent customer request", title: "Mamadou Sarr requested priority handling", meta: "Order OD-28E9 · App message · 8 minutes ago", detail: "Customer needs the suit ready before 17:00 today.", action: "Review request", href: "./cleanhub-pos-order-detail.html?order=OD-28E9&customer=Mamadou%20Sarr" },
+        { id: "pickup", type: "pickup", icon: "clipboard-list", tone: "violet", label: "Ready for pickup", title: "Mamadou Sarr · 2 garments", meta: "Ticket CH-91B4 · Due today · Balance XOF 12,500", detail: "Confirm payment before completing handover.", action: "Start pickup", href: "./cleanhub-pos-ticket-detail.html?ticket=CH-91B4&customer=Mamadou%20Sarr" },
+        { id: "payment", type: "payment", icon: "wallet-cards", tone: "amber", label: "Payment pending confirmation", title: "Wave payment needs review", meta: "Order OD-28E9 · XOF 12,500 · 10:24", detail: "Mobile payment was recorded and is awaiting an authorized confirmation.", action: "Review payment", href: "./cleanhub-pos-order-detail.html?order=OD-28E9&customer=Mamadou%20Sarr" },
+        { id: "overdue", type: "attention", icon: "clock", tone: "amber", label: "Overdue ticket", title: "Diop Family · Carpet cleaning", meta: "Ticket CH-7C20 · Due yesterday at 18:00", detail: "No completion update has been recorded since yesterday.", action: "Open ticket", href: "./cleanhub-pos-ticket-detail.html?ticket=CH-7C20&customer=Diop%20Family" },
+        { id: "pickup-2", type: "pickup", icon: "clipboard-list", tone: "blue", label: "Pickup due soon", title: "Aminata Diop · 3 garments", meta: "Ticket CH-8F2A · Due today at 18:00 · Paid", detail: "All items passed quality check and are ready at counter storage A-12.", action: "View ticket", href: "./cleanhub-pos-ticket-detail.html?ticket=CH-8F2A&customer=Aminata%20Diop" }
+      ];
+      const notifications = [
+        { id: "notice-urge", tone: "red", title: "Customer urged priority handling", meta: "Mamadou Sarr · Order OD-28E9 · 8 min", unread: true },
+        { id: "notice-summary", tone: "blue", title: "Today's pending work summary", meta: "18 pickups · 5 overdue · Sent at shift start", unread: true },
+        { id: "notice-delay", tone: "amber", title: "Pickup time changed by customer", meta: "Fatou Ndiaye · Delayed to Jun 20, 16:00", unread: true }
+      ];
+
+      function App() {
+        return React.createElement("div", {
+          dangerouslySetInnerHTML: { __html: pageHtml() }
+        });
+      }
+
+      function render() {
+        window.__cleanHubRoot.render(React.createElement(App));
+      }
+
+      function pageHtml() {
+        return `
+          <div class="flex h-screen overflow-hidden bg-page">
+            <aside class="flex w-[240px] shrink-0 flex-col border-r border-slate-200 bg-white">
+              <div class="border-b border-slate-100 px-5 py-5">
+                <div class="flex items-center gap-3">
+                  <img src="./assets/cleanhub-logo-mark.jpg" class="h-11 w-11 rounded-xl object-cover" alt="CleanHub mark" />
+                  <div>
+                    <div class="text-lg font-extrabold tracking-tight">
+                      <span class="text-slate-950">Clean</span><span class="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">Hub</span>
+                    </div>
+                    <div class="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">POS</div>
+                  </div>
+                </div>
+
+                <a href="./cleanhub-pos-new-intake.html" class="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand text-sm font-semibold text-white transition hover:bg-brandDark">
+                  ${icon("user-plus", "h-4 w-4")}
+                  New Intake
+                </a>
+              </div>
+
+              <nav class="scrollbar flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
+                <div class="space-y-6">
+                  ${navGroup("Operate", [
+                    ["layout-dashboard", "Workspace", true, "./cleanhub-pos-home.html"],
+                    ["user-plus", "New Intake", false, "./cleanhub-pos-new-intake.html"],
+                    ["search", "Find Customer", false, "./cleanhub-pos-customers.html"],
+                    ["scan-line", "Scan Label", false, "#scan"],
+                    ["wallet-cards", "Take Payment", false, "./cleanhub-pos-orders.html?payment=unpaid"]
+                  ])}
+                  ${navGroup("Records", [
+                    ["users", "Customers", false, "./cleanhub-pos-customers.html"],
+                    ["clipboard-list", "Tickets", false, "./cleanhub-pos-tickets.html"],
+                    ["receipt", "Orders", false, "./cleanhub-pos-orders.html"],
+                    ["chart", "Statistics", false, "./cleanhub-pos-statistics.html"],
+                    ["shirt", "Garments", false, "#"]
+                  ])}
+                  ${navGroup("Store", [
+                    ["replace", "Shift Handover", false, "#handover"],
+                    ["bell", "Notifications", false, "#store-notifications"],
+                    ["settings", "Settings", false, "#"]
+                  ])}
+                </div>
+              </nav>
+
+              <div class="border-t border-slate-100 p-4">
+                <div class="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
+                  <div class="brand-gradient flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold text-white">MC</div>
+                  <div class="min-w-0">
+                    <div class="truncate text-sm font-semibold text-slate-900">Maya C.</div>
+                    <div class="text-xs font-medium text-slate-500">Cashier</div>
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            <main class="flex min-w-0 flex-1 flex-col">
+              <header class="flex h-[68px] items-center gap-4 border-b border-slate-200 bg-white px-6">
+                <div class="flex h-11 w-full max-w-[620px] items-center rounded-lg border border-slate-200 bg-slate-50 px-3 transition focus-within:border-blue-300 focus-within:bg-white focus-within:shadow-focus">
+                  ${icon("search", "mr-2.5 h-4.5 w-4.5 text-slate-400")}
+                  <input id="workspace-search" onkeydown="if(event.key==='Enter') Workspace.search(this.value)" class="h-full flex-1 bg-transparent text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400" placeholder="Search phone, customer, ticket, order, label" />
+                  <button onclick="Workspace.scan()" class="ml-2 flex h-8 items-center gap-1.5 rounded-md bg-white px-2.5 text-xs font-semibold text-slate-500 shadow-sm">
+                    ${icon("scan-line", "h-3.5 w-3.5")}
+                    Scan
+                  </button>
+                </div>
+
+                <div class="ml-auto flex items-center gap-2">
+                  <div class="hidden items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 lg:flex">
+                    <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                    Synced
+                  </div>
+                  <button class="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    ${icon("languages", "h-4 w-4 text-slate-500")}
+                    EN
+                  </button>
+                  <button class="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    ${icon("lock", "h-4 w-4 text-slate-500")}
+                    Lock
+                  </button>
+                  <button onclick="document.getElementById('store-notifications')?.scrollIntoView({behavior:'smooth'})" class="relative flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50">
+                    ${icon("bell", "h-4.5 w-4.5")}
+                    <span class="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500"></span>
+                  </button>
+                </div>
+              </header>
+
+              <div class="scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5">
+                <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
+                  <div>
+                    <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+                      <span>POS</span>
+                      ${icon("chevron-right", "h-3.5 w-3.5")}
+                      <span class="text-slate-600">Workspace</span>
+                    </div>
+                    <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Good morning, Maya</h1>
+                    <p class="mt-1 text-sm text-slate-500">Plateau Central · Friday, June 19 · Focus on the next store action.</p>
+                  </div>
+                  <div class="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                    <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                    <div><div class="text-sm font-semibold text-emerald-800">Shift open</div><div class="text-xs text-emerald-700">Since 08:02 · Maya C.</div></div>
+                  </div>
+                </div>
+
+                <section class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  ${quickAction("user-plus", "New intake", "Start customer service", "./cleanhub-pos-new-intake.html", true)}
+                  ${quickAction("scan-line", "Scan label", "Find and update a ticket", "#", false, "Workspace.scan()")}
+                  ${quickAction("clipboard-list", "Pickup handover", "Open ready tickets", "./cleanhub-pos-tickets.html?status=ready")}
+                  ${quickAction("wallet-cards", "Take payment", "Find unpaid orders", "./cleanhub-pos-orders.html?payment=unpaid")}
+                </section>
+
+                <section class="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
+                  ${metric("Shift sales", "XOF 186,500", "26 paid orders")}
+                  ${metric("Ready for pickup", "18", "4 have balance due")}
+                  ${metric("Due today", "12", "5 due within 2 hours")}
+                  ${metric("Needs attention", "7", "2 urgent · 5 overdue")}
+                </section>
+
+                <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+                  <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5">
+                      <div>
+                        <h2 class="text-lg font-semibold tracking-tight text-slate-950">Priority work queue</h2>
+                        <p class="mt-1 text-sm text-slate-500">Customer requests, pickups, payment checks, and overdue work requiring action.</p>
+                      </div>
+                      <a href="./cleanhub-pos-tickets.html" class="text-sm font-semibold text-blue-700">View all tickets</a>
+                    </div>
+                    <div class="flex gap-2 border-b border-slate-200 bg-slate-50 px-5 py-3">
+                      ${queueFilter("all", "All", workItems.length)}
+                      ${queueFilter("attention", "Attention", workItems.filter(item => item.type === "attention").length)}
+                      ${queueFilter("pickup", "Pickup", workItems.filter(item => item.type === "pickup").length)}
+                      ${queueFilter("payment", "Payments", workItems.filter(item => item.type === "payment").length)}
+                    </div>
+                    <div>${filteredWorkItems().map(workItem).join("")}</div>
+                  </section>
+
+                  <aside class="space-y-5">
+                    <section id="store-notifications" class="rounded-xl border border-slate-200 bg-white p-5 shadow-panel">
+                      <div class="flex items-center justify-between">
+                        <div><h3 class="font-semibold text-slate-950">Store notifications</h3><p class="mt-1 text-xs text-slate-500">Customer and system messages</p></div>
+                        <span class="rounded-md bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">${unreadCount()} <span>unread</span></span>
+                      </div>
+                      <div class="mt-4 space-y-1">${notifications.map(notificationItem).join("")}</div>
+                      <button onclick="Workspace.markAllRead()" class="mt-4 h-9 w-full rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Mark all as read</button>
+                    </section>
+
+                    <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-panel">
+                      <div class="flex items-center justify-between"><h3 class="font-semibold text-slate-950">Current shift</h3><span class="text-xs font-semibold text-emerald-700">Open</span></div>
+                      <div class="mt-4 space-y-3 text-sm">
+                        ${shiftDetail("Cash sales", "XOF 96,000")}
+                        ${shiftDetail("Expected cash", "XOF 101,000")}
+                        ${shiftDetail("Cash movements", "+ XOF 5,000")}
+                        ${shiftDetail("Pending confirmations", "1 payment", true)}
+                      </div>
+                      <button onclick="Workspace.handover()" class="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50">${icon("replace", "h-4 w-4")} Shift handover</button>
+                    </section>
+
+                    <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-panel">
+                      <h3 class="font-semibold text-slate-950">Store systems</h3>
+                      <div class="mt-4 space-y-3">
+                        ${systemStatus("Cloud sync", "Up to date", "emerald")}
+                        ${systemStatus("Receipt printer", "Online", "emerald")}
+                        ${systemStatus("Label printer", "2 jobs waiting", "amber")}
+                        ${systemStatus("Cash drawer", "Connected", "emerald")}
+                      </div>
+                    </section>
+                  </aside>
+                </div>
+              </div>
+            </main>
+            ${workspaceState.toast ? toast() : ""}
+          </div>
+        `;
+      }
+
+      function navGroup(title, items) {
+        return `
+          <div>
+            <div class="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">${title}</div>
+            <div class="space-y-1">${items.map(([iconName, label, active, href]) => navItem(iconName, label, active, href)).join("")}</div>
+          </div>
+        `;
+      }
+
+      function navItem(iconName, label, active, href) {
+        const specialAction = href === "#scan" ? "event.preventDefault();Workspace.scan()" : href === "#handover" ? "event.preventDefault();Workspace.handover()" : "";
+        return `
+          <a href="${href || "#"}" ${specialAction ? `onclick="${specialAction}"` : ""} class="relative flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm transition ${active ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}">
+            ${active ? '<span class="absolute left-0 h-5 w-1 rounded-r-full bg-blue-600"></span>' : ""}
+            <span class="flex h-7 w-7 items-center justify-center rounded-md ${active ? "bg-white text-blue-700 shadow-sm" : "text-slate-400"}">
+              ${icon(iconName, "h-4 w-4")}
+            </span>
+            <span class="font-medium">${label}</span>
+          </a>
+        `;
+      }
+
+      function metric(label, value, note) {
+        return `
+          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-panel">
+            <div class="text-sm font-medium text-slate-500">${label}</div>
+            <div class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">${value}</div>
+            <div class="mt-2 text-xs font-medium text-blue-600">${note}</div>
+          </div>
+        `;
+      }
+
+      function quickAction(iconName, label, description, href, primary, onclick) {
+        const classes = primary
+          ? "border-blue-600 bg-blue-600 text-white hover:bg-blue-700"
+          : "border-slate-200 bg-white text-slate-800 hover:border-blue-200 hover:bg-blue-50/50";
+        const iconTone = primary ? "bg-white/15 text-white" : "bg-blue-50 text-blue-700";
+        const content = `<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconTone}">${icon(iconName, "h-5 w-5")}</span><span class="min-w-0 text-left"><span class="block text-sm font-semibold">${label}</span><span class="mt-0.5 block truncate text-xs ${primary ? "text-blue-100" : "text-slate-500"}">${description}</span></span>`;
+        return onclick
+          ? `<button onclick="${onclick}" class="flex min-h-[78px] items-center gap-3 rounded-xl border p-4 transition ${classes}">${content}</button>`
+          : `<a href="${href}" class="flex min-h-[78px] items-center gap-3 rounded-xl border p-4 transition ${classes}">${content}</a>`;
+      }
+
+      function queueFilter(value, label, count) {
+        const active = workspaceState.filter === value;
+        return `<button onclick="Workspace.setFilter('${value}')" class="rounded-lg px-3 py-2 text-xs font-semibold ${active ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:text-blue-700"}">${label} <span class="ml-1 ${active ? "text-blue-100" : "text-slate-400"}">${count}</span></button>`;
+      }
+
+      function filteredWorkItems() {
+        return workspaceState.filter === "all" ? workItems : workItems.filter(item => item.type === workspaceState.filter);
+      }
+
+      function toneClasses(tone) {
+        return {
+          red: "bg-red-50 text-red-700",
+          amber: "bg-amber-50 text-amber-700",
+          violet: "bg-violet-50 text-violet-700",
+          blue: "bg-blue-50 text-blue-700",
+          emerald: "bg-emerald-50 text-emerald-700"
+        }[tone] || "bg-slate-100 text-slate-600";
+      }
+
+      function workItem(item) {
+        return `<article class="flex flex-col gap-4 border-b border-slate-100 p-5 last:border-b-0 lg:flex-row lg:items-center"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${toneClasses(item.tone)}">${icon(item.icon, "h-5 w-5")}</span><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><span class="rounded-md px-2 py-1 text-[11px] font-semibold ${toneClasses(item.tone)}">${item.label}</span><span class="text-xs text-slate-400">${item.meta}</span></div><h3 class="mt-2 text-sm font-semibold text-slate-950">${item.title}</h3><p class="mt-1 text-xs leading-5 text-slate-500">${item.detail}</p></div><a href="${item.href}" class="flex h-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">${item.action}</a></article>`;
+      }
+
+      function notificationItem(item) {
+        return `<button onclick="Workspace.readNotice('${item.id}')" class="flex w-full gap-3 rounded-lg p-3 text-left hover:bg-slate-50"><span class="mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${item.unread ? item.tone === "red" ? "bg-red-500" : item.tone === "amber" ? "bg-amber-500" : "bg-blue-500" : "bg-slate-200"}"></span><span class="min-w-0"><span class="block text-sm font-semibold ${item.unread ? "text-slate-900" : "text-slate-500"}">${item.title}</span><span class="mt-1 block text-xs leading-5 text-slate-500">${item.meta}</span></span></button>`;
+      }
+
+      function unreadCount() {
+        return notifications.filter(item => item.unread).length;
+      }
+
+      function shiftDetail(label, value, warning) {
+        return `<div class="flex items-center justify-between"><span class="text-slate-500">${label}</span><span class="font-semibold ${warning ? "text-amber-700" : "text-slate-800"}">${value}</span></div>`;
+      }
+
+      function systemStatus(label, value, tone) {
+        return `<div class="flex items-center justify-between text-sm"><span class="text-slate-600">${label}</span><span class="flex items-center gap-2 text-xs font-semibold ${tone === "amber" ? "text-amber-700" : "text-emerald-700"}"><span class="h-2 w-2 rounded-full ${tone === "amber" ? "bg-amber-500" : "bg-emerald-500"}"></span>${value}</span></div>`;
+      }
+
+      function toast() {
+        return `<div class="fixed bottom-5 right-5 z-50 flex max-w-sm items-start gap-3 rounded-xl border border-blue-200 bg-white p-4 shadow-xl"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700">${icon("scan-line", "h-4 w-4")}</span><div><div class="text-sm font-semibold text-slate-900">${workspaceState.toast}</div><div class="mt-1 text-xs text-slate-500">The workspace is ready for the next action.</div></div></div>`;
+      }
+
+      function icon(name, classes) {
+        const icons = {
+          "bell": '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+          "chart": '<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="5" rx="1"/><rect x="12" y="8" width="3" height="9" rx="1"/><rect x="17" y="5" width="3" height="12" rx="1"/>',
+          "chevron-right": '<path d="m9 18 6-6-6-6"/>',
+          "clock": '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+          "clipboard-list": '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M8 11h8"/><path d="M8 16h5"/>',
+          "languages": '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
+          "layout-dashboard": '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+          "lock": '<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+          "receipt": '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2Z"/><path d="M8 7h8"/><path d="M8 12h8"/><path d="M8 17h5"/>',
+          "replace": '<path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M10 20H4v-6"/><path d="M4 20l10-10"/>',
+          "scan-line": '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>',
+          "search": '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>',
+          "settings": '<path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8.9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.17.52.66 1 1.51 1H21a2 2 0 1 1 0 4h-.09c-.85 0-1.34.48-1.51 1Z"/>',
+          "shirt": '<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.23 2.18l.62 3.1a2 2 0 0 0 2.74 1.42L6 10v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10l.25.16a2 2 0 0 0 2.74-1.42l.62-3.1a2 2 0 0 0-1.23-2.18Z"/>',
+          "user-plus": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/>',
+          "users": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+          "wallet-cards": '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h2"/>'
+        };
+
+        return `<svg class="${classes}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || '<circle cx="12" cy="12" r="9"/>'}</svg>`;
+      }
+
+      window.__cleanHubRoot = ReactDOM.createRoot(document.getElementById("root"));
+      window.Workspace = {
+        setFilter(filter) {
+          workspaceState.filter = filter;
+          render();
+        },
+        scan() {
+          workspaceState.toast = "Scanner is ready. Scan an order or garment label.";
+          render();
+          setTimeout(() => { workspaceState.toast = ""; render(); }, 2600);
+        },
+        search(value) {
+          const query = String(value || "").trim();
+          if (!query) {
+            document.getElementById("workspace-search")?.focus();
+            return;
+          }
+          if (/^OD-/i.test(query)) {
+            window.location.href = `./cleanhub-pos-order-detail.html?order=${encodeURIComponent(query.toUpperCase())}`;
+            return;
+          }
+          if (/^CH-/i.test(query)) {
+            window.location.href = `./cleanhub-pos-ticket-detail.html?ticket=${encodeURIComponent(query.toUpperCase())}`;
+            return;
+          }
+          window.location.href = `./cleanhub-pos-customers.html?query=${encodeURIComponent(query)}`;
+        },
+        readNotice(id) {
+          const notice = notifications.find(item => item.id === id);
+          if (notice) notice.unread = false;
+          render();
+        },
+        markAllRead() {
+          notifications.forEach(item => { item.unread = false; });
+          workspaceState.toast = "All store notifications marked as read.";
+          render();
+          setTimeout(() => { workspaceState.toast = ""; render(); }, 2200);
+        },
+        handover() {
+          workspaceState.toast = "Shift handover summary is ready for cash confirmation.";
+          render();
+          setTimeout(() => { workspaceState.toast = ""; render(); }, 2600);
+        }
+      };
+      render();
+    </script>
+    <script src="./assets/zh-cn.js"></script>
+  </body>
+</html>

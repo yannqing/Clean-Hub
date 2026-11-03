@@ -1,0 +1,5 @@
+ALTER TABLE "pos_offline_sale_exceptions" ALTER COLUMN "shift_id" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "pos_offline_sale_exceptions" ADD COLUMN "register_session_id" varchar(26);--> statement-breakpoint
+ALTER TABLE "pos_offline_sale_exceptions" ADD COLUMN "cash_drawer_session_id" varchar(26);--> statement-breakpoint
+ALTER TABLE "pos_offline_sale_exceptions" ADD CONSTRAINT "pos_offline_sale_exceptions_register_session_id_pos_register_sessions_id_fk" FOREIGN KEY ("register_session_id") REFERENCES "public"."pos_register_sessions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "pos_offline_sale_exceptions" ADD CONSTRAINT "pos_offline_sale_exceptions_cash_drawer_session_id_pos_cash_drawer_sessions_id_fk" FOREIGN KEY ("cash_drawer_session_id") REFERENCES "public"."pos_cash_drawer_sessions"("id") ON DELETE no action ON UPDATE no action;

@@ -1,0 +1,134 @@
+/**
+ * 客户管理 — UI constants (labels, status maps, defaults).
+ */
+import type {
+  CustomerStatusFilter,
+  CustomerFilterState,
+  ProfileFormValues,
+  ResultTypeFilter,
+} from "./types";
+
+export const CUSTOMERS_PAGE_TITLE = "客户管理";
+export const CUSTOMERS_PAGE_DESCRIPTION =
+  "一次查询同时匹配客户账户和客户档案，店员无需提前判断手机号属于哪种数据。";
+
+export const CUSTOMER_DEFAULT_FILTERS: CustomerFilterState = {
+  query: "",
+  resultType: "all",
+  status: "all",
+  page: 1,
+  pageSize: 10,
+};
+
+export const CUSTOMER_RESULT_TYPE_OPTIONS: {
+  value: ResultTypeFilter;
+  label: string;
+}[] = [
+  { value: "all", label: "全部结果类型" },
+  { value: "account", label: "仅客户账户" },
+  { value: "profile", label: "仅客户档案" },
+];
+
+export const CUSTOMER_STATUS_OPTIONS: {
+  value: CustomerStatusFilter;
+  label: string;
+}[] = [
+  { value: "all", label: "全部状态" },
+  { value: "active", label: "正常" },
+  { value: "disabled", label: "停用" },
+];
+
+export const CUSTOMER_COLUMN_KEYS = [
+  "customer",
+  "contact",
+  "account",
+  "status",
+  "createdAt",
+  "actions",
+] as const;
+
+export type CustomerColumnKey = (typeof CUSTOMER_COLUMN_KEYS)[number];
+
+/** Status -> badge classes. The wording lives in `lib/customer-labels.ts`. */
+export const CUSTOMER_STATUS_META = {
+  active: {
+    badgeClassName: "bg-emerald-50 text-emerald-700",
+    dotClassName: "bg-emerald-500",
+  },
+  disabled: {
+    badgeClassName: "bg-muted text-muted-foreground",
+    dotClassName: "bg-muted-foreground",
+  },
+} as const;
+
+export const CUSTOMER_LIST_VIEW_TITLE = "客户管理";
+export const CUSTOMER_LIST_VIEW_SUBTITLE =
+  "一次查询同时匹配客户账户和客户档案，店员无需提前判断手机号属于哪种数据。";
+
+export const CUSTOMER_PROFILE_RELATIONSHIPS = ["本人", "家庭成员", "企业员工"];
+
+export const EMPTY_ACCOUNT_FORM = {
+  accountName: "",
+  phone: "",
+  email: "",
+};
+
+export const EMPTY_PROFILE_FORM: ProfileFormValues = {
+  customerAccountId: "",
+  fullName: "",
+  phone: "",
+  email: "",
+  relationship: "本人",
+  address: "",
+  notes: "",
+};
+
+/** Placeholder for stats the milestone doc defers (tier/balance/orders). */
+export const CUSTOMER_STAT_PLACEHOLDER = "—";
+
+// ---- 服务工单 tone maps (local) --------------------------------------------
+// Only the colouring is local now. The wording comes from
+// `@/lib/ticket-labels`, which customers, tickets and orders all share -- the
+// copies here had already drifted from the ticket screens.
+
+export const CUSTOMER_TICKET_STATUS_TONES: Record<string, string> = {
+  draft: "bg-muted text-muted-foreground",
+  pending: "bg-accent text-accent-foreground",
+  in_progress: "bg-accent text-accent-foreground",
+  ready_to_pick: "bg-secondary text-secondary-foreground",
+  picked_up: "bg-emerald-50 text-emerald-700",
+  cancelled: "bg-red-50 text-red-700",
+  exception: "bg-amber-50 text-amber-700",
+};
+
+// ---- 订单 label maps (local) -----------------------------------------------
+
+
+export const CUSTOMER_ORDER_STATUS_TONES: Record<string, string> = {
+  draft: "bg-muted text-muted-foreground",
+  received: "bg-accent text-accent-foreground",
+  paid: "bg-emerald-50 text-emerald-700",
+  delivered: "bg-secondary text-secondary-foreground",
+  cancelled: "bg-red-50 text-red-700",
+};
+
+
+export const CUSTOMER_ORDER_PAYMENT_TONES: Record<string, string> = {
+  unpaid: "bg-red-50 text-red-700",
+  paid: "bg-emerald-50 text-emerald-700",
+  partial: "bg-amber-50 text-amber-700",
+  refunded: "bg-muted text-muted-foreground",
+};
+
+
+// ---- 工单项目（服务项目）label maps (local) ---------------------------------
+// Powers the 服务项目 tab on the customer detail view.
+
+export const CUSTOMER_TICKET_ITEM_STATUS_TONES: Record<string, string> = {
+  pending_wash: "bg-muted text-muted-foreground",
+  washing: "bg-accent text-accent-foreground",
+  done: "bg-emerald-50 text-emerald-700",
+  ready_to_pick: "bg-secondary text-secondary-foreground",
+  exception: "bg-red-50 text-red-700",
+};
+

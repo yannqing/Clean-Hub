@@ -5,13 +5,22 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
-import { webAdminApi } from "@/lib/api-client";
+
+import { logoutAction } from "../actions/logout.action";
 
 type LogoutButtonProps = {
   className?: string;
+  leadingIcon?: React.ReactNode;
+  signOutLabel?: string;
+  signingOutLabel?: string;
 };
 
-export function LogoutButton({ className }: LogoutButtonProps) {
+export function LogoutButton({
+  className,
+  leadingIcon,
+  signOutLabel = "Sign out",
+  signingOutLabel = "Signing out...",
+}: LogoutButtonProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
@@ -19,13 +28,19 @@ export function LogoutButton({ className }: LogoutButtonProps) {
     setSubmitting(true);
 
     try {
-      await webAdminApi.auth.logout();
-      toast.success("Signed out.");
+      const result = await logoutAction();
+
+      if (result.ok) {
+        toast.success("Signed out.");
+      } else {
+        toast.error(result.message);
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to sign out cleanly.";
       toast.error(message);
     } finally {
+      // Always return to the login page, even if the server logout failed.
       router.replace(webAdminRoutes.login);
       router.refresh();
       setSubmitting(false);
@@ -41,7 +56,8 @@ export function LogoutButton({ className }: LogoutButtonProps) {
       type="button"
       variant="ghost"
     >
-      {submitting ? "Signing out..." : "Sign out"}
+      {leadingIcon}
+      {submitting ? signingOutLabel : signOutLabel}
     </Button>
   );
 }

@@ -1,0 +1,466 @@
+"use client";
+
+import type {
+  PosCatalogProduct,
+  PosOrderDetail,
+  PosProductReturnsOverview,
+  PosReturnDisposition,
+  PosReturnItemCondition,
+} from "@cleanhub/api-client";
+import { createId } from "@cleanhub/id";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Textarea,
+} from "@cleanhub/ui";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
+
+import { posRoutes } from "@/config";
+import { getPosApiErrorMessage } from "@/lib/api-error-message";
+import { posApi } from "@/lib/api-client";
+import { posToast as toast } from "@/lib/pos-toast";
+
+import { formatOrderMoney } from "../constants";
+
+type SelectedReturnItem = {
+  quantity: string;
+  condition: PosReturnItemCondition;
+  disposition: PosReturnDisposition;
+};
+
+export function ProductReturnDialog({
+  order,
+  products,
+}: {
+  order: PosOrderDetail;
+  products: PosCatalogProduct[];
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [overview, setOverview] = useState<PosProductReturnsOverview | null>(
+    null,
+  );
+  const [selected, setSelected] = useState<Record<string, SelectedReturnItem>>(
+    {},
+  );
+  const [reason, setReason] = useState("");
+  const [notes, setNotes] = useState("");
+  const [exchangeSkuId, setExchangeSkuId] = useState("");
+  const [exchangeQuantity, setExchangeQuantity] = useState("1");
+  const [exchangeItems, setExchangeItems] = useState<
+    Array<{ productSkuId: string; quantity: string; name: string }>
+  >([]);
+  const [loading, setLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  const selectedItems = useMemo(
+    () =>
+      (overview?.returnableItems ?? [])
+        .map((item) => ({ item, selection: selected[item.orderItemId] }))
+        .filter(
+          (entry): entry is typeof entry & { selection: SelectedReturnItem } =>
+            Boolean(entry.selection && Number(entry.selection.quantity) > 0),
+        ),
+    [overview, selected],
+  );
+  const estimatedRefund = useMemo(() => {
+    const gross = selectedItems.reduce(
+      (sum, { item, selection }) =>
+        sum +
+        (Number(item.lineAmount) * Number(selection.quantity)) /
+          Number(item.purchasedQuantity),
+      0,
+    );
+    return Math.min(
+      Number(order.paidAmount),
+      Number(order.subtotalAmount) > 0
+        ? (Number(order.totalAmount) * gross) / Number(order.subtotalAmount)
+        : 0,
+    );
+  }, [order, selectedItems]);
+  const estimatedExchangeAmount = useMemo(
+    () =>
+      exchangeItems.reduce((sum, item) => {
+        const product = products.find(
+          (entry) => entry.productSkuId === item.productSkuId,
+        );
+        return sum + Number(product?.amount ?? 0) * Number(item.quantity);
+      }, 0),
+    [exchangeItems, products],
+  );
+  const estimatedCashOut = Math.max(
+    0,
+    estimatedRefund - estimatedExchangeAmount,
+  );
+  const estimatedAdditionalDue = Math.max(
+    0,
+    estimatedExchangeAmount - estimatedRefund,
+  );
+
+  function load() {
+    setLoading(true);
+    void posApi.pos.orders
+      .listProductReturns(order.id)
+      .then(setOverview)
+      .catch((error) => toast.error(getPosApiErrorMessage(error)))
+      .finally(() => setLoading(false));
+  }
+
+  function updateSelection(
+    orderItemId: string,
+    patch: Partial<SelectedReturnItem>,
+  ) {
+    setSelected((current) => {
+      const existing = current[orderItemId];
+      const returnable = overview?.returnableItems.find(
+        (item) => item.orderItemId === orderItemId,
+      );
+      return {
+        ...current,
+        [orderItemId]: existing
+          ? { ...existing, ...patch }
+          : {
+              quantity: "0",
+              condition: "good",
+              disposition: returnable?.trackInventory ? "restock" : "discarded",
+              ...patch,
+            },
+      };
+    });
+  }
+
+  function addExchangeItem() {
+    const product = products.find(
+      (entry) => entry.productSkuId === exchangeSkuId,
+    );
+    if (!product || Number(exchangeQuantity) <= 0) return;
+    setExchangeItems((current) => [
+      ...current.filter((item) => item.productSkuId !== product.productSkuId),
+      {
+        productSkuId: product.productSkuId,
+        quantity: Number(exchangeQuantity)
+          .toFixed(3)
+          .replace(/\.?0+$/, ""),
+        name: product.variantName
+          ? `${product.name} · ${product.variantName}`
+          : product.name,
+      },
+    ]);
+    setExchangeSkuId("");
+    setExchangeQuantity("1");
+  }
+
+  function submit() {
+    if (selectedItems.length === 0) {
+      toast.error("请至少选择一件要退回的商品。");
+      return;
+    }
+    if (reason.trim().length < 3) {
+      toast.error("请填写至少 3 个字符的退换货原因。");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        const result = await posApi.pos.orders.createProductReturn(order.id, {
+          idempotencyKey: createId(),
+          reason: reason.trim(),
+          notes: notes.trim() || undefined,
+          items: selectedItems.map(({ item, selection }) => ({
+            orderItemId: item.orderItemId,
+            quantity: selection.quantity,
+            condition: selection.condition,
+            disposition: selection.disposition,
+          })),
+          exchangeItems:
+            exchangeItems.length > 0
+              ? exchangeItems.map(({ productSkuId, quantity }) => ({
+                  productSkuId,
+                  quantity,
+                }))
+              : undefined,
+        });
+        if (result.salesReturn.status === "received") {
+          toast.warning(
+            "退货已入库，非现金退款仍待渠道确认，请在原订单完成退款核销。",
+          );
+        } else {
+          toast.success(
+            result.exchangeOrder
+              ? "退货与换货抵扣已完成。"
+              : "商品退货与退款已完成。",
+          );
+        }
+        setOpen(false);
+        if (result.exchangeOrder) {
+          router.push(posRoutes.orderDetail(result.exchangeOrder.id));
+        } else {
+          router.refresh();
+        }
+      } catch (error) {
+        toast.error(getPosApiErrorMessage(error));
+      }
+    });
+  }
+
+  return (
+    <>
+      <Button
+        className="h-11"
+        onClick={() => {
+          setOpen(true);
+          load();
+        }}
+        type="button"
+        variant="outline"
+      >
+        商品退换货
+      </Button>
+      <Dialog onOpenChange={setOpen} open={open}>
+        <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>按商品退货 / 换货</DialogTitle>
+            <DialogDescription>
+              数量按原订单校验；只有选择“回库”的库存商品会增加在手库存。换货会生成关联订单并自动转入退货额度。
+            </DialogDescription>
+          </DialogHeader>
+          {loading || !overview ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              正在读取可退数量…
+            </p>
+          ) : (
+            <div className="space-y-5">
+              <div className="space-y-2">
+                {overview.returnableItems.map((item) => {
+                  const selection = selected[item.orderItemId] ?? {
+                    quantity: "0",
+                    condition: "good" as const,
+                    disposition: item.trackInventory
+                      ? ("restock" as const)
+                      : ("discarded" as const),
+                  };
+                  return (
+                    <div
+                      className="grid gap-3 rounded-md border p-3 sm:grid-cols-[1fr_105px_125px_125px]"
+                      key={item.orderItemId}
+                    >
+                      <div>
+                        <p className="text-sm font-semibold">{item.itemName}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          可退 {item.returnableQuantity} / 已购{" "}
+                          {item.purchasedQuantity}
+                        </p>
+                      </div>
+                      <Input
+                        max={Number(item.returnableQuantity)}
+                        min={0}
+                        onChange={(event) =>
+                          updateSelection(item.orderItemId, {
+                            quantity: event.target.value,
+                          })
+                        }
+                        step="0.001"
+                        type="number"
+                        value={selection.quantity}
+                      />
+                      <Select
+                        onValueChange={(condition) =>
+                          updateSelection(item.orderItemId, {
+                            condition: condition as PosReturnItemCondition,
+                          })
+                        }
+                        value={selection.condition}
+                      >
+                        <SelectTrigger className="h-10 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unopened">未开封</SelectItem>
+                          <SelectItem value="good">完好</SelectItem>
+                          <SelectItem value="damaged">损坏</SelectItem>
+                          <SelectItem value="defective">质量问题</SelectItem>
+                          <SelectItem value="unknown">未知</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        onValueChange={(disposition) =>
+                          updateSelection(item.orderItemId, {
+                            disposition: disposition as PosReturnDisposition,
+                          })
+                        }
+                        value={selection.disposition}
+                      >
+                        <SelectTrigger className="h-10 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {item.trackInventory ? (
+                            <SelectItem value="restock">回库</SelectItem>
+                          ) : null}
+                          <SelectItem value="damaged">损坏区</SelectItem>
+                          <SelectItem value="discarded">报废</SelectItem>
+                          <SelectItem value="exchange">换货留存</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <section className="space-y-3 rounded-md border p-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">换购商品（可选）</h3>
+                  <span className="text-xs text-muted-foreground">
+                    退货额度{" "}
+                    {formatOrderMoney(
+                      estimatedRefund.toFixed(2),
+                      order.currency,
+                    )}
+                  </span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[1fr_100px_auto]">
+                  <Select
+                    onValueChange={setExchangeSkuId}
+                    value={exchangeSkuId}
+                  >
+                    <SelectTrigger className="h-10 w-full">
+                      <SelectValue placeholder="选择替换商品" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {products.map((product) => (
+                        <SelectItem
+                          key={product.productSkuId}
+                          value={product.productSkuId}
+                        >
+                          {product.name} {product.variantName ?? ""} ·{" "}
+                          {product.amount}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    min={0.001}
+                    onChange={(event) =>
+                      setExchangeQuantity(event.target.value)
+                    }
+                    step="0.001"
+                    type="number"
+                    value={exchangeQuantity}
+                  />
+                  <Button
+                    disabled={!exchangeSkuId}
+                    onClick={addExchangeItem}
+                    type="button"
+                    variant="outline"
+                  >
+                    添加
+                  </Button>
+                </div>
+                {exchangeItems.map((item) => (
+                  <div
+                    className="flex justify-between text-xs"
+                    key={item.productSkuId}
+                  >
+                    <span>
+                      {item.name} × {item.quantity}
+                    </span>
+                    <Button
+                      className="h-auto px-0 text-destructive hover:text-destructive"
+                      onClick={() =>
+                        setExchangeItems((current) =>
+                          current.filter(
+                            (entry) => entry.productSkuId !== item.productSkuId,
+                          ),
+                        )
+                      }
+                      size="sm"
+                      type="button"
+                      variant="link"
+                    >
+                      移除
+                    </Button>
+                  </div>
+                ))}
+                <div className="grid gap-1 rounded-md bg-muted/50 p-3 text-xs text-muted-foreground sm:grid-cols-2">
+                  <span>
+                    预计原路退款：
+                    {formatOrderMoney(
+                      estimatedCashOut.toFixed(2),
+                      order.currency,
+                    )}
+                  </span>
+                  <span>
+                    预计换货补款：
+                    {formatOrderMoney(
+                      estimatedAdditionalDue.toFixed(2),
+                      order.currency,
+                    )}
+                  </span>
+                  <span className="sm:col-span-2">
+                    最终金额以服务端重新计价为准；换货抵扣后只退差额，不会重复退款。
+                  </span>
+                </div>
+              </section>
+
+              <label className="block text-xs font-semibold text-muted-foreground">
+                退换货原因
+                <Input
+                  className="mt-1.5"
+                  maxLength={500}
+                  onChange={(event) => setReason(event.target.value)}
+                  value={reason}
+                />
+              </label>
+              <label className="block text-xs font-semibold text-muted-foreground">
+                备注（可选）
+                <Textarea
+                  className="mt-1.5"
+                  maxLength={2000}
+                  onChange={(event) => setNotes(event.target.value)}
+                  value={notes}
+                />
+              </label>
+              {overview.data.length > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  该订单已有 {overview.data.length}{" "}
+                  笔退换货记录（含待渠道退款）。
+                </p>
+              ) : null}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              onClick={() => setOpen(false)}
+              type="button"
+              variant="outline"
+            >
+              取消
+            </Button>
+            <Button
+              disabled={isPending || loading}
+              onClick={submit}
+              type="button"
+            >
+              {isPending
+                ? "处理中…"
+                : exchangeItems.length
+                  ? "确认换货"
+                  : "确认退货"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

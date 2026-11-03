@@ -1,11 +1,7 @@
-import { PagePlaceholder } from "@/components/app-shell";
+import { redirect } from "next/navigation";
 
-export default function PricesPage() {
-  return (
-    <PagePlaceholder
-      description="Manage price books, branch-specific pricing, and service pricing rules."
-      items={["Price books", "Branch overrides", "Tax rules", "Effective dates"]}
-      title="Prices"
-    />
-  );
+import { webAdminRoutes } from "@/config/routes";
+
+export default function TenantPricesPage() {
+  redirect(webAdminRoutes.tenant.services);
 }

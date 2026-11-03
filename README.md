@@ -33,7 +33,7 @@ pnpm install
 
 ## Local Quick Start
 
-For a normal local `web-admin + api + PostgreSQL` development session, use this sequence:
+For a normal local `web-admin + api + PostgreSQL + MinIO` development session, use this sequence:
 
 ```bash
 cp .env.example .env
@@ -85,7 +85,7 @@ pnpm --filter @cleanhub/web-admin add @cleanhub/ui@workspace:*
 
 ## Database
 
-CleanHub uses Drizzle ORM with PostgreSQL. Local development can use the root Docker Compose file.
+CleanHub uses Drizzle ORM with PostgreSQL. Local development can use the root Docker Compose file. The same local stack also starts MinIO for S3-compatible media object storage.
 
 All business entity IDs use ULID strings. Database ID columns are stored as `varchar(26)`, not auto-increment integers and not PostgreSQL `uuid`. Generate IDs through `@cleanhub/id`.
 
@@ -95,11 +95,21 @@ Copy the example environment file first:
 cp .env.example .env
 ```
 
-Start the local PostgreSQL container:
+Start the local PostgreSQL and MinIO containers:
 
 ```bash
 pnpm db:up
 ```
+
+MinIO is available at:
+
+```text
+S3 endpoint: http://localhost:9000
+Console:     http://localhost:9001
+Bucket:      cleanhub-media
+```
+
+The default local MinIO credentials are defined in `.env.example`. Production deployments should use a private bucket, strong dedicated access keys, and the same `OBJECT_STORAGE_*` environment variables.
 
 Check container status or logs:
 
@@ -128,7 +138,7 @@ pnpm db:studio
 
 For early local prototyping only, `pnpm db:push` can push schema changes directly to the local database without creating migration files. Do not use `db:push` as the normal team workflow once migrations are being reviewed.
 
-Stop the local PostgreSQL container:
+Stop the local PostgreSQL and MinIO containers:
 
 ```bash
 pnpm db:down
@@ -170,6 +180,52 @@ URL:
 http://localhost:3001
 ```
 
+POS Web uses dual-token (access + refresh) authentication shared with Web Admin.
+Each installation is enrolled to one tenant and branch at runtime; there is no
+build-time tenant code. On first use, an owner or manager verifies their account,
+selects an accessible branch, and names the terminal. The administrator session
+is then cleared while the HttpOnly terminal credential remains, allowing staff
+to sign in with a PIN.
+
+Seed cashier accounts (requires `pnpm db:up` + `pnpm db:migrate` first):
+
+```bash
+pnpm db:seed
+```
+
+Sign-in credentials:
+
+```text
+Setup:    tenant.admin1@cleanhub.local / 123456
+Email:    pos.cashier1@cleanhub.local   (also cashier2 / cashier3 / cashier4)
+Password: 123456
+PIN:      cashier1=111111, cashier2=222222, cashier3=333333, cashier4=444444
+```
+
+Select the POS development profile before starting the servers. For local
+browser development, run:
+
+```bash
+pnpm pos:config:local
+```
+
+For Android/iPad development over the local network, run:
+
+```bash
+pnpm pos:config:lan
+```
+
+LAN mode detects the current private IPv4 address and updates the POS Web API
+URL, Next.js development origin, API CORS origin, and Capacitor server URL as
+one profile. Override the detected interface when necessary:
+
+```bash
+pnpm pos:config:lan -- --host 192.168.2.106
+```
+
+Run `pnpm pos:config` to inspect the active profile. Restart the API and POS
+Web after switching; LAN mode also requires another Capacitor sync/install.
+
 ### API
 
 ```bash
@@ -192,11 +248,33 @@ The desktop app is currently an Electron shell placeholder. Full Electron launch
 
 ### Mobile
 
+Start the mobile web dev server:
+
+```bash
+pnpm --filter @cleanhub/mobile-web dev
+```
+
+Open the native Android project:
+
 ```bash
 pnpm --filter @cleanhub/mobile dev
 ```
 
-The mobile app is currently a Capacitor shell placeholder. Android/iOS native platforms still need to be added before real mobile development.
+This command runs `cap open android`, so Android Studio must be installed and discoverable. If Capacitor cannot find it on Windows, set `CAPACITOR_ANDROID_STUDIO_PATH` to your `studio64.exe`, for example:
+
+```powershell
+$env:CAPACITOR_ANDROID_STUDIO_PATH = "C:\Program Files\Android\Android Studio\bin\studio64.exe"
+pnpm --filter @cleanhub/mobile dev
+```
+
+For a permanent user-level setting:
+
+```powershell
+[Environment]::SetEnvironmentVariable("CAPACITOR_ANDROID_STUDIO_PATH", "C:\Program Files\Android\Android Studio\bin\studio64.exe", "User")
+```
+
+The mobile app is a Capacitor shell that loads the `@cleanhub/mobile-web` Next.js app during development.
+Delivery proof photos and customer signatures use object storage: mobile-web requests a short-lived upload ticket from the API, uploads media directly to MinIO/S3, then submits the returned object key to the delivery API.
 
 ## Build
 

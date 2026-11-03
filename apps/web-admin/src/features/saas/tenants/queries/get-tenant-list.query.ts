@@ -1,5 +1,11 @@
-import type { TenantSummary } from "../types";
+import type { QueryParams } from "@cleanhub/api-client";
 
-export async function getTenantListQuery(): Promise<TenantSummary[]> {
-  return [];
+import { webAdminApi } from "@/lib/api-client";
+
+import type { TenantListResponse } from "../types";
+
+export async function getTenantListQuery(
+  query?: QueryParams,
+): Promise<TenantListResponse> {
+  return webAdminApi.saas.tenants.list(query);
 }

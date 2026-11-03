@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CleanHub POS Customers</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: "#2563EB",
+              brandDark: "#1D4ED8",
+              violetBrand: "#8B5CF6",
+              ink: "#0F172A",
+              page: "#F7F9FC"
+            },
+            boxShadow: {
+              panel: "0 1px 2px rgba(15, 23, 42, 0.04)",
+              focus: "0 0 0 4px rgba(37, 99, 235, 0.10)"
+            }
+          }
+        }
+      };
+    </script>
+    <style>
+      body {
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .brand-gradient {
+        background: linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #8b5cf6 100%);
+      }
+
+      .scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 transparent;
+      }
+
+      .scrollbar::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 999px;
+      }
+    </style>
+  </head>
+  <body class="bg-page text-ink">
+    <div id="root"></div>
+
+    <script>
+      function App() {
+        return React.createElement("div", {
+          dangerouslySetInnerHTML: { __html: pageHtml() }
+        });
+      }
+
+      function pageHtml() {
+        return `
+          <div class="flex h-screen overflow-hidden bg-page">
+            <aside class="flex w-[240px] shrink-0 flex-col border-r border-slate-200 bg-white">
+              <div class="border-b border-slate-100 px-5 py-5">
+                <div class="flex items-center gap-3">
+                  <img src="./assets/cleanhub-logo-mark.jpg" class="h-11 w-11 rounded-xl object-cover" alt="CleanHub mark" />
+                  <div>
+                    <div class="text-lg font-extrabold tracking-tight">
+                      <span class="text-slate-950">Clean</span><span class="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">Hub</span>
+                    </div>
+                    <div class="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">POS</div>
+                  </div>
+                </div>
+
+                <a href="./cleanhub-pos-new-intake.html" class="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand text-sm font-semibold text-white transition hover:bg-brandDark">
+                  ${icon("user-plus", "h-4 w-4")}
+                  New Intake
+                </a>
+              </div>
+
+              <nav class="scrollbar flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
+                <div class="space-y-6">
+                  ${navGroup("Operate", [
+                    ["layout-dashboard", "Workspace", false, "./cleanhub-pos-home.html"],
+                    ["user-plus", "New Intake", false, "./cleanhub-pos-new-intake.html"],
+                    ["search", "Find Customer", false, "./cleanhub-pos-customers.html"],
+                    ["scan-line", "Scan Label", false, "#"],
+                    ["wallet-cards", "Take Payment", false, "#"]
+                  ])}
+                  ${navGroup("Records", [
+                    ["users", "Customers", true, "./cleanhub-pos-customers.html"],
+                    ["clipboard-list", "Tickets", false, "./cleanhub-pos-tickets.html"],
+                    ["receipt", "Orders", false, "./cleanhub-pos-orders.html"],
+                    ["chart", "Statistics", false, "./cleanhub-pos-statistics.html"],
+                    ["shirt", "Garments", false, "#"]
+                  ])}
+                  ${navGroup("Store", [
+                    ["replace", "Shift Handover", false, "#"],
+                    ["bell", "Notifications", false, "#"],
+                    ["settings", "Settings", false, "#"]
+                  ])}
+                </div>
+              </nav>
+
+              <div class="border-t border-slate-100 p-4">
+                <div class="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
+                  <div class="brand-gradient flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold text-white">MC</div>
+                  <div class="min-w-0">
+                    <div class="truncate text-sm font-semibold text-slate-900">Maya C.</div>
+                    <div class="text-xs font-medium text-slate-500">Cashier</div>
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            <main class="flex min-w-0 flex-1 flex-col">
+              <header class="flex h-[68px] items-center gap-4 border-b border-slate-200 bg-white px-6">
+                <div class="flex h-11 w-full max-w-[620px] items-center rounded-lg border border-slate-200 bg-slate-50 px-3 transition focus-within:border-blue-300 focus-within:bg-white focus-within:shadow-focus">
+                  ${icon("search", "mr-2.5 h-4.5 w-4.5 text-slate-400")}
+                  <input class="h-full flex-1 bg-transparent text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400" placeholder="Search phone, customer, ticket, order, label" />
+                  <button class="ml-2 flex h-8 items-center gap-1.5 rounded-md bg-white px-2.5 text-xs font-semibold text-slate-500 shadow-sm">
+                    ${icon("scan-line", "h-3.5 w-3.5")}
+                    Scan
+                  </button>
+                </div>
+
+                <div class="ml-auto flex items-center gap-2">
+                  <div class="hidden items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 lg:flex">
+                    <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                    Synced
+                  </div>
+                  <button class="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    ${icon("languages", "h-4 w-4 text-slate-500")}
+                    EN
+                  </button>
+                  <button class="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    ${icon("lock", "h-4 w-4 text-slate-500")}
+                    Lock
+                  </button>
+                  <button class="relative flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50">
+                    ${icon("bell", "h-4.5 w-4.5")}
+                    <span class="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500"></span>
+                  </button>
+                </div>
+              </header>
+
+              <div class="scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5">
+                <div class="mb-5 flex items-center justify-between">
+                  <div>
+                    <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+                      <span>POS</span>
+                      ${icon("chevron-right", "h-3.5 w-3.5")}
+                      <span class="text-slate-600">Customers</span>
+                    </div>
+                    <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Customers</h1>
+                  </div>
+                  <button class="flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-semibold text-white hover:bg-brandDark">New Customer</button>
+                </div>
+                <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-panel">
+                  <div class="flex items-center justify-between gap-4"><div class="flex h-11 flex-1 items-center rounded-lg border border-slate-200 bg-slate-50 px-3">${icon("search", "mr-2.5 h-4.5 w-4.5 text-slate-400")}<input class="h-full flex-1 bg-transparent text-sm font-medium outline-none" placeholder="Search phone, email, account, or profile name" /></div><button class="h-11 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700">Filters</button></div>
+                  <div class="mt-5 overflow-hidden rounded-lg border border-slate-200"><div class="grid grid-cols-[1.2fr_1fr_120px_140px_120px] bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500"><div>Customer</div><div>Account</div><div>Profiles</div><div>Last order</div><div class="text-right">Balance</div></div>
+                    <div class="grid grid-cols-[1.2fr_1fr_120px_140px_120px] items-center border-t border-slate-100 px-4 py-4 text-sm"><div><div class="font-semibold text-slate-950">Aminata Diop</div><div class="text-xs text-slate-500">+221 77 000 0000</div></div><div class="text-slate-700">Diop Family</div><div class="text-slate-600">3</div><div class="text-slate-500">Today</div><div class="text-right font-semibold text-slate-950">XOF 8,500</div></div>
+                    <div class="grid grid-cols-[1.2fr_1fr_120px_140px_120px] items-center border-t border-slate-100 px-4 py-4 text-sm"><div><div class="font-semibold text-slate-950">Mamadou Sarr</div><div class="text-xs text-slate-500">mamadou@example.com</div></div><div class="text-slate-700">Sarr Account</div><div class="text-slate-600">1</div><div class="text-slate-500">Yesterday</div><div class="text-right font-semibold text-slate-950">XOF 0</div></div>
+                    <div class="grid grid-cols-[1.2fr_1fr_120px_140px_120px] items-center border-t border-slate-100 px-4 py-4 text-sm"><div><div class="font-semibold text-slate-950">Fatou Ndiaye</div><div class="text-xs text-slate-500">+221 76 220 1144</div></div><div class="text-slate-700">Personal</div><div class="text-slate-600">1</div><div class="text-slate-500">Jun 17</div><div class="text-right font-semibold text-slate-950">XOF 2,000</div></div>
+                  </div>
+                </section>
+              </div>
+            </main>
+          </div>
+        `;
+      }
+
+      function navGroup(title, items) {
+        return `
+          <div>
+            <div class="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">${title}</div>
+            <div class="space-y-1">${items.map(([iconName, label, active, href]) => navItem(iconName, label, active, href)).join("")}</div>
+          </div>
+        `;
+      }
+
+      function navItem(iconName, label, active, href) {
+        return `
+          <a href="${href || "#"}" class="relative flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm transition ${active ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}">
+            ${active ? '<span class="absolute left-0 h-5 w-1 rounded-r-full bg-blue-600"></span>' : ""}
+            <span class="flex h-7 w-7 items-center justify-center rounded-md ${active ? "bg-white text-blue-700 shadow-sm" : "text-slate-400"}">
+              ${icon(iconName, "h-4 w-4")}
+            </span>
+            <span class="font-medium">${label}</span>
+          </a>
+        `;
+      }
+
+      function metric(label, value, note) {
+        return `
+          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-panel">
+            <div class="text-sm font-medium text-slate-500">${label}</div>
+            <div class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">${value}</div>
+            <div class="mt-2 text-xs font-medium text-blue-600">${note}</div>
+          </div>
+        `;
+      }
+
+      function profile(name, meta, active) {
+        const initials = name.split(" ").map((word) => word[0]).slice(0, 2).join("");
+        return `
+          <button class="flex w-full items-center justify-between border-b border-slate-100 px-4 py-3 text-left last:border-b-0 ${active ? "bg-blue-50" : "bg-white hover:bg-slate-50"}">
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-semibold ${active ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"}">${initials}</div>
+              <div>
+                <div class="text-sm font-semibold text-slate-950">${name}</div>
+                <div class="text-xs text-slate-500">${meta}</div>
+              </div>
+            </div>
+            ${active ? '<span class="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white">Selected</span>' : ""}
+          </button>
+        `;
+      }
+
+      function step(number, label, active) {
+        return `
+          <div class="flex items-center gap-2">
+            <span class="flex h-6 w-6 items-center justify-center rounded-md text-xs font-semibold ${active ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"}">${number}</span>
+            <span class="text-xs font-semibold ${active ? "text-blue-700" : "text-slate-400"}">${label}</span>
+          </div>
+        `;
+      }
+
+      function ticketItem(item, detail, status, amount) {
+        return `
+          <div class="grid grid-cols-[1.4fr_1fr_110px_110px] items-center border-t border-slate-100 px-4 py-4">
+            <div>
+              <div class="font-semibold text-slate-950">${item}</div>
+              <div class="mt-1 text-xs text-slate-500">Label pending · Qty 1</div>
+            </div>
+            <div class="text-sm text-slate-600">${detail}</div>
+            <div><span class="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">${status}</span></div>
+            <div class="text-right font-semibold text-slate-950">${amount}</div>
+          </div>
+        `;
+      }
+
+      function todo(label, count, tone) {
+        return `
+          <button class="flex w-full items-center justify-between rounded-lg border border-slate-100 px-3 py-3 text-left hover:bg-slate-50">
+            <span class="text-sm font-medium text-slate-700">${label}</span>
+            <span class="rounded-md px-2.5 py-1 text-xs font-semibold ${tone}">${count}</span>
+          </button>
+        `;
+      }
+
+      function workTile(label, count, note, tone) {
+        return `
+          <button class="min-h-[96px] rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-blue-200 hover:bg-blue-50/40">
+            <span class="rounded-md px-2.5 py-1 text-xs font-semibold ${tone}">${count}</span>
+            <span class="mt-3 block text-sm font-semibold text-slate-950">${label}</span>
+            <span class="mt-0.5 block text-xs text-slate-500">${note}</span>
+          </button>
+        `;
+      }
+
+      function quickButton(iconName, label) {
+        return `
+          <button class="flex h-20 flex-col items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50/40 hover:text-blue-700">
+            ${icon(iconName, "h-4.5 w-4.5")}
+            ${label}
+          </button>
+        `;
+      }
+
+      function ticketRow(ticket, customer, status, due, action) {
+        const tone = status === "Ready"
+          ? "bg-violet-50 text-violet-700"
+          : status === "Overdue"
+            ? "bg-amber-50 text-amber-700"
+            : status === "Received"
+              ? "bg-slate-100 text-slate-600"
+              : "bg-blue-50 text-blue-700";
+
+        return `
+          <div class="grid grid-cols-[120px_1fr_120px_120px_110px] items-center border-t border-slate-100 px-4 py-4 text-sm">
+            <div class="font-semibold text-slate-950">${ticket}</div>
+            <div class="text-slate-700">${customer}</div>
+            <div><span class="rounded-md px-2.5 py-1 text-xs font-semibold ${tone}">${status}</span></div>
+            <div class="text-slate-500">${due}</div>
+            <div class="text-right"><button class="font-semibold text-blue-700">${action}</button></div>
+          </div>
+        `;
+      }
+
+      function icon(name, classes) {
+        const icons = {
+          "bell": '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+          "chart": '<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="5" rx="1"/><rect x="12" y="8" width="3" height="9" rx="1"/><rect x="17" y="5" width="3" height="12" rx="1"/>',
+          "chevron-right": '<path d="m9 18 6-6-6-6"/>',
+          "clock": '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+          "clipboard-list": '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M8 11h8"/><path d="M8 16h5"/>',
+          "languages": '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
+          "layout-dashboard": '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+          "lock": '<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+          "receipt": '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2Z"/><path d="M8 7h8"/><path d="M8 12h8"/><path d="M8 17h5"/>',
+          "replace": '<path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M10 20H4v-6"/><path d="M4 20l10-10"/>',
+          "scan-line": '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>',
+          "search": '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>',
+          "settings": '<path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8.9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.17.52.66 1 1.51 1H21a2 2 0 1 1 0 4h-.09c-.85 0-1.34.48-1.51 1Z"/>',
+          "shirt": '<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.23 2.18l.62 3.1a2 2 0 0 0 2.74 1.42L6 10v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10l.25.16a2 2 0 0 0 2.74-1.42l.62-3.1a2 2 0 0 0-1.23-2.18Z"/>',
+          "user-plus": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/>',
+          "users": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+          "wallet-cards": '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h2"/>'
+        };
+
+        return `<svg class="${classes}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || '<circle cx="12" cy="12" r="9"/>'}</svg>`;
+      }
+
+      window.__cleanHubRoot = ReactDOM.createRoot(document.getElementById("root"));
+      window.__cleanHubRoot.render(React.createElement(App));
+    </script>
+    <script src="./assets/customer-management-app.js"></script>
+    <script src="./assets/zh-cn.js"></script>
+  </body>
+</html>

@@ -9,6 +9,7 @@ export type ApiFieldError = {
 export type ApiErrorDetails = {
   message?: string;
   code?: string;
+  lockedUntil?: string;
   requestId?: string;
   validationErrors?: ApiFieldError[];
 };
@@ -29,6 +30,7 @@ export class ApiHttpError<TResponse = unknown> extends ApiClientError {
   readonly method: HttpMethod;
   readonly url: string;
   readonly code?: string;
+  readonly lockedUntil?: string;
   readonly responseData?: TResponse;
   readonly validationErrors?: ApiFieldError[];
 
@@ -40,6 +42,7 @@ export class ApiHttpError<TResponse = unknown> extends ApiClientError {
     url,
     requestId,
     code,
+    lockedUntil,
     responseData,
     validationErrors,
   }: {
@@ -50,6 +53,7 @@ export class ApiHttpError<TResponse = unknown> extends ApiClientError {
     url: string;
     requestId?: string;
     code?: string;
+    lockedUntil?: string;
     responseData?: TResponse;
     validationErrors?: ApiFieldError[];
   }) {
@@ -60,6 +64,7 @@ export class ApiHttpError<TResponse = unknown> extends ApiClientError {
     this.method = method;
     this.url = url;
     this.code = code;
+    this.lockedUntil = lockedUntil;
     this.responseData = responseData;
     this.validationErrors = validationErrors;
   }

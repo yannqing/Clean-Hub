@@ -1,1 +1,1 @@
-export * from "./tenant-user-table-placeholder";
+export * from "./tenant-user-list-view";
