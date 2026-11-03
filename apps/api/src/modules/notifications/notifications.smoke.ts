@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import type { ChannelAdapter, ChannelSendInput } from "./channel-adapter.js";
+import { renderNotificationTemplate } from "./notification-renderer.js";
 import { orderCreatedEvent } from "./notification-events.js";
 import type { NotificationsRepositoryLike } from "./notifications.service.js";
 import { NotificationsService } from "./notifications.service.js";
@@ -367,6 +368,19 @@ class FakeEmailAdapter implements ChannelAdapter {
 }
 
 export async function runNotificationSmokeChecks(): Promise<void> {
+  for (const [locale, expectedType, expectedStatus] of [
+    ["fr", "de collecte", "en cours de livraison"],
+    ["en", "pickup", "out for delivery"],
+    ["zh-CN", "取件", "配送中"],
+  ]) {
+    const variables = { type: "pickup", toStatus: "delivering" };
+    const rendered = renderNotificationTemplate(createTemplate(locale!, {
+      templateCode: "push.delivery.status_changed", titleTemplate: "{{toStatus}}", contentTemplate: "{{type}}: {{toStatus}}",
+    }), variables, locale);
+    assert(rendered.title === expectedStatus && rendered.content.includes(expectedType!), "delivery enum text follows the actual template locale");
+    assert(variables.toStatus === "delivering", "localization must not alter payload enum values");
+  }
+
   const repository = new MemoryNotificationsRepository();
   const adapter = new FakeEmailAdapter();
   const service = new NotificationsService({

@@ -76,14 +76,33 @@ export function renderNotificationTemplate(
   variables: Record<string, unknown>,
   requestedLocale?: string | null,
 ): RenderedNotification {
+  const renderedVariables = template.templateCode.endsWith(".delivery.status_changed")
+    ? localizeDeliveryVariables(variables, normalizeLocale(template.locale) ?? "en")
+    : variables;
   return {
-    title: renderText(template.titleTemplate, variables),
-    content: renderText(template.contentTemplate, variables),
+    title: renderText(template.titleTemplate, renderedVariables),
+    content: renderText(template.contentTemplate, renderedVariables),
     locale: normalizeLocale(template.locale) ?? template.locale,
     fallbackUsed:
       Boolean(normalizeLocale(requestedLocale)) &&
       normalizeLocale(requestedLocale) !== normalizeLocale(template.locale),
   };
+}
+
+// Localize only display variables at render time. The stored payload retains
+// stable enum values for routing, audit and customer tracking.
+function localizeDeliveryVariables(variables: Record<string, unknown>, locale: NotificationLocale) {
+  const labels: Record<NotificationLocale, Record<string, string>> = {
+    en: { pickup: "pickup", dropoff: "return", pending_dispatch: "awaiting dispatch", en_route: "on the way", arrived: "arrived", picked_up: "collected", delivering: "out for delivery", signed: "signed for", exception: "delayed", cancelled: "cancelled" },
+    fr: { pickup: "de collecte", dropoff: "de retour", pending_dispatch: "en attente d’affectation", en_route: "en route", arrived: "sur place", picked_up: "collectée", delivering: "en cours de livraison", signed: "réceptionnée", exception: "en anomalie", cancelled: "annulée" },
+    "zh-CN": { pickup: "取件", dropoff: "送回", pending_dispatch: "待派送", en_route: "前往中", arrived: "已到达", picked_up: "已取件", delivering: "配送中", signed: "已签收", exception: "配送异常", cancelled: "已取消" },
+  };
+  return Object.fromEntries(Object.entries(variables).map(([key, value]) => [
+    key,
+    ["type", "fromStatus", "toStatus"].includes(key) && typeof value === "string"
+      ? labels[locale][value] ?? value
+      : value,
+  ]));
 }
 
 function renderText(template: string, variables: Record<string, unknown>): string {
