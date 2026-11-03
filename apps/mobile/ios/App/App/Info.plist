@@ -24,18 +24,26 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+    <key>CFBundleLocalizations</key>
+    <array><string>en</string><string>fr</string><string>zh-Hans</string></array>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>CleanHub lets you select a delivery proof photo from your photo library.</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>CleanHub needs your permission if you choose to save a proof photo to your photo library.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>CleanHub utilise l'appareil photo pour joindre une preuve aux tâches de livraison.</string>
+	<string>CleanHub uses the camera to attach proof to a delivery task.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>CleanHub utilise Bluetooth pour rechercher et connecter une imprimante portable de livraison.</string>
+	<string>CleanHub uses Bluetooth to find and connect a portable delivery printer.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>CleanHub utilise Bluetooth pour imprimer les reçus et étiquettes de collecte ou de livraison.</string>
+	<string>CleanHub uses Bluetooth to print pickup and delivery receipts and labels.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>CleanHub utilise la localisation pendant les tournées pour enregistrer les mises à jour de livraison.</string>
+	<string>CleanHub uses your location only during an active delivery action.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>CleanHub utilise la localisation pendant une action de livraison active.</string>
+	<string>CleanHub uses your location only during an active delivery action.</string>
 	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
+    <string>LaunchScreen</string>
+    <key>UIBackgroundModes</key>
+    <array><string>remote-notification</string></array>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>

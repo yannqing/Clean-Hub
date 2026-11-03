@@ -1,4 +1,5 @@
 import type { MobileAuthContext, MobileTokenResponse } from "@cleanhub/api-client";
+import { credentialStorage } from "./credential-storage";
 import { setBusinessTimeZone } from "./business-time";
 
 const STORAGE_KEYS = {
@@ -25,25 +26,9 @@ export type StoredMobileSession = {
   authContext: MobileAuthContext;
 };
 
-/**
- * Where the customer session is kept.
- *
- * On a device Capacitor routes `Preferences` to the native implementation --
- * SharedPreferences on Android, the keychain-backed store on iOS -- and that is
- * the only configuration this app actually ships in: `next.config` exports a
- * static bundle that `apps/mobile` loads, and nothing deploys it as a website.
- *
- * In a plain browser (`pnpm dev`, or a static export served directly)
- * `Preferences` resolves to `PreferencesWeb`, which IS `window.localStorage`.
- * So does the fallback below. A browser therefore keeps the tokens somewhere
- * any injected script can read, whichever path is taken -- there is no safer
- * option available to a page, which is why CLAUDE.md requires HttpOnly cookies
- * for the web apps and why this one is not served as a website.
- *
- * Android backups are disabled for the same reason: SharedPreferences is a
- * backup domain, so without that, the session would sync to the user's cloud
- * account. See `apps/mobile/android/.../data_extraction_rules.xml`.
- */
+/** Non-secret installation preferences. Sessions use credentialStorage:
+ * iOS Keychain / Android Keystore encryption, migrated from older Preferences.
+ * Browser preview is development-only and uses PreferencesWeb. */
 async function getPreferenceStore(): Promise<PreferenceStore | null> {
   if (typeof window === "undefined") {
     return null;
@@ -87,8 +72,6 @@ async function writeValue(key: string, value: string): Promise<void> {
   }
 
   if (typeof window !== "undefined") {
-    // Only reachable if the Capacitor import itself failed; see the note on
-    // getPreferenceStore for why this is no worse than what it falls back from.
     window.localStorage.setItem(key, value);
   }
 }
@@ -107,21 +90,21 @@ async function removeValue(key: string): Promise<void> {
 }
 
 export async function getAccessToken(): Promise<string | null> {
-  return readValue(STORAGE_KEYS.accessToken);
+  return credentialStorage.getItem(STORAGE_KEYS.accessToken);
 }
 
 export async function getRefreshToken(): Promise<string | null> {
-  return readValue(STORAGE_KEYS.refreshToken);
+  return credentialStorage.getItem(STORAGE_KEYS.refreshToken);
 }
 
 export async function saveMobileSession(response: MobileTokenResponse): Promise<void> {
   setBusinessTimeZone(response.authContext.timezone);
   await Promise.all([
-    writeValue(STORAGE_KEYS.accessToken, response.accessToken),
-    writeValue(STORAGE_KEYS.refreshToken, response.refreshToken),
-    writeValue(STORAGE_KEYS.accessTokenExpiresAt, response.accessTokenExpiresAt),
-    writeValue(STORAGE_KEYS.refreshTokenExpiresAt, response.refreshTokenExpiresAt),
-    writeValue(STORAGE_KEYS.authContext, JSON.stringify(response.authContext)),
+    credentialStorage.setItem(STORAGE_KEYS.accessToken, response.accessToken),
+    credentialStorage.setItem(STORAGE_KEYS.refreshToken, response.refreshToken),
+    credentialStorage.setItem(STORAGE_KEYS.accessTokenExpiresAt, response.accessTokenExpiresAt),
+    credentialStorage.setItem(STORAGE_KEYS.refreshTokenExpiresAt, response.refreshTokenExpiresAt),
+    credentialStorage.setItem(STORAGE_KEYS.authContext, JSON.stringify(response.authContext)),
   ]);
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("cleanhub:session-updated", { detail: response.authContext }));
 }
@@ -129,11 +112,11 @@ export async function saveMobileSession(response: MobileTokenResponse): Promise<
 export async function getMobileSession(): Promise<StoredMobileSession | null> {
   const [accessToken, refreshToken, accessTokenExpiresAt, refreshTokenExpiresAt, authContext] =
     await Promise.all([
-      readValue(STORAGE_KEYS.accessToken),
-      readValue(STORAGE_KEYS.refreshToken),
-      readValue(STORAGE_KEYS.accessTokenExpiresAt),
-      readValue(STORAGE_KEYS.refreshTokenExpiresAt),
-      readValue(STORAGE_KEYS.authContext),
+      credentialStorage.getItem(STORAGE_KEYS.accessToken),
+      credentialStorage.getItem(STORAGE_KEYS.refreshToken),
+      credentialStorage.getItem(STORAGE_KEYS.accessTokenExpiresAt),
+      credentialStorage.getItem(STORAGE_KEYS.refreshTokenExpiresAt),
+      credentialStorage.getItem(STORAGE_KEYS.authContext),
     ]);
 
   if (!accessToken || !refreshToken || !accessTokenExpiresAt || !refreshTokenExpiresAt || !authContext) {
@@ -158,11 +141,11 @@ export async function getMobileSession(): Promise<StoredMobileSession | null> {
 
 export async function clearMobileSession(): Promise<void> {
   await Promise.all([
-    removeValue(STORAGE_KEYS.accessToken),
-    removeValue(STORAGE_KEYS.refreshToken),
-    removeValue(STORAGE_KEYS.accessTokenExpiresAt),
-    removeValue(STORAGE_KEYS.refreshTokenExpiresAt),
-    removeValue(STORAGE_KEYS.authContext),
+    credentialStorage.removeItem(STORAGE_KEYS.accessToken),
+    credentialStorage.removeItem(STORAGE_KEYS.refreshToken),
+    credentialStorage.removeItem(STORAGE_KEYS.accessTokenExpiresAt),
+    credentialStorage.removeItem(STORAGE_KEYS.refreshTokenExpiresAt),
+    credentialStorage.removeItem(STORAGE_KEYS.authContext),
   ]);
   if (typeof window !== "undefined") window.dispatchEvent(new Event("cleanhub:session-cleared"));
 }

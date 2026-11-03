@@ -19,6 +19,7 @@ coverage
 # Package manager and tool caches
 .cache
 .pnpm-store
+.kotlin
 
 # Hosting/build platform outputs
 .vercel

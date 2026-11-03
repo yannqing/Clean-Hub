@@ -11,6 +11,8 @@
     "test:e2e:readiness": "pnpm build && playwright test -c playwright.readiness.config.ts"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.2",
     "@capacitor/preferences": "^8.0.1",
     "@cleanhub/api-client": "workspace:*",
     "@cleanhub/domain": "workspace:*",

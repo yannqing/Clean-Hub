@@ -26,6 +26,7 @@
     "@capacitor-community/bluetooth-le": "^8.2.0",
     "@capacitor-firebase/messaging": "^8.5.2",
     "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.2",
     "@capacitor/camera": "^8.2.0",
     "@capacitor/cli": "^8.5.2",
     "@capacitor/core": "^8.5.2",

@@ -1,6 +1,6 @@
 import { isApiHttpError } from "@cleanhub/api-client";
 import { apiClient } from "./api-client";
-import { createDeliveryStorage } from "@/features/delivery/lib/storage";
+import { credentialStorage } from "./credential-storage";
 import type { StoredMobileSession } from "./token-storage";
 
 const key = "cleanhub.mobile.pending-logouts.v1";
@@ -18,7 +18,7 @@ function serialize<T>(action: () => Promise<T>): Promise<T> {
   return result;
 }
 async function read(): Promise<PendingLogout[]> {
-  const raw = await createDeliveryStorage().getItem(key);
+  const raw = await credentialStorage.getItem(key);
   if (!raw) return [];
   let parsed: unknown;
   try {
@@ -39,7 +39,7 @@ async function read(): Promise<PendingLogout[]> {
     : [];
 }
 async function write(jobs: PendingLogout[]) {
-  const storage = createDeliveryStorage();
+  const storage = credentialStorage;
   if (jobs.length) await storage.setItem(key, JSON.stringify(jobs));
   else await storage.removeItem(key);
 }

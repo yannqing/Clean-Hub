@@ -1,0 +1,7 @@
+"NSCameraUsageDescription" = "CleanHub 使用相机为配送任务拍摄凭证。";
+"NSPhotoLibraryUsageDescription" = "CleanHub 允许您从相册中选择配送凭证照片。";
+"NSPhotoLibraryAddUsageDescription" = "如果您选择将凭证照片保存到相册，CleanHub 需要您的授权。";
+"NSBluetoothAlwaysUsageDescription" = "CleanHub 使用蓝牙搜索并连接配送便携打印机。";
+"NSBluetoothPeripheralUsageDescription" = "CleanHub 使用蓝牙打印取件和配送收据及标签。";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "CleanHub 仅在您进行配送操作时使用当前位置。";
+"NSLocationWhenInUseUsageDescription" = "CleanHub 仅在您进行配送操作时使用当前位置。";

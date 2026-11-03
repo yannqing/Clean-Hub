@@ -1,0 +1,7 @@
+"NSCameraUsageDescription" = "CleanHub uses the camera to attach proof to a delivery task.";
+"NSPhotoLibraryUsageDescription" = "CleanHub lets you select a delivery proof photo from your photo library.";
+"NSPhotoLibraryAddUsageDescription" = "CleanHub needs your permission if you choose to save a proof photo to your photo library.";
+"NSBluetoothAlwaysUsageDescription" = "CleanHub uses Bluetooth to find and connect a portable delivery printer.";
+"NSBluetoothPeripheralUsageDescription" = "CleanHub uses Bluetooth to print pickup and delivery receipts and labels.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "CleanHub uses your location only during an active delivery action.";
+"NSLocationWhenInUseUsageDescription" = "CleanHub uses your location only during an active delivery action.";
