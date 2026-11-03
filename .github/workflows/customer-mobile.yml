@@ -34,6 +34,12 @@ jobs:
       DATABASE_REQUIRE_RLS: "false"
       LOG_LEVEL: warn
       NEXT_PUBLIC_API_BASE_URL: http://localhost:4000
+      # CORS creates the full API app, including media services, but never
+      # uploads objects. Use isolated fixture credentials rather than local .env.
+      OBJECT_STORAGE_ENDPOINT: http://127.0.0.1:9000
+      OBJECT_STORAGE_BUCKET: cleanhub-mobile-ci
+      OBJECT_STORAGE_ACCESS_KEY: isolated-ci
+      OBJECT_STORAGE_SECRET_KEY: isolated-ci-not-for-production
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -93,6 +99,8 @@ jobs:
           java-version: "21"
       - uses: android-actions/setup-android@v3
         if: matrix.platform == 'android'
+        with:
+          packages: platform-tools
       - uses: maxim-lobanov/setup-xcode@v1
         if: matrix.platform == 'ios'
         with:
