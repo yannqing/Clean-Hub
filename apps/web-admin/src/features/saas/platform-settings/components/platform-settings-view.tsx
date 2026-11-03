@@ -2,6 +2,7 @@
 
 import {
   Button,
+  Input,
   Checkbox,
   Icon,
   Label,
@@ -56,6 +57,8 @@ function toFormValues(settings: PlatformSettings): PlatformSettingsFormValues {
     defaultCurrency: settings.defaultCurrency,
     timezone: settings.timezone,
     maintenanceMode: settings.maintenanceMode,
+    mobileMinimumVersion: settings.mobileMinimumVersion ?? "0.0.0",
+    mobileUpdateUrl: settings.mobileUpdateUrl ?? "",
   };
 }
 
@@ -64,7 +67,10 @@ export function PlatformSettingsView({
 }: {
   section?: "defaults" | "maintenance";
 }) {
-  const { feedback, m, formatDateTime } = useSaasI18n();
+  const { feedback, m, formatDateTime, locale } = useSaasI18n();
+  const mobileLabels = locale === "zh-CN" ? { title: "用户 App 远程版本策略", minimum: "最低支持版本", url: "正式下载地址（HTTPS）", help: "保存后已安装的用户 App 将在联网检查时应用；0.0.0 表示不限制。请先发布可用的新包，再提高最低版本。" }
+    : locale === "fr" ? { title: "Versions de l’application client", minimum: "Version minimale prise en charge", url: "Lien de téléchargement officiel (HTTPS)", help: "Appliqué aux applications installées lors de leur prochain contrôle en ligne. 0.0.0 désactive la limite. Publiez le nouveau paquet avant de relever la version minimale." }
+    : { title: "Customer app version policy", minimum: "Minimum supported version", url: "Official download URL (HTTPS)", help: "Installed apps apply this policy on their next online check. 0.0.0 removes the limit. Publish a working new package before raising the minimum." };
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -131,6 +137,8 @@ export function PlatformSettingsView({
             defaultLanguage: form.defaultLanguage,
             defaultCurrency: form.defaultCurrency,
             timezone: form.timezone,
+            mobileMinimumVersion: form.mobileMinimumVersion || "0.0.0",
+            mobileUpdateUrl: form.mobileUpdateUrl?.trim() || null,
           };
     const result = await updatePlatformSettingsAction(input);
     if (result.ok) {
@@ -296,6 +304,14 @@ export function PlatformSettingsView({
               </p>
             </>
           )}
+          {section === "defaults" ? <fieldset className="grid gap-3 border-t pt-4">
+            <legend className="text-sm font-semibold">{mobileLabels.title}</legend>
+            <Label htmlFor="mobile-minimum">{mobileLabels.minimum}</Label>
+            <Input id="mobile-minimum" value={form.mobileMinimumVersion || "0.0.0"} onChange={e => setForm(current => ({ ...current, mobileMinimumVersion: e.target.value }))} placeholder="1.0.0" />
+            <Label htmlFor="mobile-update-url">{mobileLabels.url}</Label>
+            <Input id="mobile-update-url" type="url" value={form.mobileUpdateUrl || ""} onChange={e => setForm(current => ({ ...current, mobileUpdateUrl: e.target.value }))} />
+            <p className="text-xs text-muted-foreground">{mobileLabels.help}</p>
+          </fieldset> : null}
           {settings ? (
             <p className="text-xs text-muted-foreground">
               {m.platformSettings.lastUpdated}{" "}

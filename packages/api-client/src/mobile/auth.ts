@@ -15,6 +15,7 @@ type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
 
 export function createMobileAuthApi(client: ApiClient) {
   return {
+    getReleasePolicy: (options?: RequestOptions) => client.get<{ minimumVersion: string; updateUrl: string | null; version: number }>("/mobile/release-policy", { ...options, skipAuthRefresh: true }),
     getCustomerLoginOptions: (
       query: Pick<MobileRequestOtpRequest, "tenantCode">,
       options?: RequestOptions,

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { mobileReleasePolicyController } from "./release-policy.controller.js";
 
 import { createMobileTenantDatabaseContextMiddleware } from "../../http/database-context.middleware.js";
 import type { AppBindings } from "../../http/types.js";
@@ -34,6 +35,7 @@ export function createMobileRoutes({
   notificationPublisher,
 }: CreateMobileRoutesOptions) {
   const routes = new Hono<AppBindings>();
+  routes.get("/release-policy", mobileReleasePolicyController);
   const notificationsService =
     notificationPublisher ?? new NotificationsService();
 

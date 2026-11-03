@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { getDb, type Database } from "@cleanhub/db";
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
@@ -26,6 +27,8 @@ function toAuditSnapshot(settings: PlatformSettings): PlatformSettingsAuditSnaps
     defaultCurrency: settings.defaultCurrency,
     timezone: settings.timezone,
     maintenanceMode: settings.maintenanceMode,
+    mobileMinimumVersion: settings.mobileMinimumVersion,
+    mobileUpdateUrl: settings.mobileUpdateUrl,
   };
 }
 
@@ -71,8 +74,11 @@ export async function updatePlatformSettings(
       defaultCurrency: input.data.defaultCurrency ?? before.defaultCurrency,
       timezone: input.data.timezone ?? before.timezone,
       maintenanceMode: input.data.maintenanceMode ?? before.maintenanceMode,
+      mobileMinimumVersion: input.data.mobileMinimumVersion ?? before.mobileMinimumVersion ?? "0.0.0",
+      mobileUpdateUrl: input.data.mobileUpdateUrl === undefined ? before.mobileUpdateUrl : input.data.mobileUpdateUrl,
     };
 
+    z.object({ mobileMinimumVersion: z.string(), mobileUpdateUrl: z.string().nullable().optional() }).refine(value => value.mobileMinimumVersion === "0.0.0" || Boolean(value.mobileUpdateUrl), "Set the app download URL before enforcing a minimum version.").parse(merged);
     const updated = await upsertPlatformSettings(tx, {
       actorUserId: input.authContext.userId,
       ...merged,

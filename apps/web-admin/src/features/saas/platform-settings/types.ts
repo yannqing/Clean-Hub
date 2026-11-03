@@ -11,6 +11,8 @@ export type PlatformSettingsFormValues = {
   defaultCurrency: string;
   timezone: string;
   maintenanceMode: boolean;
+  mobileMinimumVersion?: string;
+  mobileUpdateUrl?: string | null;
 };
 
 export type PlatformSettingsActionResult =

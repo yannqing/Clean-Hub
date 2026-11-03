@@ -24,6 +24,8 @@ function toPlatformSettings(row: {
   defaultCurrency: string;
   timezone: string;
   maintenanceMode: boolean;
+  mobileMinimumVersion?: string;
+  mobileUpdateUrl?: string | null;
   updatedAt: Date;
   updatedBy: string | null;
   version: number;
@@ -34,6 +36,8 @@ function toPlatformSettings(row: {
     defaultCurrency: row.defaultCurrency,
     timezone: row.timezone,
     maintenanceMode: row.maintenanceMode,
+    mobileMinimumVersion: row.mobileMinimumVersion ?? "0.0.0",
+    mobileUpdateUrl: row.mobileUpdateUrl ?? null,
     updatedAt: row.updatedAt.toISOString(),
     updatedBy: row.updatedBy,
     version: row.version,
@@ -50,6 +54,8 @@ export async function findPlatformSettings(
       defaultCurrency: platformSettings.defaultCurrency,
       timezone: platformSettings.timezone,
       maintenanceMode: platformSettings.maintenanceMode,
+      mobileMinimumVersion: platformSettings.mobileMinimumVersion,
+      mobileUpdateUrl: platformSettings.mobileUpdateUrl,
       updatedAt: platformSettings.updatedAt,
       updatedBy: platformSettings.updatedBy,
       version: platformSettings.version,
@@ -69,6 +75,8 @@ export type UpsertPlatformSettingsInput = {
   defaultCurrency: string;
   timezone: string;
   maintenanceMode: boolean;
+  mobileMinimumVersion?: string;
+  mobileUpdateUrl?: string | null;
 };
 
 export async function upsertPlatformSettings(
@@ -84,6 +92,8 @@ export async function upsertPlatformSettings(
       defaultCurrency: input.defaultCurrency,
       timezone: input.timezone,
       maintenanceMode: input.maintenanceMode,
+        mobileMinimumVersion: input.mobileMinimumVersion,
+        mobileUpdateUrl: input.mobileUpdateUrl,
       updatedBy: input.actorUserId,
     })
     .onConflictDoUpdate({
@@ -93,6 +103,8 @@ export async function upsertPlatformSettings(
         defaultCurrency: input.defaultCurrency,
         timezone: input.timezone,
         maintenanceMode: input.maintenanceMode,
+        mobileMinimumVersion: input.mobileMinimumVersion,
+        mobileUpdateUrl: input.mobileUpdateUrl,
         updatedAt: new Date(),
         updatedBy: input.actorUserId,
         version: sql`${platformSettings.version} + 1`,

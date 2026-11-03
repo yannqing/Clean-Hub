@@ -6,6 +6,8 @@ export type PlatformSettings = {
   defaultCurrency: string;
   timezone: string;
   maintenanceMode: boolean;
+  mobileMinimumVersion?: string;
+  mobileUpdateUrl?: string | null;
   updatedAt: string | null;
   updatedBy: string | null;
   version: number;
@@ -16,6 +18,8 @@ export type UpdatePlatformSettingsRequest = {
   defaultCurrency?: string;
   timezone?: string;
   maintenanceMode?: boolean;
+  mobileMinimumVersion?: string;
+  mobileUpdateUrl?: string | null;
 };
 
 export type PlatformTaxTemplate = {
